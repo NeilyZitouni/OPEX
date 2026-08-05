@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_opex_membership_file_list" model="ir.ui.view">
+        <field name="name">opex.membership.file.list</field>
+        <field name="model">opex.membership.file</field>
+        <field name="arch" type="xml">
+            <list string="Dossiers d'adhésion">
+                <field name="partner_id"/>
+                <field name="date_depot"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_membership_file_form" model="ir.ui.view">
+        <field name="name">opex.membership.file.form</field>
+        <field name="model">opex.membership.file</field>
+        <field name="arch" type="xml">
+            <form string="Dossier d'adhésion">
+                <header>
+                    <button name="action_submit" type="object" string="Soumettre le dossier"
+                            class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_validate_secretariat" type="object" string="Valider (Secrétariat)"
+                            class="oe_highlight" invisible="state != 'control'"
+                            groups="opex_membership.group_secretariat"/>
+                    <button name="action_validate_copil" type="object" string="Valider (COPIL)"
+                            class="oe_highlight" invisible="state != 'committee'"
+                            groups="opex_membership.group_copil"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,control,committee,validated,active"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="partner_id"/>
+                            <field name="date_depot"/>
+                        </group>
+                        <group>
+                            <field name="signature_date" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Documents" name="documents">
+                            <field name="document_ids" widget="many2many_binary"/>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_membership_file" model="ir.actions.act_window">
+        <field name="name">Dossiers d'adhésion</field>
+        <field name="res_model">opex.membership.file</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

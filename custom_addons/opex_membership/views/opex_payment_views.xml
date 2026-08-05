@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_opex_payment_list" model="ir.ui.view">
+        <field name="name">opex.payment.list</field>
+        <field name="model">opex.payment</field>
+        <field name="arch" type="xml">
+            <list string="Paiements">
+                <field name="subscription_id"/>
+                <field name="date_paiement"/>
+                <field name="montant"/>
+                <field name="mode_paiement"/>
+                <field name="reference_transaction"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_payment_form" model="ir.ui.view">
+        <field name="name">opex.payment.form</field>
+        <field name="model">opex.payment</field>
+        <field name="arch" type="xml">
+            <form string="Paiement">
+                <sheet>
+                    <group>
+                        <field name="subscription_id"/>
+                        <field name="currency_id" invisible="1"/>
+                        <field name="montant"/>
+                        <field name="date_paiement"/>
+                        <field name="mode_paiement"/>
+                        <field name="reference_transaction"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_payment" model="ir.actions.act_window">
+        <field name="name">Paiements</field>
+        <field name="res_model">opex.payment</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

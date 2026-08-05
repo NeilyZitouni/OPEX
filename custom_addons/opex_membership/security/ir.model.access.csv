@@ -1,2 +1,11 @@
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_gic_portal_gic_portal,gic_portal.gic_portal,model_gic_portal_gic_portal,base.group_user,1,1,1,1
+access_opex_membership_category_secretariat,opex.membership.category.secretariat,model_opex_membership_category,group_secretariat,1,0,0,0
+access_opex_membership_category_copil,opex.membership.category.copil,model_opex_membership_category,group_copil,1,1,1,1
+access_opex_membership_file_secretariat,opex.membership.file.secretariat,model_opex_membership_file,group_secretariat,1,1,1,0
+access_opex_membership_file_copil,opex.membership.file.copil,model_opex_membership_file,group_copil,1,1,1,0
+access_opex_subscription_secretariat,opex.subscription.secretariat,model_opex_subscription,group_secretariat,1,1,1,0
+access_opex_subscription_copil,opex.subscription.copil,model_opex_subscription,group_copil,1,1,1,0
+access_opex_payment_secretariat,opex.payment.secretariat,model_opex_payment,group_secretariat,1,1,1,0
+access_opex_payment_copil,opex.payment.copil,model_opex_payment,group_copil,1,1,1,0
+access_opex_cluster_event_secretariat,opex.cluster.event.secretariat,model_opex_cluster_event,group_secretariat,1,1,1,1
+access_opex_cluster_event_copil,opex.cluster.event.copil,model_opex_cluster_event,group_copil,1,1,1,1

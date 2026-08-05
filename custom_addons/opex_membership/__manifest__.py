@@ -1,33 +1,36 @@
 {
-    'name': "gic_portal",
+    'name': "OPEX Membership",
 
-    'summary': "Short (1 phrase/line) summary of the module's purpose",
+    'summary': "Gestion des adhérents, cotisations et vie du cluster GIC OPEX Group",
 
     'description': """
-Long description of module's purpose
+Module OPEX Membership (POC)
+=============================
+Gère le réseau et les adhérents du cluster GIC OPEX Group : adhésion,
+cotisations, paiements, annuaire des membres et événements du cluster.
     """,
 
-    'author': "My Company",
-    'website': "https://www.yourcompany.com",
+    'author': "DELTALOG",
+    'website': "https://www.deltalog-conseil.com",
 
-    # Categories can be used to filter modules in modules listing
-    # Check https://github.com/odoo/odoo/blob/15.0/odoo/addons/base/data/ir_module_category_data.xml
-    # for the full list
-    'category': 'Uncategorized',
-    'version': '0.1',
+    'category': 'Services/Membership',
+    'version': '19.0.1.0.0',
 
-    # any module necessary for this one to work correctly
-    'depends': ['base'],
+    'depends': ['base', 'mail'],
 
-    # always loaded
     'data': [
-        # 'security/ir.model.access.csv',
-        'views/views.xml',
-        'views/templates.xml',
+        'security/security.xml',
+        'security/ir.model.access.csv',
+        'views/opex_membership_category_views.xml',
+        'views/res_partner_views.xml',
+        'views/opex_membership_file_views.xml',
+        'views/opex_subscription_views.xml',
+        'views/opex_payment_views.xml',
+        'views/opex_cluster_event_views.xml',
+        'views/opex_membership_menus.xml',
     ],
-    # only loaded in demonstration mode
-    'demo': [
-        'demo/demo.xml',
-    ],
-}
 
+    'installable': True,
+    'application': True,
+    'license': 'LGPL-3',
+}

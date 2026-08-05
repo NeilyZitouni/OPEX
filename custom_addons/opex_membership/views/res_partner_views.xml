@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_partner_form_inherit_opex_membership" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.opex.membership</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Adhésion" name="opex_membership">
+                    <group>
+                        <group string="Statut">
+                            <field name="is_member"/>
+                            <field name="categorie_membre_id"/>
+                            <field name="date_adhesion"/>
+                            <field name="is_published_directory" readonly="1"/>
+                        </group>
+                        <group string="Profil">
+                            <field name="secteur_activite"/>
+                            <field name="wilaya"/>
+                        </group>
+                    </group>
+                    <separator string="Dossiers d'adhésion"/>
+                    <field name="membership_file_ids">
+                        <list>
+                            <field name="date_depot"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                    <separator string="Cotisations"/>
+                    <field name="subscription_ids">
+                        <list>
+                            <field name="date_emission"/>
+                            <field name="date_echeance"/>
+                            <field name="montant"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                    <separator string="Événements"/>
+                    <field name="event_ids" widget="many2many_tags"/>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_list_inherit_opex_membership" model="ir.ui.view">
+        <field name="name">res.partner.list.inherit.opex.membership</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_tree"/>
+        <field name="arch" type="xml">
+            <field name="phone" position="after">
+                <field name="is_member" optional="show"/>
+                <field name="categorie_membre_id" optional="show"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="action_opex_membership_member" model="ir.actions.act_window">
+        <field name="name">Membres</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="domain">[('is_member', '=', True)]</field>
+        <field name="context">{'default_is_member': True, 'search_default_is_member': True}</field>
+    </record>
+
+</odoo>

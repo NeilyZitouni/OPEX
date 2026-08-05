@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_opex_membership_root" name="OPEX Membership" sequence="10"/>
+
+    <menuitem id="menu_opex_membership_member"
+              name="Membres"
+              parent="menu_opex_membership_root"
+              action="action_opex_membership_member"
+              sequence="10"/>
+
+    <menuitem id="menu_opex_membership_file"
+              name="Dossiers d'adhésion"
+              parent="menu_opex_membership_root"
+              action="action_opex_membership_file"
+              sequence="20"/>
+
+    <menuitem id="menu_opex_subscription"
+              name="Cotisations"
+              parent="menu_opex_membership_root"
+              action="action_opex_subscription"
+              sequence="30"/>
+
+    <menuitem id="menu_opex_payment"
+              name="Paiements"
+              parent="menu_opex_membership_root"
+              action="action_opex_payment"
+              sequence="40"/>
+
+    <menuitem id="menu_opex_cluster_event"
+              name="Événements"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_event"
+              sequence="50"/>
+
+    <menuitem id="menu_opex_membership_configuration"
+              name="Configuration"
+              parent="menu_opex_membership_root"
+              sequence="90"/>
+
+    <menuitem id="menu_opex_membership_category"
+              name="Catégories d'adhésion"
+              parent="menu_opex_membership_configuration"
+              action="action_opex_membership_category"
+              sequence="10"/>
+
+</odoo>
