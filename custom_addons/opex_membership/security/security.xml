@@ -1,24 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
-
-    <record id="module_category_opex_membership" model="ir.module.category">
-        <field name="name">OPEX Membership</field>
-        <field name="description">Gestion des adhérents, cotisations et vie du cluster GIC OPEX Group.</field>
+    <record id="module_category_opex" model="ir.module.category">
+        <field name="name">GIC OPEX Group</field>
         <field name="sequence">20</field>
+    </record>
+
+    <record id="privilege_opex_membership" model="res.groups.privilege">
+        <field name="name">Membership</field>
+        <field name="sequence">10</field>
+        <field name="category_id" ref="module_category_opex"/>
     </record>
 
     <record id="group_secretariat" model="res.groups">
         <field name="name">Secrétariat</field>
-        <field name="category_id" ref="module_category_opex_membership"/>
+        <field name="privilege_id" ref="privilege_opex_membership"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
         <field name="comment">Contrôle administratif des dossiers d'adhésion, gestion des cotisations et des paiements.</field>
     </record>
 
     <record id="group_copil" model="res.groups">
         <field name="name">COPIL</field>
-        <field name="category_id" ref="module_category_opex_membership"/>
+        <field name="privilege_id" ref="privilege_opex_membership"/>
         <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
-        <field name="comment">Comité de pilotage : validation finale des adhésions et gestion des catégories de membres.</field>
+        <field name="comment">Validation finale des dossiers d'adhésion.</field>
     </record>
-
 </odoo>
