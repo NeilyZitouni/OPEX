@@ -1,2 +1,5 @@
 venv/
 odoo.conf
+odoo/
+__pycache__/
+*.pyc
