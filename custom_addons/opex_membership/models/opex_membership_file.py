@@ -17,8 +17,18 @@ class OpexMembershipFile(models.Model):
         ondelete='cascade',
         tracking=True,
     )
+    category_id = fields.Many2one(
+        'opex.membership.category',
+        string="Catégorie demandée",
+        tracking=True,
+        help="Catégorie d'adhésion souhaitée ; détermine le montant de la cotisation. "
+             "À défaut, celle du contact est utilisée.",
+    )
     date_depot = fields.Datetime(string="Date de dépôt", default=fields.Datetime.now)
     document_ids = fields.Many2many('ir.attachment', string="Documents joints")
+    subscription_ids = fields.One2many(
+        'opex.subscription', 'membership_file_id', string="Cotisations"
+    )
     signature_date = fields.Date(string="Date de signature de la charte")
     state = fields.Selection(
         [
@@ -73,36 +83,61 @@ class OpexMembershipFile(models.Model):
                     "Ce dossier est actuellement à l'état « %s »."
                 ) % rec._state_label())
             rec.state = 'validated'
-            rec._run_system_activation()
+            rec.action_create_subscription()
 
-    def _run_system_activation(self):
-        """Chaîne cotisation -> paiement -> signature -> activation -> publication annuaire."""
+    def _get_category(self):
+        """Catégorie facturée : celle demandée sur le dossier, sinon celle du contact."""
+        self.ensure_one()
+        return self.category_id or self.partner_id.categorie_membre_id
+
+    def action_create_subscription(self):
+        """Émet la cotisation via la facturation native Odoo (sale.order).
+
+        Le dossier reste à l'état Validé COPIL : c'est l'encaissement effectif de
+        la commande qui déclenchera l'activation (cf. `_activate_membership`).
+        """
         self.ensure_one()
         partner = self.partner_id
-        category = partner.categorie_membre_id
+        category = self._get_category()
         if not category:
             raise UserError(_(
                 "Impossible de générer la cotisation : %s n'a pas de catégorie "
                 "de membre définie (avec un montant de cotisation associé)."
             ) % partner.name)
 
+        product = category._get_cotisation_product()
+        order = self.env['sale.order'].sudo().create({
+            'partner_id': partner.id,
+            'order_line': [fields.Command.create({
+                'product_id': product.id,
+                'product_uom_qty': 1,
+            })],
+        })
+
         today = fields.Date.context_today(self)
         subscription = self.env['opex.subscription'].create({
             'partner_id': partner.id,
+            'membership_file_id': self.id,
+            'sale_order_id': order.id,
             'currency_id': category.currency_id.id,
-            'montant': category.montant_cotisation,
+            'montant': product.list_price,
             'date_emission': today,
             'date_echeance': today + timedelta(days=30),
         })
-        subscription.action_register_payment(
-            montant=category.montant_cotisation,
-            mode_paiement='card',
-            reference_transaction=_("Paiement en ligne automatique - adhésion"),
-        )
+        order.action_confirm()
+        return subscription
 
-        self.signature_date = today
-        self.state = 'active'
-        partner.write({
-            'is_member': True,
-            'is_published_directory': True,
-        })
+    def _activate_membership(self):
+        """Signature de la charte -> activation -> publication annuaire.
+
+        Appelé automatiquement quand la cotisation liée passe à l'état Payée.
+        """
+        for rec in self:
+            rec.write({
+                'signature_date': fields.Date.context_today(rec),
+                'state': 'active',
+            })
+            rec.partner_id.write({
+                'is_member': True,
+                'is_published_directory': True,
+            })

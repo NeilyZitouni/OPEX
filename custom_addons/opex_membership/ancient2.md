@@ -18,23 +18,6 @@ définitifs :
 Si un doute existe entre ce fichier et un autre prompt, **ce fichier fait autorité**
 pour les noms techniques — c'est la source de vérité du projet.
 
-## 📄 Lire le dossier `docs/` avant de commencer
-
-Le dossier `docs/` à la racine du module contient les documents de référence
-complets du projet — lis-les avant toute implémentation, ils contiennent des
-détails que ce fichier résume mais ne répète pas intégralement :
-
-- `livrable_deltalog.pdf` — diagrammes UML (classes, activité, séquence) et
-  spécifications fonctionnelles originales de DELTALOG
-- `portail_digital_vision.pdf` — vision globale du portail, les 3 domaines
-  métier, l'architecture générale et le socle commun
-- `product_backlog.md` — les User Stories (US-01 à US-24) et le planning de
-  sprint ; les extensions décrites plus bas dans ce fichier correspondent
-  précisément aux US-01, US-03, US-16 et à la section "Jour 9-10" du sprint 1
-
-Si un champ ou un comportement n'est pas assez précis dans ce fichier, vérifie
-d'abord dans `docs/` avant de faire une supposition.
-
 ---
 
 ## Ce qui est DÉJÀ FAIT (ne pas retoucher, sauf extensions explicites listées plus bas)

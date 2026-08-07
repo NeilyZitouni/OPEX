@@ -16,7 +16,7 @@ cotisations, paiements, annuaire des membres et événements du cluster.
     'category': 'Services/Membership',
     'version': '19.0.1.0.0',
 
-    'depends': ['base', 'mail'],
+    'depends': ['base', 'mail', 'sale'],
 
     'data': [
         'security/security.xml',

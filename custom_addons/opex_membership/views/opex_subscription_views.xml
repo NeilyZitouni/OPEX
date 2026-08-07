@@ -9,6 +9,7 @@
                 <field name="partner_id"/>
                 <field name="date_emission"/>
                 <field name="date_echeance"/>
+                <field name="sale_order_id"/>
                 <field name="montant"/>
                 <field name="state" widget="badge"/>
             </list>
@@ -37,6 +38,8 @@
                         <group>
                             <field name="date_emission"/>
                             <field name="date_echeance"/>
+                            <field name="sale_order_id"/>
+                            <field name="membership_file_id"/>
                         </group>
                     </group>
                     <notebook>

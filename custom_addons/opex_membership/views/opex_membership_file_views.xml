@@ -7,6 +7,7 @@
         <field name="arch" type="xml">
             <list string="Dossiers d'adhésion">
                 <field name="partner_id"/>
+                <field name="category_id"/>
                 <field name="date_depot"/>
                 <field name="state" widget="badge"/>
             </list>
@@ -34,6 +35,7 @@
                     <group>
                         <group>
                             <field name="partner_id"/>
+                            <field name="category_id"/>
                             <field name="date_depot"/>
                         </group>
                         <group>
@@ -43,6 +45,17 @@
                     <notebook>
                         <page string="Documents" name="documents">
                             <field name="document_ids" widget="many2many_binary"/>
+                        </page>
+                        <page string="Cotisations" name="subscriptions">
+                            <field name="subscription_ids" readonly="1">
+                                <list>
+                                    <field name="date_emission"/>
+                                    <field name="date_echeance"/>
+                                    <field name="sale_order_id"/>
+                                    <field name="montant"/>
+                                    <field name="state" widget="badge"/>
+                                </list>
+                            </field>
                         </page>
                     </notebook>
                 </sheet>
