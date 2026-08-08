@@ -113,55 +113,108 @@ et synchronise juste vers le calendrier natif pour l'affichage agenda.
 
 ---
 
-## Extension 3 — Portail Web Public
+## Extension 3 — Portail Web Public (annuaire uniquement — voir Extension 5 pour le candidat)
 
-**Objectif :** couvrir US-01 (inscription en ligne) et US-16 (annuaire public), et le
-sprint "Jour 9-10 : Intégration Frontend (Portail)".
+**⚠️ RÉVISÉ** : la partie "inscription" de cette extension (route
+`/opex/membership/register`) est **remplacée** par l'Extension 5 ci-dessous, qui
+utilise le système de compte portail natif d'Odoo au lieu d'un formulaire public
+anonyme. Ne construis PAS la route `/opex/membership/register` décrite plus bas
+dans ce document — seule la route `/opex/directory` (annuaire public, sans
+authentification) reste valable telle quelle.
 
-### Nouveaux fichiers
+**Objectif :** couvrir US-16 (annuaire public), et le sprint "Jour 9-10".
 
-```
-opex_membership/
-├── controllers/
-│   ├── __init__.py
-│   └── main.py
-├── views/
-│   └── portal_templates.xml
-```
-
-### Ajoute au `__manifest__.py`
-```python
-'depends': ['base', 'mail', 'contacts', 'sale', 'website', 'calendar', 'documents'],
-```
-Ajoute aussi `'views/portal_templates.xml'` à la liste `'data'`.
-
-### Route 1 — Inscription publique : `/opex/membership/register`
-
-- `GET` : affiche un formulaire QWeb public (hérite `website.layout`) avec les champs :
-  nom, email, téléphone, secteur d'activité, wilaya, catégorie souhaitée
-  (`opex.membership.category`, sélectionnable), documents à joindre
-- `POST` : crée un `res.partner` (via `sudo()`, car route publique non authentifiée),
-  puis un `opex.membership.file` en état `draft` lié à ce partner, avec la catégorie
-  choisie
-- Redirige vers une page de confirmation ("Votre dossier a été soumis, vous recevrez
-  une notification à chaque étape")
-
-### Route 2 — Annuaire public : `/opex/directory`
+### Route — Annuaire public : `/opex/directory`
 
 - `GET` avec paramètres de recherche optionnels : `secteur`, `wilaya`, `q` (nom)
 - Affiche uniquement les `res.partner` où `is_member = True` ET
   `is_published_directory = True`
 - Template avec formulaire de recherche multicritère en haut, résultats en cartes
   en dessous (nom, secteur, wilaya, catégorie)
-- Route publique, pas d'authentification requise (utilise `sudo()` en lecture seule
-  uniquement — ne jamais exposer d'écriture sur une route non protégée)
+- Route publique (`auth='public'`), lecture seule, utilise `sudo()` en lecture
+  uniquement
 
-### Sécurité des routes
+---
 
-Les deux routes sont `auth='public'`. Utilise `request.env['model'].sudo()` pour les
-opérations, mais reste strict : la route d'inscription ne doit permettre que la
-**création** de `res.partner`/`opex.membership.file` en état `draft` — jamais de
-lecture ou modification d'autres enregistrements.
+## Extension 5 — Espace Candidat (compte portail natif)
+
+**Objectif :** implémenter fidèlement le couloir "Candidat" du diagramme d'activité
+— "Création du compte" puis "Dépôt du dossier d'adhésion", **avant** toute
+intervention de Secrétariat/COPIL. Le candidat ne doit JAMAIS avoir besoin qu'un
+Secrétariat ou COPIL crée le dossier à sa place.
+
+### Principe : utiliser le groupe portail natif, pas un nouveau groupe custom
+
+- **Ne crée PAS** de nouveau `res.groups` pour "Candidat"
+- Utilise `base.group_portal`, le groupe portail natif d'Odoo (accès limité,
+  interface "Mon compte", pas le back-office)
+- "Création du compte" = le flux `/web/signup` déjà natif à Odoo (rien à coder) —
+  vérifie juste que Réglages → Général → "Comptes clients" autorise
+  l'inscription libre (`auth_signup_uninvited = 'b2c'` ou équivalent)
+
+### Sécurité — `ir.model.access.csv`
+
+Ajoute une ligne donnant à `base.group_portal` :
+- `perm_read = 1`, `perm_write = 1`, `perm_create = 1`, `perm_unlink = 0` sur
+  `opex.membership.file`
+- `perm_read = 1` (uniquement) sur `opex.membership.category`
+
+### Sécurité — `ir.rule` (règle d'enregistrement, PAS juste ir.model.access.csv)
+
+Crée une règle sur `opex.membership.file` pour `base.group_portal` :
+```python
+domain_force = "[('partner_id', '=', user.partner_id.id)]"
+```
+avec `perm_read=True, perm_create=True` sans restriction supplémentaire, et
+```python
+domain_force = "[('partner_id', '=', user.partner_id.id), ('state', '=', 'draft')]"
+```
+pour `perm_write=True` — un candidat ne peut modifier son dossier que tant qu'il
+est en Brouillon, plus une fois soumis (le contrôle passe à Secrétariat/COPIL).
+
+### Sécurité — forcer `partner_id` côté serveur (ne pas faire confiance au client)
+
+Dans `opex.membership.file`, surcharge `create()` : si l'utilisateur courant est
+dans `base.group_portal`, force `vals['partner_id'] = self.env.user.partner_id.id`
+**quelle que soit la valeur envoyée** par le formulaire — empêche un candidat de
+créer un dossier au nom de quelqu'un d'autre en trafiquant la requête.
+
+### Controller portail (hérite `CustomerPortal`)
+
+Fichier `controllers/portal.py` :
+- `/my/membership` — liste des dossiers du candidat connecté (`GET`)
+- `/my/membership/new` — formulaire de dépôt (`GET` affiche, `POST` crée en
+  `state='draft'`, `partner_id` forcé côté serveur comme ci-dessus)
+- `/my/membership/<int:file_id>` — détail en lecture seule (statut, historique)
+- Ajoute le compteur "Mes dossiers d'adhésion" à `_prepare_home_portal_values()`
+  (page d'accueil du portail, à côté des compteurs natifs comme "Mes commandes")
+
+### Vues portail (QWeb, héritent `portal.portal_layout`)
+
+- `views/portal_templates.xml` : templates pour les 3 routes ci-dessus, dans le
+  style visuel standard du portail Odoo (mêmes classes CSS que les pages
+  "Mes commandes"/"Mes factures" natives, pour la cohérence visuelle)
+
+### Ajoute au `__manifest__.py` (cumule avec les dépendances des extensions précédentes)
+```python
+'depends': ['base', 'mail', 'contacts', 'sale', 'website', 'portal', 'calendar', 'documents'],
+```
+Ajoute `'security/ir_rule.xml'` (nouveau fichier, la règle d'enregistrement
+ci-dessus), et `'views/portal_templates.xml'` à la liste `'data'`.
+
+### Nouveaux fichiers pour les Extensions 3 et 5
+```
+opex_membership/
+├── controllers/
+│   ├── __init__.py
+│   ├── directory.py       (annuaire public, Extension 3)
+│   └── portal.py          (espace candidat, Extension 5)
+├── security/
+│   └── ir_rule.xml        (nouveau, la règle d'enregistrement ci-dessus)
+├── views/
+│   ├── directory_templates.xml
+│   └── portal_templates.xml
+```
 
 ---
 
@@ -177,9 +230,12 @@ fonctionne déjà sans erreur.
 
 ## Ordre d'implémentation recommandé
 
-1. Extension 1 (sale.order) — la plus proche du code existant, risque le plus faible
+1. Extension 1 (sale.order) — déjà en cours / fait
 2. Extension 2 (calendar.event) — indépendante, risque faible
-3. Extension 3 (portail web) — la plus grosse pièce, teste après les deux premières
-4. Extension 4 — seulement si tout le reste est stable
+3. **Extension 5 (espace Candidat)** — priorité haute : c'est le trou fonctionnel
+   actuellement identifié (Secrétariat/COPIL ne doivent pas créer les dossiers
+   à la place du candidat)
+4. Extension 3 (annuaire public) — plus petite pièce restante, peut suivre juste après
+5. Extension 4 — seulement si tout le reste est stable
 
 Teste et commit après **chaque extension**, pas à la fin de tout.

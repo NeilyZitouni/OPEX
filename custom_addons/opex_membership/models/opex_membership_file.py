@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from odoo import _, fields, models
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 
 
@@ -47,6 +47,22 @@ class OpexMembershipFile(models.Model):
     def _state_label(self):
         self.ensure_one()
         return dict(self._fields['state'].selection).get(self.state)
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        """Un candidat portail ne dépose de dossier qu'en son propre nom.
+
+        Le formulaire de `/my/membership/new` est rempli côté navigateur : ni
+        `partner_id` ni `state` ne peuvent en venir. Les réécrire ici, plutôt que
+        de se contenter de ne pas les afficher, ferme la porte à une requête
+        forgée qui créerait un dossier au nom d'un autre contact — ou déjà validé.
+        """
+        if self.env.user._is_portal():
+            partner_id = self.env.user.partner_id.id
+            for vals in vals_list:
+                vals['partner_id'] = partner_id
+                vals['state'] = 'draft'
+        return super().create(vals_list)
 
     def action_submit(self):
         """soumettreDossier : Brouillon -> En contrôle."""

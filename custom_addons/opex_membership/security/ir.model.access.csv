@@ -9,3 +9,5 @@ access_opex_payment_secretariat,opex.payment.secretariat,model_opex_payment,grou
 access_opex_payment_copil,opex.payment.copil,model_opex_payment,group_copil,1,1,1,0
 access_opex_cluster_event_secretariat,opex.cluster.event.secretariat,model_opex_cluster_event,group_secretariat,1,1,1,1
 access_opex_cluster_event_copil,opex.cluster.event.copil,model_opex_cluster_event,group_copil,1,1,1,1
+access_opex_membership_file_portal,opex.membership.file.portal,model_opex_membership_file,base.group_portal,1,1,1,0
+access_opex_membership_category_portal,opex.membership.category.portal,model_opex_membership_category,base.group_portal,1,0,0,0

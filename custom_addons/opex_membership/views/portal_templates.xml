@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Carte "Mes dossiers d'adhésion" sur l'accueil du portail -->
+    <template id="portal_my_home_membership" name="Portail : mes dossiers d'adhésion"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="30">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes dossiers d'adhésion</t>
+                <t t-set="text">Déposer et suivre ma demande d'adhésion au cluster</t>
+                <t t-set="url" t-value="'/my/membership'"/>
+                <t t-set="placeholder_count" t-value="'membership_file_count'"/>
+            </t>
+        </div>
+    </template>
+
+    <!-- Fil d'Ariane -->
+    <template id="portal_breadcrumbs_membership" name="Portail : fil d'Ariane adhésion"
+              inherit_id="portal.portal_breadcrumbs" priority="30">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name in ('membership', 'membership_new')"
+                t-attf-class="breadcrumb-item #{'active ' if not membership_file and page_name != 'membership_new' else ''}">
+                <a t-if="membership_file or page_name == 'membership_new'" href="/my/membership">Dossiers d'adhésion</a>
+                <t t-else="">Dossiers d'adhésion</t>
+            </li>
+            <li t-if="page_name == 'membership_new'" class="breadcrumb-item active">
+                Nouveau dossier
+            </li>
+            <li t-if="membership_file" class="breadcrumb-item active">
+                Dossier n° <t t-out="membership_file.id"/>
+            </li>
+        </xpath>
+    </template>
+
+    <!-- Pastille d'état, réutilisée par la liste et le détail -->
+    <template id="portal_membership_state_badge" name="Portail : état du dossier">
+        <span t-attf-class="badge rounded-pill #{
+                'text-bg-success' if membership_file.state == 'active'
+                else 'text-bg-info' if membership_file.state == 'validated'
+                else 'text-bg-secondary' if membership_file.state == 'draft'
+                else 'text-bg-warning'}">
+            <t t-out="membership_file._state_label()"/>
+        </span>
+    </template>
+
+    <!-- /my/membership : liste des dossiers du candidat -->
+    <template id="portal_my_membership_files" name="Portail : mes dossiers d'adhésion">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mes dossiers d'adhésion</t>
+            </t>
+
+            <div class="mb-4">
+                <a href="/my/membership/new" class="btn btn-primary">
+                    <i class="fa fa-plus me-1"/>Déposer un dossier d'adhésion
+                </a>
+            </div>
+
+            <div t-if="not membership_files" class="alert alert-info" role="alert">
+                Vous n'avez encore déposé aucun dossier d'adhésion.
+            </div>
+
+            <t t-if="membership_files" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Dossier</th>
+                        <th>Catégorie demandée</th>
+                        <th class="text-end">Date de dépôt</th>
+                        <th class="text-center">État</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="membership_files" t-as="membership_file">
+                        <td>
+                            <a t-attf-href="/my/membership/#{membership_file.id}">
+                                Dossier n° <t t-out="membership_file.id"/>
+                            </a>
+                        </td>
+                        <td><span t-field="membership_file.category_id"/></td>
+                        <td class="text-end">
+                            <span t-field="membership_file.date_depot" t-options="{'widget': 'date'}"/>
+                        </td>
+                        <td class="text-center">
+                            <t t-call="opex_membership.portal_membership_state_badge"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <!-- /my/membership/new : formulaire de dépôt -->
+    <template id="portal_membership_file_new" name="Portail : déposer un dossier d'adhésion">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Déposer un dossier d'adhésion</t>
+            </t>
+
+            <div t-if="errors" class="alert alert-danger" role="alert">
+                Votre dossier n'a pas pu être enregistré, merci de corriger les points signalés ci-dessous.
+            </div>
+
+            <form action="/my/membership/new" method="post" enctype="multipart/form-data" class="o_portal_details">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="col-form-label" for="candidate_name">Candidat</label>
+                        <input type="text" id="candidate_name" class="form-control" disabled="disabled"
+                               t-att-value="partner.name"/>
+                        <small class="form-text text-muted">
+                            Le dossier est déposé au nom de votre compte. Pour corriger ces informations,
+                            passez par <a href="/my/account">Mon compte</a>.
+                        </small>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="col-form-label" for="category_id">Catégorie d'adhésion souhaitée</label>
+                        <select name="category_id" id="category_id"
+                                t-attf-class="form-select #{'is-invalid' if errors.get('category_id') else ''}">
+                            <option value="">Choisissez une catégorie…</option>
+                            <option t-foreach="categories" t-as="category"
+                                    t-att-value="category.id"
+                                    t-att-selected="'selected' if form.get('category_id') == str(category.id) else None">
+                                <t t-out="category.name"/>
+                            </option>
+                        </select>
+                        <div t-if="errors.get('category_id')" class="invalid-feedback d-block">
+                            <t t-out="errors['category_id']"/>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="col-form-label" for="secteur_activite">Secteur d'activité</label>
+                        <input type="text" name="secteur_activite" id="secteur_activite" class="form-control"
+                               t-att-value="form.get('secteur_activite') or partner.secteur_activite or ''"/>
+                    </div>
+
+                    <div class="col-md-6">
+                        <label class="col-form-label" for="wilaya">Wilaya</label>
+                        <input type="text" name="wilaya" id="wilaya" class="form-control"
+                               t-att-value="form.get('wilaya') or partner.wilaya or ''"/>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="col-form-label" for="documents">Pièces justificatives</label>
+                        <input type="file" name="documents" id="documents" class="form-control" multiple="multiple"/>
+                        <small class="form-text text-muted">
+                            Joignez ici les pièces de votre dossier ; le Secrétariat ne pourra
+                            le transmettre au comité que s'il est complet.
+                        </small>
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Enregistrer le dossier</button>
+                    <a href="/my/membership" class="btn btn-light">Annuler</a>
+                </div>
+            </form>
+        </t>
+    </template>
+
+    <!-- /my/membership/<id> : détail en lecture seule -->
+    <template id="portal_membership_file_page" name="Portail : détail du dossier d'adhésion">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mon dossier d'adhésion</t>
+            </t>
+
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0">Dossier n° <t t-out="membership_file.id"/></h5>
+                    <t t-call="opex_membership.portal_membership_state_badge"/>
+                </div>
+
+                <div class="card-body">
+                    <!-- Avancement : reprend les 5 étapes du workflow d'adhésion -->
+                    <t t-set="states" t-value="[
+                        ('draft', 'Brouillon'),
+                        ('control', 'En contrôle'),
+                        ('committee', 'En comité'),
+                        ('validated', 'Validé COPIL'),
+                        ('active', 'Actif'),
+                    ]"/>
+                    <t t-set="current_index"
+                       t-value="[state[0] for state in states].index(membership_file.state)"/>
+                    <ol class="list-unstyled d-flex flex-wrap gap-3 mb-4">
+                        <li t-foreach="states" t-as="state" class="d-flex align-items-center gap-2">
+                            <i t-attf-class="fa #{
+                                'fa-check-circle text-success' if state_index &lt; current_index
+                                else 'fa-dot-circle-o text-primary' if state_index == current_index
+                                else 'fa-circle-o text-muted'}"/>
+                            <span t-attf-class="#{'fw-bold' if state_index == current_index else 'text-muted'}">
+                                <t t-out="state[1]"/>
+                            </span>
+                        </li>
+                    </ol>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <strong>Catégorie demandée</strong>
+                            <div><span t-field="membership_file.category_id"/></div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <strong>Date de dépôt</strong>
+                            <div><span t-field="membership_file.date_depot"/></div>
+                        </div>
+                        <div t-if="membership_file.signature_date" class="col-md-6 mb-3">
+                            <strong>Date de signature de la charte</strong>
+                            <div><span t-field="membership_file.signature_date"/></div>
+                        </div>
+                    </div>
+
+                    <h6 class="mt-3">Pièces jointes</h6>
+                    <div t-if="not membership_file.document_ids" class="text-muted">
+                        Aucune pièce jointe pour l'instant.
+                    </div>
+                    <ul t-else="" class="list-unstyled">
+                        <li t-foreach="membership_file.document_ids" t-as="document">
+                            <i class="fa fa-paperclip me-1"/><t t-out="document.name"/>
+                        </li>
+                    </ul>
+
+                    <t t-if="membership_file.subscription_ids">
+                        <h6 class="mt-4">Cotisations</h6>
+                        <t t-call="portal.portal_table">
+                            <t t-set="pager" t-value="False"/>
+                            <thead>
+                                <tr class="active">
+                                    <th>Émise le</th>
+                                    <th>Échéance</th>
+                                    <th class="text-end">Montant</th>
+                                    <th class="text-center">État</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="membership_file.subscription_ids" t-as="subscription">
+                                    <td><span t-field="subscription.date_emission"/></td>
+                                    <td><span t-field="subscription.date_echeance"/></td>
+                                    <td class="text-end"><span t-field="subscription.montant"/></td>
+                                    <td class="text-center"><span t-field="subscription.state"/></td>
+                                </tr>
+                            </tbody>
+                        </t>
+                    </t>
+                </div>
+
+                <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <t t-if="membership_file.state == 'draft'">
+                        <span class="text-muted">
+                            Votre dossier est encore modifiable. Soumettez-le pour qu'il parte au contrôle du Secrétariat.
+                        </span>
+                        <form t-attf-action="/my/membership/#{membership_file.id}/submit" method="post" class="mb-0">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-primary">Soumettre le dossier</button>
+                        </form>
+                    </t>
+                    <span t-else="" class="text-muted">
+                        Votre dossier est en cours de traitement : il n'est plus modifiable.
+                        Vous serez notifié à chaque étape.
+                    </span>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

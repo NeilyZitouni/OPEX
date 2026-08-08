@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Les droits de `ir.model.access.csv` sont donnés au modèle, pas à
+        l'enregistrement : sans les règles ci-dessous, un candidat portail
+        pourrait lire et modifier les dossiers de tous les autres candidats.
+
+        Les deux règles portent sur des opérations disjointes (lecture/création
+        d'un côté, écriture de l'autre), elles ne se recouvrent donc pas.
+    -->
+
+    <record id="rule_membership_file_portal" model="ir.rule">
+        <field name="name">Dossier d'adhésion : le candidat n'accède qu'à ses propres dossiers</field>
+        <field name="model_id" ref="model_opex_membership_file"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_membership_file_portal_write_draft" model="ir.rule">
+        <field name="name">Dossier d'adhésion : le candidat ne modifie que son dossier en Brouillon</field>
+        <field name="model_id" ref="model_opex_membership_file"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('state', '=', 'draft')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+</odoo>
