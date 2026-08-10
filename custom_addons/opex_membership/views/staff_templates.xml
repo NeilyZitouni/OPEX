@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Liens de navigation ajoutés au header du site.
+
+        `portal.placeholder_user_sign_in` est le point d'extension rendu par
+        toutes les variantes d'en-tête du module `website` : y greffer les liens
+        les rend disponibles quel que soit l'en-tête choisi dans l'éditeur.
+    -->
+    <template id="website_header_staff_links" name="En-tête : liens portail OPEX"
+              inherit_id="portal.placeholder_user_sign_in">
+        <xpath expr="." position="inside">
+            <!-- Espace de traitement : réservé au personnel interne. Un
+                 candidat portail comme un visiteur anonyme n'a aucun des trois
+                 groupes, le lien n'existe donc pas dans leur page. -->
+            <li t-if="request.env.user.has_group('opex_membership.group_secretariat')
+                      or request.env.user.has_group('opex_membership.group_copil')
+                      or request.env.user.has_group('base.group_system')"
+                t-attf-class="#{_item_class} o_no_autohide_item">
+                <a href="/staff/membership" t-attf-class="#{_link_class}">Espace validation</a>
+            </li>
+            <!-- Point d'entrée du personnel interne, aligné sur le « Sign in »
+                 natif : masqué dès qu'une session est ouverte, le menu
+                 utilisateur prenant alors le relais. -->
+            <li groups="base.group_public" t-attf-class="#{_item_class} o_no_autohide_item">
+                <a href="/web/login" t-attf-class="#{_link_class}">Connexion</a>
+            </li>
+        </xpath>
+    </template>
+
+    <!-- Pastille d'état, en-tête de page et fil d'Ariane communs aux 2 pages -->
+    <template id="staff_page_header" name="Espace validation : en-tête">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+            <div>
+                <h1 class="mb-1">Espace validation</h1>
+                <p class="text-muted mb-0">
+                    Traitement des dossiers d'adhésion — <t t-out="request.env.user.name"/>
+                </p>
+            </div>
+            <a href="/staff/membership" class="btn btn-light">
+                <i class="fa fa-list me-1"/>Dossiers à traiter
+            </a>
+        </div>
+    </template>
+
+    <!-- /staff/membership : file d'attente du rôle connecté -->
+    <template id="staff_membership_files" name="Espace validation : dossiers à traiter">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="oe_structure"/>
+
+                <section class="py-5">
+                    <div class="container">
+                        <t t-call="opex_membership.staff_page_header"/>
+
+                        <div t-if="not membership_files" class="alert alert-info" role="alert">
+                            Aucun dossier n'attend votre intervention pour le moment.
+                        </div>
+
+                        <div t-else="" class="table-responsive">
+                            <table class="table table-striped align-middle">
+                                <thead>
+                                    <tr>
+                                        <th>Candidat</th>
+                                        <th>Catégorie demandée</th>
+                                        <th>Date de dépôt</th>
+                                        <th class="text-center">État</th>
+                                        <th class="text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="membership_files" t-as="membership_file">
+                                        <td>
+                                            <span t-field="membership_file.partner_id"/>
+                                            <div class="text-muted small">
+                                                Dossier n° <t t-out="membership_file.id"/>
+                                            </div>
+                                        </td>
+                                        <td><span t-field="membership_file.category_id"/></td>
+                                        <td>
+                                            <span t-field="membership_file.date_depot"
+                                                  t-options="{'widget': 'date'}"/>
+                                        </td>
+                                        <td class="text-center">
+                                            <t t-call="opex_membership.portal_membership_state_badge"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <a t-attf-href="/staff/membership/#{membership_file.id}"
+                                               class="btn btn-sm btn-primary">Traiter</a>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div class="d-flex justify-content-center mt-4">
+                            <t t-call="portal.pager"/>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="oe_structure"/>
+            </div>
+        </t>
+    </template>
+
+    <!-- /staff/membership/<id> : détail et action de validation -->
+    <template id="staff_membership_file_page" name="Espace validation : détail du dossier">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="oe_structure"/>
+
+                <section class="py-5">
+                    <div class="container">
+                        <t t-call="opex_membership.staff_page_header"/>
+
+                        <!-- Message d'erreur remonté tel quel par le modèle : le
+                             controller ne réinterprète pas la règle métier. -->
+                        <div t-if="error" class="alert alert-danger" role="alert">
+                            <t t-out="error"/>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <h5 class="mb-0">
+                                    Dossier n° <t t-out="membership_file.id"/> —
+                                    <span t-field="membership_file.partner_id"/>
+                                </h5>
+                                <t t-call="opex_membership.portal_membership_state_badge"/>
+                            </div>
+
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Candidat</strong>
+                                        <div><span t-field="membership_file.partner_id"/></div>
+                                        <div t-if="membership_file.partner_id.email" class="text-muted">
+                                            <span t-field="membership_file.partner_id.email"/>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Catégorie demandée</strong>
+                                        <div><span t-field="membership_file.category_id"/></div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Date de dépôt</strong>
+                                        <div><span t-field="membership_file.date_depot"/></div>
+                                    </div>
+                                    <div t-if="membership_file.signature_date" class="col-md-6 mb-3">
+                                        <strong>Date de signature de la charte</strong>
+                                        <div><span t-field="membership_file.signature_date"/></div>
+                                    </div>
+                                </div>
+
+                                <h6 class="mt-3">Pièces jointes</h6>
+                                <div t-if="not membership_file.document_ids" class="text-muted">
+                                    Aucune pièce jointe : le dossier ne peut pas être transmis au comité.
+                                </div>
+                                <ul t-else="" class="list-unstyled">
+                                    <li t-foreach="membership_file.document_ids" t-as="document">
+                                        <i class="fa fa-paperclip me-1"/>
+                                        <a t-attf-href="/web/content/#{document.id}?download=true">
+                                            <t t-out="document.name"/>
+                                        </a>
+                                    </li>
+                                </ul>
+
+                                <t t-if="membership_file.subscription_ids">
+                                    <h6 class="mt-4">Cotisations</h6>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Émise le</th>
+                                                    <th>Échéance</th>
+                                                    <th class="text-end">Montant</th>
+                                                    <th class="text-center">État</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr t-foreach="membership_file.subscription_ids" t-as="subscription">
+                                                    <td><span t-field="subscription.date_emission"/></td>
+                                                    <td><span t-field="subscription.date_echeance"/></td>
+                                                    <td class="text-end"><span t-field="subscription.montant"/></td>
+                                                    <td class="text-center"><span t-field="subscription.state"/></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </t>
+                            </div>
+
+                            <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <t t-if="transition">
+                                    <span class="text-muted">
+                                        Ce dossier attend votre validation.
+                                    </span>
+                                    <form t-attf-action="/staff/membership/#{membership_file.id}/validate"
+                                          method="post" class="mb-0">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-primary">
+                                            <t t-out="transition['label']"/>
+                                        </button>
+                                    </form>
+                                </t>
+                                <t t-elif="payable_subscription">
+                                    <span class="text-muted">
+                                        Cotisation de
+                                        <span t-field="payable_subscription.montant"/>
+                                        en attente de règlement — l'enregistrer solde le reste dû
+                                        et active l'adhésion.
+                                    </span>
+                                    <form t-attf-action="/staff/membership/#{membership_file.id}/register_payment"
+                                          method="post" class="mb-0">
+                                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-primary">
+                                            Enregistrer le paiement
+                                        </button>
+                                    </form>
+                                </t>
+                                <span t-else="" class="text-muted">
+                                    Aucune action ne vous revient sur ce dossier à son état actuel.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="oe_structure"/>
+            </div>
+        </t>
+    </template>
+
+</odoo>

@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        /cluster : page de présentation du cluster.
+
+        Les trois domaines du portail sont présentés pour rester fidèle à la
+        vision du projet, mais seul « Réseau & Adhérents » est développé à ce
+        stade : les deux autres sections sont explicitement marquées comme non
+        disponibles, sans lien ni bouton, pour ne donner aucune impression
+        trompeuse de fonctionnalité.
+    -->
+    <template id="website_cluster_homepage" name="GIC OPEX Group — Présentation du cluster">
+        <t t-call="website.layout">
+            <!-- `oe_structure` reste sur des zones vides : les blocs déposés
+                 depuis l'éditeur de site n'écrasent alors pas les compteurs
+                 dynamiques de la page. -->
+            <div id="wrap">
+                <div class="oe_structure"/>
+
+                <!-- Hero -->
+                <section class="bg-primary text-white py-5">
+                    <div class="container py-4 text-center">
+                        <h1 class="display-4 mb-2">GIC OPEX Group</h1>
+                        <p class="lead mb-4">Cluster d'excellence opérationnelle</p>
+                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                            <a href="/web/signup?redirect=/my/membership/new" class="btn btn-light btn-lg">
+                                Devenir membre
+                            </a>
+                            <a href="/opex/directory" class="btn btn-outline-light btn-lg">
+                                Consulter l'annuaire
+                            </a>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Domaine 1 : Réseau &amp; Adhérents (fonctionnel) -->
+                <section class="py-5">
+                    <div class="container">
+                        <div class="row align-items-center g-4">
+                            <div class="col-lg-7">
+                                <span class="badge text-bg-success mb-2">Disponible</span>
+                                <h2 class="mb-3">Réseau &amp; Adhérents</h2>
+                                <p class="text-muted">
+                                    Adhésion en ligne, suivi du dossier étape par étape, cotisation
+                                    et reçu, annuaire public des membres : le premier domaine du
+                                    portail est ouvert. Un candidat crée son compte, dépose son
+                                    dossier, et suit son avancement jusqu'à la validation par le
+                                    comité de pilotage.
+                                </p>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <a href="/opex/directory" class="btn btn-primary">
+                                        Annuaire des membres
+                                    </a>
+                                    <a href="/my/membership" class="btn btn-outline-primary">
+                                        Suivre mon dossier
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="col-lg-5">
+                                <div class="row g-3">
+                                    <div class="col-6">
+                                        <div class="card text-center h-100">
+                                            <div class="card-body">
+                                                <div class="display-5 text-primary">
+                                                    <t t-out="member_count"/>
+                                                </div>
+                                                <div class="text-muted">
+                                                    <t t-if="member_count &gt; 1">membres du cluster</t>
+                                                    <t t-else="">membre du cluster</t>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="card text-center h-100">
+                                            <div class="card-body">
+                                                <div class="display-5 text-primary">
+                                                    <t t-out="category_count"/>
+                                                </div>
+                                                <div class="text-muted">
+                                                    <t t-if="category_count &gt; 1">catégories d'adhésion</t>
+                                                    <t t-else="">catégorie d'adhésion</t>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Domaines 2 et 3 : pas encore développés -->
+                <section class="py-5 bg-light">
+                    <div class="container">
+                        <h2 class="mb-2">Les autres domaines du cluster</h2>
+                        <p class="text-muted mb-4">
+                            Ces deux modules font partie de la vision du portail mais
+                            <strong>ne sont pas encore développés</strong> : les décrire ici ne les
+                            rend pas accessibles, aucun service n'est ouvert derrière.
+                        </p>
+
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="card h-100 border-secondary-subtle">
+                                    <div class="card-body">
+                                        <span class="badge text-bg-secondary mb-2">
+                                            <i class="fa fa-clock-o me-1"/>Prochainement
+                                        </span>
+                                        <h3 class="h5">Innovation Booster</h3>
+                                        <p class="text-muted mb-0">
+                                            Accompagnement des projets d'innovation des adhérents :
+                                            dépôt d'idées, sélection, suivi des projets soutenus par
+                                            le cluster. Module en développement, non disponible.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <div class="card h-100 border-secondary-subtle">
+                                    <div class="card-body">
+                                        <span class="badge text-bg-secondary mb-2">
+                                            <i class="fa fa-clock-o me-1"/>Prochainement
+                                        </span>
+                                        <h3 class="h5">Appels &amp; Interventions</h3>
+                                        <p class="text-muted mb-0">
+                                            Appels à intervenants, mise en relation avec les experts
+                                            du réseau et suivi des missions. Module en développement,
+                                            non disponible.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="oe_structure"/>
+            </div>
+        </t>
+    </template>
+
+</odoo>

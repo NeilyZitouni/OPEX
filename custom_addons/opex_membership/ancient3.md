@@ -134,56 +134,6 @@ authentification) reste valable telle quelle.
 - Route publique (`auth='public'`), lecture seule, utilise `sudo()` en lecture
   uniquement
 
-### Intégration au menu du site (nouveau — obligatoire pour cette extension)
-
-Fichier `data/website_menu.xml`, deux `website.menu` liés au menu racine du site :
-- **"Annuaire"** → `/opex/directory`
-- **"Devenir membre"** → `/web/signup?redirect=/my/membership/new` (route native
-  Odoo — après inscription, redirige directement vers le formulaire de dépôt de
-  dossier, pas besoin de coder une redirection custom)
-
----
-
-## Extension 6 — Page de présentation du cluster (landing page)
-
-**Objectif :** donner une vraie porte d'entrée publique au portail, présentable
-pour la soutenance — pas juste des routes techniques sans point d'accès visible.
-
-### Principe important : rester honnête sur ce qui est réellement fonctionnel
-
-Seul le module Membership est développé à ce stade. La page doit présenter les
-3 domaines du cluster (cohérence avec la vision du projet), mais **marquer
-clairement** Innovation et Intervenants comme "à venir" — ne jamais laisser croire
-que ces parties sont fonctionnelles alors qu'elles ne le sont pas encore.
-
-### Nouveau fichier `views/website_homepage.xml`
-
-Template QWeb hérité de `website.layout`, contenu :
-- **Hero** : titre "GIC OPEX Group", sous-titre "Cluster d'excellence
-  opérationnelle", deux boutons d'action : **"Devenir membre"** (→
-  `/web/signup?redirect=/my/membership/new`) et **"Consulter l'annuaire"**
-  (→ `/opex/directory`)
-- **Section "Réseau & Adhérents"** (fonctionnelle) : description courte + un
-  ou deux chiffres réels tirés de la base (nombre de membres actifs, nombre de
-  catégories) — passés par le controller, pas codés en dur
-- **Sections "Innovation Booster" et "Appels & Interventions"** : présentation
-  courte de l'intention, avec un badge/étiquette visuelle claire du type
-  "Prochainement" ou "En développement" — pas de lien actif, pas de bouton
-  d'action, juste informatif
-
-### Nouveau controller — route `/cluster`
-
-`GET`, `auth='public'`. Calcule les statistiques réelles via `sudo()` en lecture
-seule (`res.partner.search_count([('is_member', '=', True)])` etc.) et les passe
-au template. Pas d'écriture, route entièrement publique et sûre.
-
-### Définir cette page comme accueil du site (étape manuelle, pas de code)
-
-Une fois la page fonctionnelle à `/cluster`, l'utilisateur définit lui-même
-l'accueil dans **Site Web → Configuration → Réglages → URL de la page d'accueil**
-= `/cluster`. Ne fais PAS de route codée en dur sur `/` — ça risquerait d'entrer
-en conflit avec les pages déjà installées par le module `website`.
-
 ---
 
 ## Extension 5 — Espace Candidat (compte portail natif)
@@ -236,11 +186,6 @@ Fichier `controllers/portal.py` :
 - `/my/membership/new` — formulaire de dépôt (`GET` affiche, `POST` crée en
   `state='draft'`, `partner_id` forcé côté serveur comme ci-dessus)
 - `/my/membership/<int:file_id>` — détail en lecture seule (statut, historique)
-- `/my/membership/<int:file_id>/submit` — **(`POST`, statut ✅ implémenté)**
-  appelle `action_submit()` sur le dossier pour le faire passer de Brouillon à
-  En contrôle. Vérifie `record.partner_id == request.env.user.partner_id`
-  avant d'agir (même logique de protection que le `create()` surchargé) —
-  sans cette route, le dossier reste bloqué en Brouillon indéfiniment.
 - Ajoute le compteur "Mes dossiers d'adhésion" à `_prepare_home_portal_values()`
   (page d'accueil du portail, à côté des compteurs natifs comme "Mes commandes")
 
@@ -252,13 +197,8 @@ Fichier `controllers/portal.py` :
 
 ### Ajoute au `__manifest__.py` (cumule avec les dépendances des extensions précédentes)
 ```python
-'depends': ['base', 'mail', 'contacts', 'sale', 'website', 'portal', 'calendar'],
+'depends': ['base', 'mail', 'contacts', 'sale', 'website', 'portal', 'calendar', 'documents'],
 ```
-**Ne pas ajouter `'documents'`** — absent de certaines installations Community,
-rendrait le module non installable. L'app Documents ne sert qu'à l'Extension 4
-(optionnelle) ; sans elle, `document_ids` reste sur `ir.attachment`, ce qui
-fonctionne très bien pour le POC.
-
 Ajoute `'security/ir_rule.xml'` (nouveau fichier, la règle d'enregistrement
 ci-dessus), et `'views/portal_templates.xml'` à la liste `'data'`.
 
@@ -288,77 +228,14 @@ fonctionne déjà sans erreur.
 
 ---
 
-## Extension 7 — Espace de traitement web pour Secrétariat / COPIL / Admin
-
-**Objectif :** donner à Secrétariat, COPIL et Admin un espace **web dédié** pour
-consulter et valider les dossiers — symétrique à l'espace candidat (Extension 5),
-mais pour le personnel interne. Le back-office Odoo classique reste disponible
-et complet ; ceci est une façade web supplémentaire, plus simple à démontrer
-dans un navigateur, pas un remplacement.
-
-### Sécurité — connexion interne, pas portail
-
-- `auth='user'` (utilisateur interne connecté, jamais `auth='public'`)
-- Contrôle explicite dans le controller à chaque route :
-  ```python
-  user = request.env.user
-  if not (user.has_group('opex_membership.group_secretariat')
-          or user.has_group('opex_membership.group_copil')
-          or user.has_group('base.group_system')):
-      return request.redirect('/my')
-  ```
-- **Ne duplique jamais la logique métier.** Le controller appelle les méthodes
-  déjà existantes sur `opex.membership.file`
-  (`action_validate_secretariat()`, `action_validate_copil()`) — il ne
-  réécrit aucune règle de transition d'état.
-
-### Nouveau fichier `controllers/staff.py`
-
-- `/staff/membership` — `GET`, liste des dossiers à traiter, filtrée selon le
-  rôle du user connecté : Secrétariat voit `state='control'`, COPIL voit
-  `state in ('committee', 'validated')`, Admin voit tout
-- `/staff/membership/<int:file_id>` — `GET`, détail du dossier (mêmes
-  informations que côté candidat, plus les boutons d'action pertinents selon
-  le rôle)
-- `/staff/membership/<int:file_id>/validate` — `POST`, appelle la méthode de
-  transition appropriée selon le groupe de l'utilisateur connecté (jamais
-  selon un paramètre envoyé par le formulaire — le rôle vient toujours de
-  `request.env.user`, jamais d'une donnée cliente)
-
-### Nouveau fichier `views/staff_templates.xml`
-
-Hérite `website.layout`, même esprit visuel que le reste du site. Liste type
-"à traiter" : nom du candidat, catégorie demandée, date de dépôt, bouton
-"Traiter" vers le détail.
-
-### Lien de navigation conditionnel (pas un menu public)
-
-Dans le header du site, ajoute un lien **visible uniquement si connecté ET
-dans un des 3 groupes** :
-```xml
-<t t-if="request.env.user.has_group('opex_membership.group_secretariat')
-         or request.env.user.has_group('opex_membership.group_copil')
-         or request.env.user.has_group('base.group_system')">
-    <a href="/staff/membership">Espace validation</a>
-</t>
-```
-Un candidat ou un visiteur non connecté ne doit jamais voir ce lien. Ajoute
-aussi un lien simple **"Connexion"** (→ `/web/login`, sans signup) visible
-pour tout le monde, non connecté inclus — c'est le point d'entrée pour le
-personnel interne qui n'a pas encore de session active.
-
----
-
 ## Ordre d'implémentation recommandé
 
-1. Extension 1 (sale.order) — fait
-2. Extension 5 (espace Candidat) — fait et testé de bout en bout
-3. Extension 3 (annuaire public + menu) — fait
-4. Extension 6 (page de présentation) — fait
-5. **Extension 7 (espace de traitement Secrétariat/COPIL/Admin)** — à faire
-   maintenant, c'est le trou identifié : le staff n'a aujourd'hui aucun moyen
-   de traiter un dossier autrement qu'en passant par le back-office Odoo
-6. Extension 2 (calendar.event) — indépendante, peut se faire n'importe quand
-7. Extension 4 — seulement si tout le reste est stable
+1. Extension 1 (sale.order) — déjà en cours / fait
+2. Extension 2 (calendar.event) — indépendante, risque faible
+3. **Extension 5 (espace Candidat)** — priorité haute : c'est le trou fonctionnel
+   actuellement identifié (Secrétariat/COPIL ne doivent pas créer les dossiers
+   à la place du candidat)
+4. Extension 3 (annuaire public) — plus petite pièce restante, peut suivre juste après
+5. Extension 4 — seulement si tout le reste est stable
 
 Teste et commit après **chaque extension**, pas à la fin de tout.

@@ -16,12 +16,13 @@ cotisations, paiements, annuaire des membres et événements du cluster.
     'category': 'Services/Membership',
     'version': '19.0.1.0.0',
 
-    'depends': ['base', 'mail', 'sale', 'portal'],
+    'depends': ['base', 'mail', 'sale', 'portal', 'website'],
 
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
         'security/ir_rule.xml',
+        'data/website_menu.xml',
         'views/opex_membership_category_views.xml',
         'views/res_partner_views.xml',
         'views/opex_membership_file_views.xml',
@@ -30,6 +31,9 @@ cotisations, paiements, annuaire des membres et événements du cluster.
         'views/opex_cluster_event_views.xml',
         'views/opex_membership_menus.xml',
         'views/portal_templates.xml',
+        'views/directory_templates.xml',
+        'views/website_homepage.xml',
+        'views/staff_templates.xml',
     ],
 
     'installable': True,

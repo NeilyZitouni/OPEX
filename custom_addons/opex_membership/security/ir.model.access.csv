@@ -9,5 +9,11 @@ access_opex_payment_secretariat,opex.payment.secretariat,model_opex_payment,grou
 access_opex_payment_copil,opex.payment.copil,model_opex_payment,group_copil,1,1,1,0
 access_opex_cluster_event_secretariat,opex.cluster.event.secretariat,model_opex_cluster_event,group_secretariat,1,1,1,1
 access_opex_cluster_event_copil,opex.cluster.event.copil,model_opex_cluster_event,group_copil,1,1,1,1
+access_opex_membership_file_admin,opex.membership.file.admin,model_opex_membership_file,base.group_system,1,1,1,0
+access_opex_membership_category_admin,opex.membership.category.admin,model_opex_membership_category,base.group_system,1,0,0,0
+access_opex_subscription_admin,opex.subscription.admin,model_opex_subscription,base.group_system,1,1,1,0
+access_opex_payment_admin,opex.payment.admin,model_opex_payment,base.group_system,1,1,1,0
+access_res_partner_opex_secretariat,res.partner.opex.secretariat,base.model_res_partner,group_secretariat,1,1,0,0
+access_res_partner_opex_copil,res.partner.opex.copil,base.model_res_partner,group_copil,1,1,0,0
 access_opex_membership_file_portal,opex.membership.file.portal,model_opex_membership_file,base.group_portal,1,1,1,0
 access_opex_membership_category_portal,opex.membership.category.portal,model_opex_membership_category,base.group_portal,1,0,0,0

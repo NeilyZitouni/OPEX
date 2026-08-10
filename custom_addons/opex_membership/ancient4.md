@@ -288,77 +288,14 @@ fonctionne déjà sans erreur.
 
 ---
 
-## Extension 7 — Espace de traitement web pour Secrétariat / COPIL / Admin
-
-**Objectif :** donner à Secrétariat, COPIL et Admin un espace **web dédié** pour
-consulter et valider les dossiers — symétrique à l'espace candidat (Extension 5),
-mais pour le personnel interne. Le back-office Odoo classique reste disponible
-et complet ; ceci est une façade web supplémentaire, plus simple à démontrer
-dans un navigateur, pas un remplacement.
-
-### Sécurité — connexion interne, pas portail
-
-- `auth='user'` (utilisateur interne connecté, jamais `auth='public'`)
-- Contrôle explicite dans le controller à chaque route :
-  ```python
-  user = request.env.user
-  if not (user.has_group('opex_membership.group_secretariat')
-          or user.has_group('opex_membership.group_copil')
-          or user.has_group('base.group_system')):
-      return request.redirect('/my')
-  ```
-- **Ne duplique jamais la logique métier.** Le controller appelle les méthodes
-  déjà existantes sur `opex.membership.file`
-  (`action_validate_secretariat()`, `action_validate_copil()`) — il ne
-  réécrit aucune règle de transition d'état.
-
-### Nouveau fichier `controllers/staff.py`
-
-- `/staff/membership` — `GET`, liste des dossiers à traiter, filtrée selon le
-  rôle du user connecté : Secrétariat voit `state='control'`, COPIL voit
-  `state in ('committee', 'validated')`, Admin voit tout
-- `/staff/membership/<int:file_id>` — `GET`, détail du dossier (mêmes
-  informations que côté candidat, plus les boutons d'action pertinents selon
-  le rôle)
-- `/staff/membership/<int:file_id>/validate` — `POST`, appelle la méthode de
-  transition appropriée selon le groupe de l'utilisateur connecté (jamais
-  selon un paramètre envoyé par le formulaire — le rôle vient toujours de
-  `request.env.user`, jamais d'une donnée cliente)
-
-### Nouveau fichier `views/staff_templates.xml`
-
-Hérite `website.layout`, même esprit visuel que le reste du site. Liste type
-"à traiter" : nom du candidat, catégorie demandée, date de dépôt, bouton
-"Traiter" vers le détail.
-
-### Lien de navigation conditionnel (pas un menu public)
-
-Dans le header du site, ajoute un lien **visible uniquement si connecté ET
-dans un des 3 groupes** :
-```xml
-<t t-if="request.env.user.has_group('opex_membership.group_secretariat')
-         or request.env.user.has_group('opex_membership.group_copil')
-         or request.env.user.has_group('base.group_system')">
-    <a href="/staff/membership">Espace validation</a>
-</t>
-```
-Un candidat ou un visiteur non connecté ne doit jamais voir ce lien. Ajoute
-aussi un lien simple **"Connexion"** (→ `/web/login`, sans signup) visible
-pour tout le monde, non connecté inclus — c'est le point d'entrée pour le
-personnel interne qui n'a pas encore de session active.
-
----
-
 ## Ordre d'implémentation recommandé
 
 1. Extension 1 (sale.order) — fait
 2. Extension 5 (espace Candidat) — fait et testé de bout en bout
-3. Extension 3 (annuaire public + menu) — fait
-4. Extension 6 (page de présentation) — fait
-5. **Extension 7 (espace de traitement Secrétariat/COPIL/Admin)** — à faire
-   maintenant, c'est le trou identifié : le staff n'a aujourd'hui aucun moyen
-   de traiter un dossier autrement qu'en passant par le back-office Odoo
-6. Extension 2 (calendar.event) — indépendante, peut se faire n'importe quand
-7. Extension 4 — seulement si tout le reste est stable
+3. Extension 3 (annuaire public + menu) — à faire maintenant, prérequis d'Extension 6
+4. **Extension 6 (page de présentation)** — juste après, dépend des liens
+   créés par l'Extension 3 (`/opex/directory`, `/web/signup`)
+5. Extension 2 (calendar.event) — indépendante, peut se faire n'importe quand
+6. Extension 4 — seulement si tout le reste est stable
 
 Teste et commit après **chaque extension**, pas à la fin de tout.

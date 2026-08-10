@@ -107,7 +107,11 @@
                 Votre dossier n'a pas pu être enregistré, merci de corriger les points signalés ci-dessous.
             </div>
 
-            <form action="/my/membership/new" method="post" enctype="multipart/form-data" class="o_portal_details">
+            <!-- Ne pas remettre `o_portal_details` sur ce formulaire : en v19 cette
+                 classe n'a plus aucun style, c'est uniquement le sélecteur de
+                 l'interaction `portal.portal_details`, qui suppose un formulaire
+                 d'adresse et déréférence `select[name=country_id]` sans le tester. -->
+            <form action="/my/membership/new" method="post" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                 <div class="row g-3">

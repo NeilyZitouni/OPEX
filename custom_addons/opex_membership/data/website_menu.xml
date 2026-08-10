@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Points d'entrée publics du portail, ajoutés au menu principal du site.
+
+        `noupdate="1"` : ces entrées sont éditables depuis l'éditeur de site
+        (libellé, ordre, suppression) ; une mise à jour du module ne doit pas
+        écraser ce que l'utilisateur y a changé.
+    -->
+    <data noupdate="1">
+
+        <record id="website_menu_directory" model="website.menu">
+            <field name="name">Annuaire</field>
+            <field name="url">/opex/directory</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">50</field>
+        </record>
+
+        <!--
+            Inscription par le flux natif `/web/signup` (Extension 5) : le
+            candidat crée son compte portail puis atterrit directement sur le
+            formulaire de dépôt de dossier, sans redirection custom.
+        -->
+        <record id="website_menu_become_member" model="website.menu">
+            <field name="name">Devenir membre</field>
+            <field name="url">/web/signup?redirect=/my/membership/new</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">55</field>
+        </record>
+
+    </data>
+</odoo>
