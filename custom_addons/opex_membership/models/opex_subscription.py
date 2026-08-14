@@ -94,6 +94,26 @@ class OpexSubscription(models.Model):
                 "Relance envoyée à %s pour la cotisation de %s (échéance : %s)."
             ) % (rec.partner_id.name, rec.montant, rec.date_echeance))
 
+    def _amount_paid(self):
+        """Total réellement encaissé : seuls les paiements confirmés comptent.
+
+        Une preuve déposée par le candidat est « à vérifier » tant que le
+        Secrétariat ne l'a pas contrôlée ; la compter ici solderait la
+        cotisation sur la seule déclaration du candidat.
+        """
+        self.ensure_one()
+        return sum(
+            self.payment_ids.filtered(lambda p: p.state == 'paid').mapped('montant')
+        )
+
+    def _reconcile_payments(self):
+        """Solde la cotisation dès que les paiements confirmés la couvrent."""
+        for rec in self:
+            if rec.state in ('paid', 'cancelled'):
+                continue
+            if rec._amount_paid() >= rec.montant:
+                rec.state = 'paid'
+
     def action_register_payment(self, montant=None, mode_paiement='transfer',
                                  reference_transaction=False, date_paiement=None):
         """enregistrerPaiement : crée un opex.payment lié, passe l'état à Payée si le montant couvre la cotisation."""
@@ -107,9 +127,7 @@ class OpexSubscription(models.Model):
                 raise UserError(_(
                     "La cotisation de %s est déjà soldée."
                 ) % rec.partner_id.name)
-            amount = montant if montant is not None else (
-                rec.montant - sum(rec.payment_ids.mapped('montant'))
-            )
+            amount = montant if montant is not None else (rec.montant - rec._amount_paid())
             if amount <= 0:
                 raise UserError(_("Le montant du paiement doit être positif."))
             self.env['opex.payment'].create({
@@ -118,7 +136,8 @@ class OpexSubscription(models.Model):
                 'date_paiement': date_paiement or fields.Datetime.now(),
                 'reference_transaction': reference_transaction,
                 'mode_paiement': mode_paiement,
+                # Saisie par le Secrétariat : l'encaissement est constaté, pas
+                # déclaré — il n'y a rien à vérifier ensuite.
+                'state': 'paid',
             })
-            total_paid = sum(rec.payment_ids.mapped('montant'))
-            if total_paid >= rec.montant:
-                rec.state = 'paid'
+            rec._reconcile_payments()

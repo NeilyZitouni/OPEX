@@ -367,9 +367,16 @@
                         </li>
                     </ol>
 
+                    <!-- Erreur remontée telle quelle par le modèle (pièce
+                         obligatoire manquante, transition refusée) : le
+                         candidat doit lire ce qui bloque, pas une page
+                         d'erreur technique. -->
+                    <div t-if="error" class="alert alert-danger" role="alert">
+                        <t t-out="error"/>
+                    </div>
+
                     <!-- Demandes de correction encore ouvertes : le candidat doit
-                         savoir ce qu'on attend de lui. Le ré-upload et la
-                         re-soumission depuis le portail relèvent de l'Extension 11. -->
+                         savoir ce qu'on attend de lui. -->
                     <t t-set="open_corrections"
                        t-value="membership_file.correction_ids.filtered(lambda c: not c.resolved)"/>
                     <div t-if="open_corrections" class="alert alert-warning" role="alert">
@@ -386,6 +393,48 @@
                             </li>
                         </ul>
                     </div>
+
+                    <!-- Remplacement des pièces visées par une correction, et
+                         dépôt de celles qui manquent encore. `mapped` dédoublonne :
+                         deux corrections sur la même pièce ne donnent qu'un champ. -->
+                    <t t-if="membership_file.state == 'correction_requested'">
+                        <t t-set="documents_to_replace" t-value="open_corrections.mapped('document_id')"/>
+                        <div t-if="documents_to_replace or missing_slots" class="card bg-light mb-4">
+                            <div class="card-body">
+                                <h6 class="card-title">Mettre à jour mes pièces</h6>
+                                <form t-attf-action="/my/membership/#{membership_file.id}/documents"
+                                      method="post" enctype="multipart/form-data">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <div class="row g-3">
+                                        <div t-foreach="documents_to_replace" t-as="document"
+                                             class="col-md-6">
+                                            <label class="form-label"
+                                                   t-attf-for="replace_#{document.id}">
+                                                Remplacer « <t t-out="document.name"/> »
+                                            </label>
+                                            <input type="file" class="form-control"
+                                                   t-attf-name="replace_#{document.id}"
+                                                   t-attf-id="replace_#{document.id}"/>
+                                        </div>
+                                        <div t-foreach="missing_slots" t-as="slot" class="col-md-6">
+                                            <label class="form-label"
+                                                   t-attf-for="document_#{slot[0]}">
+                                                <t t-out="slot[1]"/>
+                                                <span class="text-danger"> * manquante</span>
+                                            </label>
+                                            <input type="file" class="form-control"
+                                                   t-attf-name="document_#{slot[0]}"
+                                                   t-attf-id="document_#{slot[0]}"/>
+                                        </div>
+                                    </div>
+                                    <button type="submit" class="btn btn-secondary mt-3">
+                                        Téléverser les pièces
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </t>
 
                     <div class="row">
                         <div class="col-md-6 mb-3">
@@ -431,6 +480,104 @@
                         <t t-out="', '.join(missing)"/>.
                     </div>
 
+                    <!--
+                        Paiement de la cotisation (section 24). Les deux voies
+                        sont proposées côte à côte : régler en ligne, ou
+                        déclarer un paiement déjà effectué hors du portail.
+                    -->
+                    <t t-if="membership_file.state == 'payment_pending' and pending_subscription">
+                        <div class="card border-primary mb-4">
+                            <div class="card-body">
+                                <h6 class="card-title">Payer ma cotisation</h6>
+                                <p>
+                                    Montant :
+                                    <strong><span t-field="pending_subscription.montant"/></strong>
+                                    <t t-if="pending_subscription.date_echeance">
+                                        — à régler avant le
+                                        <span t-field="pending_subscription.date_echeance"/>
+                                    </t>
+                                </p>
+
+                                <!-- Preuve précédemment rejetée : dire pourquoi
+                                     avant de redemander un justificatif. -->
+                                <div t-if="rejected_payment" class="alert alert-danger" role="alert">
+                                    <strong>Votre précédente preuve de paiement a été rejetée.</strong>
+                                    <div t-if="rejected_payment.motif_rejet" class="small mb-0">
+                                        <t t-out="rejected_payment.motif_rejet"/>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4">
+                                    <div class="col-md-5">
+                                        <h6 class="text-muted">Payer en ligne</h6>
+                                        <a t-if="online_payment_url" t-att-href="online_payment_url"
+                                           class="btn btn-primary">
+                                            Payer maintenant
+                                        </a>
+                                        <p t-else="" class="text-muted small mb-0">
+                                            Le paiement en ligne n'est pas disponible pour cette cotisation.
+                                        </p>
+                                    </div>
+
+                                    <div class="col-md-7 border-start">
+                                        <h6 class="text-muted">J'ai déjà payé</h6>
+                                        <form t-attf-action="/my/membership/#{membership_file.id}/payment_proof"
+                                              method="post" enctype="multipart/form-data">
+                                            <input type="hidden" name="csrf_token"
+                                                   t-att-value="request.csrf_token()"/>
+                                            <div class="row g-2">
+                                                <div class="col-sm-6">
+                                                    <label class="form-label" for="reference_paiement">
+                                                        Référence du paiement
+                                                    </label>
+                                                    <input type="text" name="reference_paiement"
+                                                           id="reference_paiement" class="form-control"/>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label class="form-label" for="date_paiement">
+                                                        Date du paiement
+                                                    </label>
+                                                    <input type="date" name="date_paiement"
+                                                           id="date_paiement" class="form-control"/>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label class="form-label" for="montant">Montant *</label>
+                                                    <input type="text" name="montant" id="montant"
+                                                           class="form-control"
+                                                           t-att-value="pending_subscription.montant"/>
+                                                </div>
+                                                <div class="col-sm-6">
+                                                    <label class="form-label" for="justificatif">
+                                                        Justificatif *
+                                                    </label>
+                                                    <input type="file" name="justificatif"
+                                                           id="justificatif" class="form-control"/>
+                                                </div>
+                                            </div>
+                                            <button type="submit" class="btn btn-secondary mt-3">
+                                                Envoyer ma preuve de paiement
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <!-- Règle d'or (section 47) : dire au candidat qu'il n'a
+                         rien à faire, plutôt que de le laisser devant un état. -->
+                    <div t-if="membership_file.state == 'payment_verification'"
+                         class="alert alert-info" role="alert">
+                        <strong>Votre preuve de paiement est en cours de vérification.</strong>
+                        <div class="small mb-0">
+                            Le Secrétariat contrôle votre justificatif
+                            <t t-if="payment_to_verify and payment_to_verify.justificatif_filename">
+                                (« <t t-out="payment_to_verify.justificatif_filename"/> »)
+                            </t>.
+                            Vous n'avez rien à faire pour le moment.
+                        </div>
+                    </div>
+
                     <t t-if="membership_file.subscription_ids">
                         <h6 class="mt-4">Cotisations</h6>
                         <t t-call="portal.portal_table">
@@ -463,6 +610,19 @@
                         <form t-attf-action="/my/membership/#{membership_file.id}/submit" method="post" class="mb-0">
                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                             <button type="submit" class="btn btn-primary">Soumettre le dossier</button>
+                        </form>
+                    </t>
+                    <!-- Un dossier en correction est modifiable : lui appliquer
+                         le message « plus modifiable » dirait au candidat
+                         l'inverse de ce qu'on attend de lui. -->
+                    <t t-elif="membership_file.state == 'correction_requested'">
+                        <span class="text-muted">
+                            Une fois vos pièces mises à jour, renvoyez votre dossier au Secrétariat.
+                        </span>
+                        <form t-attf-action="/my/membership/#{membership_file.id}/resubmit"
+                              method="post" class="mb-0">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-primary">Renvoyer mon dossier</button>
                         </form>
                     </t>
                     <span t-else="" class="text-muted">

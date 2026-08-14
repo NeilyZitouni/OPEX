@@ -63,6 +63,37 @@
         <field name="perm_unlink" eval="True"/>
     </record>
 
+    <!--
+        Cotisations et paiements : sans règle ici, un candidat lirait le
+        montant et les justificatifs de tous les autres membres.
+
+        Le candidat peut *créer* un paiement — c'est le dépôt d'une preuve
+        (voie B) — mais jamais le modifier : seul le Secrétariat confirme ou
+        rejette, et `create()` force l'état « à vérifier » pour qu'une preuve
+        ne puisse pas naître déjà confirmée.
+    -->
+    <record id="rule_subscription_portal" model="ir.rule">
+        <field name="name">Cotisation : le membre ne voit que les siennes</field>
+        <field name="model_id" ref="model_opex_subscription"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_payment_portal" model="ir.rule">
+        <field name="name">Paiement : le membre n'accède qu'aux siens</field>
+        <field name="model_id" ref="model_opex_payment"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('subscription_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
     <!-- La demande de correction est écrite par le Secrétariat ; le candidat
          doit pouvoir la lire, jamais la modifier ni la déclarer traitée. -->
     <record id="rule_membership_correction_portal" model="ir.rule">

@@ -41,3 +41,6 @@ access_opex_membership_subcategory_portal,opex.membership.subcategory.portal,mod
 access_opex_membership_document_portal,opex.membership.document.portal,model_opex_membership_document,base.group_portal,1,1,1,1
 access_opex_membership_correction_portal,opex.membership.correction.portal,model_opex_membership_correction,base.group_portal,1,0,0,0
 access_opex_certification_portal,opex.certification.portal,model_opex_certification,base.group_portal,1,0,0,0
+access_opex_subscription_portal,opex.subscription.portal,model_opex_subscription,base.group_portal,1,0,0,0
+access_opex_payment_portal,opex.payment.portal,model_opex_payment,base.group_portal,1,0,1,0
+access_opex_payment_comite,opex.payment.comite,model_opex_payment,group_comite,1,0,0,0

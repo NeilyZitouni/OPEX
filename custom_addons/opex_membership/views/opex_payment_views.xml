@@ -11,6 +11,10 @@
                 <field name="montant"/>
                 <field name="mode_paiement"/>
                 <field name="reference_transaction"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'paid'"
+                       decoration-warning="state == 'to_verify'"
+                       decoration-danger="state == 'rejected'"/>
             </list>
         </field>
     </record>
@@ -20,14 +24,36 @@
         <field name="model">opex.payment</field>
         <field name="arch" type="xml">
             <form string="Paiement">
+                <header>
+                    <!-- Le rejet exige un motif : il se saisit dans le champ
+                         ci-dessous, que le bouton reprend tel quel. -->
+                    <button name="action_confirm" type="object" string="Confirmer le paiement"
+                            class="oe_highlight" invisible="state != 'to_verify'"
+                            groups="opex_membership.group_secretariat"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="to_verify,paid"/>
+                </header>
                 <sheet>
                     <group>
-                        <field name="subscription_id"/>
-                        <field name="currency_id" invisible="1"/>
-                        <field name="montant"/>
-                        <field name="date_paiement"/>
-                        <field name="mode_paiement"/>
-                        <field name="reference_transaction"/>
+                        <group>
+                            <field name="subscription_id"/>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="montant"/>
+                            <field name="date_paiement"/>
+                        </group>
+                        <group>
+                            <field name="mode_paiement"/>
+                            <field name="reference_transaction"/>
+                            <field name="date_verification" readonly="1"
+                                   invisible="not date_verification"/>
+                            <field name="motif_rejet" readonly="1"
+                                   invisible="state != 'rejected'"/>
+                        </group>
+                    </group>
+                    <group string="Justificatif" invisible="not justificatif">
+                        <field name="justificatif" filename="justificatif_filename"
+                               widget="binary" readonly="1"/>
+                        <field name="justificatif_filename" invisible="1"/>
                     </group>
                 </sheet>
             </form>

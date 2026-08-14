@@ -258,6 +258,95 @@
                                 </t>
                             </div>
 
+                            <!-- Vérification de la preuve de paiement (voie B).
+                                 Le justificatif est téléchargeable : on ne
+                                 confirme pas un encaissement sans avoir pu
+                                 regarder la pièce. -->
+                            <div t-if="payment_to_verify" class="card-body border-top">
+                                <h6>Preuve de paiement à vérifier</h6>
+                                <dl class="row mb-3">
+                                    <dt class="col-sm-3">Montant déclaré</dt>
+                                    <dd class="col-sm-9"><span t-field="payment_to_verify.montant"/></dd>
+                                    <dt class="col-sm-3">Date du paiement</dt>
+                                    <dd class="col-sm-9"><span t-field="payment_to_verify.date_paiement"/></dd>
+                                    <dt t-if="payment_to_verify.reference_transaction" class="col-sm-3">
+                                        Référence
+                                    </dt>
+                                    <dd t-if="payment_to_verify.reference_transaction" class="col-sm-9">
+                                        <t t-out="payment_to_verify.reference_transaction"/>
+                                    </dd>
+                                    <dt class="col-sm-3">Justificatif</dt>
+                                    <dd class="col-sm-9">
+                                        <a t-attf-href="/web/content?model=opex.payment&amp;id=#{payment_to_verify.id}&amp;field=justificatif&amp;filename_field=justificatif_filename&amp;download=true">
+                                            <i class="fa fa-paperclip me-1"/>
+                                            <t t-out="payment_to_verify.justificatif_filename or 'Télécharger le justificatif'"/>
+                                        </a>
+                                    </dd>
+                                </dl>
+                                <div class="d-flex flex-wrap gap-3 align-items-start">
+                                    <form t-attf-action="/staff/membership/#{membership_file.id}/payment/confirm"
+                                          method="post" class="mb-0">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-success">
+                                            Confirmer le paiement
+                                        </button>
+                                    </form>
+                                    <form t-attf-action="/staff/membership/#{membership_file.id}/payment/reject"
+                                          method="post" class="mb-0 flex-grow-1">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <div class="input-group">
+                                            <input type="text" name="motif_rejet" class="form-control"
+                                                   placeholder="Motif du rejet (obligatoire)"/>
+                                            <button type="submit" class="btn btn-outline-danger">
+                                                Rejeter
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Demande de correction (section 19) : la pièce
+                                 visée, le motif et le commentaire sont exigés
+                                 tous les trois — un candidat qui reçoit « à
+                                 corriger » sans savoir quoi ni pourquoi ne peut
+                                 rien en faire. -->
+                            <div t-if="can_request_correction" class="card-body border-top">
+                                <h6>Demander une correction au candidat</h6>
+                                <form t-attf-action="/staff/membership/#{membership_file.id}/request_correction"
+                                      method="post">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <div t-if="membership_file.document_ids" class="mb-3">
+                                        <label class="form-label" for="document_id">
+                                            Pièce concernée *
+                                        </label>
+                                        <select name="document_id" id="document_id" class="form-select">
+                                            <option value="">Choisissez la pièce…</option>
+                                            <option t-foreach="membership_file.document_ids" t-as="document"
+                                                    t-att-value="document.id">
+                                                <t t-out="document.name"/>
+                                                (<t t-out="dict(document._fields['document_type'].selection)[document.document_type]"/>)
+                                            </option>
+                                        </select>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="motif">Motif *</label>
+                                        <input type="text" name="motif" id="motif" class="form-control"
+                                               placeholder="ex. Le document fourni est illisible."/>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="commentaire">Commentaire *</label>
+                                        <textarea name="commentaire" id="commentaire" class="form-control" rows="3"
+                                                  placeholder="ex. Veuillez fournir une nouvelle copie."/>
+                                    </div>
+                                    <button type="submit" class="btn btn-warning">
+                                        Envoyer la demande
+                                    </button>
+                                </form>
+                            </div>
+
                             <!-- Formulaire d'avis du Comité : trois choix
                                  exclusifs et un commentaire, comme la
                                  section 21. Il précède le pied de carte parce
@@ -339,6 +428,12 @@
                                      rien à faire alors que le formulaire attend. -->
                                 <span t-elif="can_record_avis" class="text-muted">
                                     Rendez votre avis dans le formulaire ci-dessus.
+                                </span>
+                                <span t-elif="payment_to_verify" class="text-muted">
+                                    Vérifiez la preuve de paiement dans le bloc ci-dessus.
+                                </span>
+                                <span t-elif="can_request_correction" class="text-muted">
+                                    Vous pouvez demander une correction au candidat ci-dessus.
                                 </span>
                                 <span t-else="" class="text-muted">
                                     Aucune action ne vous revient sur ce dossier à son état actuel.

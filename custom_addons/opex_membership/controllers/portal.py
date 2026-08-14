@@ -1,7 +1,7 @@
 import base64
 
 from odoo import _, http
-from odoo.exceptions import AccessError, MissingError
+from odoo.exceptions import AccessError, MissingError, UserError
 from odoo.http import request
 
 from odoo.addons.portal.controllers.portal import CustomerPortal
@@ -208,19 +208,89 @@ class MembershipCustomerPortal(CustomerPortal):
     # Détail d'un dossier
     # ------------------------------------------------------------
 
-    @http.route(['/my/membership/<int:file_id>'], type='http', auth='user', website=True)
-    def portal_membership_file_page(self, file_id, **kw):
-        try:
-            membership_file_sudo = self._document_check_access('opex.membership.file', file_id)
-        except (AccessError, MissingError):
-            return request.redirect('/my')
+    def _readable_membership_file(self, file_id):
+        """Dossier lisible par l'utilisateur courant, en `sudo()`, ou `None`.
 
+        S'en remet au contrôle d'accès standard du portail, qui gère aussi les
+        liens partagés par jeton : la consultation n'est pas réservée au seul
+        propriétaire.
+        """
+        try:
+            return self._document_check_access('opex.membership.file', file_id)
+        except (AccessError, MissingError):
+            return None
+
+    def _own_membership_file(self, file_id):
+        """Dossier appartenant au candidat connecté, en `sudo()`, ou `None`.
+
+        Réservé aux routes qui *écrivent*. Le propriétaire y est réaffirmé
+        explicitement, au même titre que `create()` réécrit `partner_id` : ce
+        qui protège une route ne doit pas dépendre du seul filtrage amont.
+        Lire un dossier et le modifier ne demandent pas le même niveau de
+        preuve, d'où deux helpers distincts.
+        """
+        membership_file_sudo = self._readable_membership_file(file_id)
+        if not membership_file_sudo:
+            return None
+        if membership_file_sudo.partner_id != request.env.user.partner_id:
+            return None
+        return membership_file_sudo
+
+    def _render_membership_file_page(self, membership_file, error=None):
+        """Page de détail du dossier, éventuellement porteuse d'un message d'erreur."""
+        subscription = membership_file._pending_subscription()
         values = self._prepare_portal_layout_values()
         values.update({
-            'membership_file': membership_file_sudo,
+            'membership_file': membership_file,
+            'pending_subscription': subscription,
+            # Voie A : la page de commande native d'Odoo porte déjà le bouton
+            # « Payer maintenant » dès qu'un fournisseur de paiement est
+            # configuré. Rien à réimplémenter, juste à y conduire le candidat.
+            'online_payment_url': (
+                subscription.sale_order_id.get_portal_url()
+                if subscription.sale_order_id else False
+            ),
+            # Preuve refusée : le candidat doit lire pourquoi avant d'en
+            # redéposer une.
+            'rejected_payment': membership_file.subscription_ids.payment_ids.filtered(
+                lambda p: p.state == 'rejected'
+            )[:1],
+            'payment_to_verify': membership_file.subscription_ids.payment_ids.filtered(
+                lambda p: p.state == 'to_verify'
+            )[:1],
+            # Pièces obligatoires encore absentes, présentées comme des champs
+            # de dépôt : le candidat en correction doit pouvoir les ajouter
+            # sans repasser par un formulaire de création.
+            'missing_slots': [
+                slot for slot in self._DOCUMENT_SLOTS
+                if slot[2] and slot[0] not in membership_file.document_ids.mapped('document_type')
+            ],
+            'error': error,
             'page_name': 'membership',
         })
         return request.render('opex_membership.portal_membership_file_page', values)
+
+    @http.route(['/my/membership/<int:file_id>'], type='http', auth='user', website=True)
+    def portal_membership_file_page(self, file_id, **kw):
+        membership_file_sudo = self._readable_membership_file(file_id)
+        if not membership_file_sudo:
+            return request.redirect('/my')
+        return self._render_membership_file_page(membership_file_sudo)
+
+    def _apply_candidate_action(self, membership_file, action):
+        """Déclenche une action du modèle et réaffiche la page si elle refuse.
+
+        Sans cela, un dossier auquel il manque une pièce obligatoire renverrait
+        au candidat une page d'erreur Odoo brute au lieu de lui dire ce qui
+        manque — exactement l'inverse de la règle d'or de la section 47.
+        """
+        try:
+            with request.env.cr.savepoint():
+                action()
+        except UserError as error:
+            return self._render_membership_file_page(
+                membership_file, error=error.args[0])
+        return request.redirect('/my/membership/%s' % membership_file.id)
 
     @http.route(
         ['/my/membership/<int:file_id>/submit'],
@@ -233,18 +303,180 @@ class MembershipCustomerPortal(CustomerPortal):
         ne remonterait jamais au Secrétariat.
 
         La transition s'exécute en `sudo()` pour que le suivi `mail.thread` du
-        changement d'état ne bute pas sur les droits du groupe portail. Le
-        propriétaire du dossier est donc réaffirmé explicitement juste avant,
-        au même titre que `create()` réécrit `partner_id` : ce qui protège la
-        route ne doit pas dépendre du seul filtrage amont.
+        changement d'état ne bute pas sur les droits du groupe portail.
         """
-        try:
-            membership_file_sudo = self._document_check_access('opex.membership.file', file_id)
-        except (AccessError, MissingError):
+        membership_file_sudo = self._own_membership_file(file_id)
+        if not membership_file_sudo:
             return request.redirect('/my')
+        if membership_file_sudo.state != 'draft':
+            return request.redirect('/my/membership/%s' % file_id)
+        return self._apply_candidate_action(
+            membership_file_sudo, membership_file_sudo.action_submit)
 
-        if membership_file_sudo.partner_id != request.env.user.partner_id:
+    # ------------------------------------------------------------
+    # Réponse à une demande de correction
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/my/membership/<int:file_id>/documents'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_membership_file_documents(self, file_id, **post):
+        """Remplace la pièce visée par une correction, ou ajoute une pièce manquante.
+
+        Les pièces sont écrites sous l'identité du candidat, pas en `sudo()` :
+        la règle d'enregistrement du module vérifie alors elle-même qu'elles
+        lui appartiennent *et* que son dossier est encore modifiable. Le
+        contrôle du controller et celui de la base disent la même chose, et
+        c'est voulu — si l'un se trompe, l'autre tient.
+        """
+        membership_file_sudo = self._own_membership_file(file_id)
+        if not membership_file_sudo:
             return request.redirect('/my')
-        if membership_file_sudo.state == 'draft':
-            membership_file_sudo.action_submit()
+        if membership_file_sudo.state not in ('draft', 'correction_requested'):
+            return request.redirect('/my/membership/%s' % file_id)
+
+        try:
+            with request.env.cr.savepoint():
+                self._replace_membership_documents(membership_file_sudo)
+                self._add_missing_membership_documents(membership_file_sudo)
+        except AccessError:
+            return self._render_membership_file_page(
+                membership_file_sudo,
+                error="Vous ne pouvez plus modifier les pièces de ce dossier.",
+            )
         return request.redirect('/my/membership/%s' % file_id)
+
+    def _replace_membership_documents(self, membership_file):
+        """Écrase le contenu des pièces que le candidat re-téléverse.
+
+        La pièce est retrouvée parmi celles du dossier : un identifiant forgé
+        ne désigne rien et le fichier est ignoré, plutôt que d'aller écraser la
+        pièce d'un autre candidat.
+        """
+        Document = request.env['opex.membership.document']
+        for key in request.httprequest.files.keys():
+            if not key.startswith('replace_'):
+                continue
+            upload = request.httprequest.files[key]
+            if not upload.filename:
+                continue
+            document = Document.search([
+                ('id', '=', int(key[len('replace_'):])),
+                ('membership_file_id', '=', membership_file.id),
+            ], limit=1) if key[len('replace_'):].isdigit() else Document
+            if document:
+                document.write({
+                    'name': upload.filename,
+                    'filename': upload.filename,
+                    'file': base64.b64encode(upload.read()),
+                })
+
+    def _add_missing_membership_documents(self, membership_file):
+        """Ajoute les pièces obligatoires que le dossier n'a pas encore."""
+        Document = request.env['opex.membership.document']
+        present = membership_file.document_ids.mapped('document_type')
+        values = []
+        for document_type, _label, is_required in self._DOCUMENT_SLOTS:
+            if not is_required or document_type in present:
+                continue
+            for upload in request.httprequest.files.getlist('document_%s' % document_type):
+                if not upload.filename:
+                    continue
+                values.append({
+                    'name': upload.filename,
+                    'filename': upload.filename,
+                    'membership_file_id': membership_file.id,
+                    'document_type': document_type,
+                    'file': base64.b64encode(upload.read()),
+                })
+        if values:
+            Document.create(values)
+
+    # ------------------------------------------------------------
+    # Paiement de la cotisation (voie B — preuve de paiement)
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/my/membership/<int:file_id>/payment_proof'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_membership_payment_proof(self, file_id, **post):
+        """Dépôt d'une preuve de paiement par le candidat (section 24, option B).
+
+        Le paiement est créé sous l'identité du candidat : la règle
+        d'enregistrement vérifie alors elle-même qu'il porte sur *sa* cotisation,
+        et `create()` impose l'état « à vérifier ». Le montant saisi n'engage
+        donc rien tant que le Secrétariat n'a pas contrôlé le justificatif.
+        """
+        membership_file_sudo = self._own_membership_file(file_id)
+        if not membership_file_sudo:
+            return request.redirect('/my')
+        if membership_file_sudo.state != 'payment_pending':
+            return request.redirect('/my/membership/%s' % file_id)
+
+        upload = request.httprequest.files.get('justificatif')
+        if not upload or not upload.filename:
+            return self._render_membership_file_page(
+                membership_file_sudo,
+                error="Le justificatif de paiement est obligatoire.",
+            )
+
+        montant, error = self._parse_payment_amount(post.get('montant'))
+        if error:
+            return self._render_membership_file_page(membership_file_sudo, error=error)
+
+        proof = {
+            'reference': (post.get('reference_paiement') or '').strip(),
+            'date_paiement': (post.get('date_paiement') or '').strip() or False,
+            'montant': montant,
+            'justificatif': base64.b64encode(upload.read()),
+            'filename': upload.filename,
+        }
+        try:
+            return self._apply_candidate_action(
+                membership_file_sudo,
+                lambda: membership_file_sudo.action_submit_payment_proof(**proof),
+            )
+        except AccessError:
+            return self._render_membership_file_page(
+                membership_file_sudo,
+                error="Vous ne pouvez pas déposer de preuve sur cette cotisation.",
+            )
+
+    def _parse_payment_amount(self, raw):
+        """Montant déclaré, ou message d'erreur lisible.
+
+        La saisie vient d'un champ libre : une virgule décimale et les espaces
+        des montants en dinars sont acceptés plutôt que renvoyés au candidat
+        comme une erreur de format.
+        """
+        cleaned = (raw or '').replace(',', '.').replace(' ', '').replace(' ', '')
+        if not cleaned:
+            return 0.0, "Indiquez le montant que vous avez payé."
+        try:
+            montant = float(cleaned)
+        except ValueError:
+            return 0.0, "Le montant doit être un nombre, par exemple 50000."
+        if montant <= 0:
+            return 0.0, "Le montant du paiement doit être positif."
+        return montant, None
+
+    @http.route(
+        ['/my/membership/<int:file_id>/resubmit'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_membership_file_resubmit(self, file_id, **post):
+        """Re-soumission après correction (Correction demandée -> En contrôle).
+
+        C'est `action_resubmit()` qui marque les corrections traitées et
+        revérifie les pièces obligatoires : le controller ne rejoue aucune de
+        ces règles.
+        """
+        membership_file_sudo = self._own_membership_file(file_id)
+        if not membership_file_sudo:
+            return request.redirect('/my')
+        if membership_file_sudo.state != 'correction_requested':
+            return request.redirect('/my/membership/%s' % file_id)
+        return self._apply_candidate_action(
+            membership_file_sudo, membership_file_sudo.action_resubmit)

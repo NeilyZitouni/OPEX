@@ -103,16 +103,48 @@ class OpexStaff(http.Controller):
                 and (user.has_group('opex_membership.group_comite')
                      or user.has_group('base.group_system')))
 
-    def _payable_subscription(self, membership_file):
-        """Cotisation encaissable depuis cette page, sinon recordset vide.
+    def _can_request_correction(self, membership_file):
+        """Le Secrétariat peut-il renvoyer ce dossier au candidat ?
 
-        Uniquement sur un dossier en attente de paiement dont une cotisation
-        attend son règlement : ailleurs, il n'y a ni bouton ni action possible.
+        Uniquement pendant le contrôle : le Comité, lui, passe par son avis
+        « Demande de complément », qui aboutit à la même demande de correction
+        (cf. `action_record_avis_comite`). Deux portes d'entrée, une seule
+        logique métier dans le modèle.
         """
-        if membership_file.state not in ('payment_pending', 'payment_verification'):
+        user = request.env.user
+        return (membership_file.state == 'control'
+                and (user.has_group('opex_membership.group_secretariat')
+                     or user.has_group('base.group_system')))
+
+    def _payable_subscription(self, membership_file):
+        """Cotisation encaissable directement par le Secrétariat, sinon vide.
+
+        Saisie manuelle d'un encaissement (espèces, virement constaté) : elle
+        n'a de sens qu'en attente de paiement. Dès qu'une preuve est déposée,
+        le dossier passe en vérification et la bonne action devient
+        « Confirmer » ou « Rejeter » cette preuve — proposer les deux
+        laisserait solder la même cotisation par deux chemins.
+        """
+        if membership_file.state != 'payment_pending':
             return request.env['opex.subscription']
         return membership_file.subscription_ids.filtered(
             lambda subscription: subscription.state == 'waiting'
+        )[:1]
+
+    def _payment_to_verify(self, membership_file):
+        """Preuve de paiement en attente de contrôle, sinon recordset vide.
+
+        Réservée au Secrétariat : c'est lui qui tient les cotisations, le
+        Comité et le COPIL n'ont pas à trancher sur un justificatif.
+        """
+        user = request.env.user
+        if membership_file.state != 'payment_verification':
+            return request.env['opex.payment']
+        if not (user.has_group('opex_membership.group_secretariat')
+                or user.has_group('base.group_system')):
+            return request.env['opex.payment']
+        return membership_file.subscription_ids.payment_ids.filtered(
+            lambda payment: payment.state == 'to_verify'
         )[:1]
 
     def _get_membership_file(self, file_id):
@@ -163,6 +195,8 @@ class OpexStaff(http.Controller):
             'transition': self._allowed_transition(membership_file),
             'payable_subscription': self._payable_subscription(membership_file),
             'can_record_avis': self._can_record_avis(membership_file),
+            'can_request_correction': self._can_request_correction(membership_file),
+            'payment_to_verify': self._payment_to_verify(membership_file),
             'error': error,
             'page_name': 'staff_membership',
         }
@@ -228,6 +262,58 @@ class OpexStaff(http.Controller):
         )
 
     # ------------------------------------------------------------
+    # Demande de correction (Secrétariat)
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/staff/membership/<int:file_id>/request_correction'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def staff_membership_file_request_correction(self, file_id, **post):
+        """Renvoie le dossier au candidat pour correction (section 19).
+
+        La pièce visée est cherchée *parmi celles du dossier* : un identifiant
+        forgé désignant la pièce d'un autre dossier ne ramène rien et la
+        demande est refusée, plutôt que d'aller pointer un document étranger.
+        """
+        if not self._is_staff():
+            return request.redirect('/my')
+
+        membership_file = self._get_membership_file(file_id)
+        if not membership_file:
+            return request.redirect('/staff/membership')
+        if not self._can_request_correction(membership_file):
+            return request.redirect('/staff/membership/%s' % file_id)
+
+        motif = (post.get('motif') or '').strip()
+        commentaire = (post.get('commentaire') or '').strip()
+        document_id = post.get('document_id') or ''
+        document = membership_file.document_ids.filtered(
+            lambda d: str(d.id) == document_id
+        )[:1]
+
+        error = None
+        if not document and membership_file.document_ids:
+            # Le dossier a des pièces : la spécification impose d'en désigner
+            # une, pour que le candidat sache laquelle refaire.
+            error = "Choisissez la pièce concernée par la correction."
+        elif not motif:
+            error = "Le motif de la correction est obligatoire."
+        elif not commentaire:
+            error = "Le commentaire est obligatoire : c'est ce texte que le candidat recevra."
+        if error:
+            return request.render(
+                'opex_membership.staff_membership_file_page',
+                self._staff_file_values(membership_file, error=error),
+            )
+
+        return self._apply_staff_action(membership_file, lambda: (
+            membership_file.action_request_correction(
+                motif=motif, commentaire=commentaire, document=document or None,
+            )
+        ))
+
+    # ------------------------------------------------------------
     # Avis du Comité d'admission
     # ------------------------------------------------------------
 
@@ -275,6 +361,49 @@ class OpexStaff(http.Controller):
             membership_file.action_record_avis_comite()
 
         return self._apply_staff_action(membership_file, record_avis)
+
+    # ------------------------------------------------------------
+    # Vérification d'une preuve de paiement (voie B)
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/staff/membership/<int:file_id>/payment/<any(confirm,reject):verdict>'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def staff_membership_verify_payment(self, file_id, verdict, **post):
+        """Confirme ou rejette la preuve déposée par le candidat (section 24).
+
+        Le verdict vient de l'URL, pas d'un champ du formulaire, et les deux
+        seules valeurs possibles sont fixées par la route elle-même. Les
+        conséquences — cotisation soldée puis dossier envoyé à la signature,
+        ou retour en attente de paiement — restent entièrement dans le modèle.
+        """
+        if not self._is_staff():
+            return request.redirect('/my')
+
+        membership_file = self._get_membership_file(file_id)
+        if not membership_file:
+            return request.redirect('/staff/membership')
+
+        payment = self._payment_to_verify(membership_file)
+        if not payment:
+            return request.redirect('/staff/membership/%s' % file_id)
+
+        if verdict == 'confirm':
+            return self._apply_staff_action(membership_file, payment.action_confirm)
+
+        motif = (post.get('motif_rejet') or '').strip()
+        if not motif:
+            return request.render(
+                'opex_membership.staff_membership_file_page',
+                self._staff_file_values(
+                    membership_file,
+                    error="Indiquez le motif du rejet : le candidat doit savoir "
+                          "quoi corriger avant de redéposer une preuve.",
+                ),
+            )
+        return self._apply_staff_action(
+            membership_file, lambda: payment.action_reject(motif))
 
     # ------------------------------------------------------------
     # Encaissement de la cotisation

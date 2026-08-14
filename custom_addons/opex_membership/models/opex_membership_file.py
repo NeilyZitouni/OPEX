@@ -393,6 +393,59 @@ class OpexMembershipFile(models.Model):
         order.action_confirm()
         return subscription
 
+    def _pending_subscription(self):
+        """Cotisation en attente de règlement sur ce dossier, sinon vide."""
+        self.ensure_one()
+        return self.subscription_ids.filtered(lambda s: s.state == 'waiting')[:1]
+
+    def action_submit_payment_proof(self, reference, date_paiement, montant,
+                                    justificatif, filename=False):
+        """Voie B : le candidat déclare un paiement effectué hors du portail.
+
+        Rien n'est soldé à ce stade — la preuve part « à vérifier » et le
+        dossier attend le contrôle du Secrétariat. C'est la différence avec la
+        voie A, où l'encaissement est constaté par Odoo lui-même.
+        """
+        self.ensure_one()
+        self._ensure_state(('payment_pending',), _("Le dépôt d'une preuve de paiement"))
+        subscription = self._pending_subscription()
+        if not subscription:
+            raise UserError(_(
+                "Aucune cotisation n'attend de règlement sur ce dossier."
+            ))
+        if not justificatif:
+            raise UserError(_("Le justificatif de paiement est obligatoire."))
+        if not montant or montant <= 0:
+            raise UserError(_("Le montant du paiement doit être positif."))
+
+        # `sudo(False)` : le dossier est manipulé en `sudo()` par le portail,
+        # mais la preuve, elle, doit être créée sous l'identité réelle du
+        # candidat — c'est ce qui laisse la règle d'enregistrement vérifier
+        # qu'elle porte bien sur sa propre cotisation. Le contrôle du
+        # controller et celui de la base disent alors la même chose.
+        payment = self.env['opex.payment'].sudo(False).create({
+            'subscription_id': subscription.id,
+            'montant': montant,
+            'date_paiement': date_paiement or fields.Datetime.now(),
+            'reference_transaction': reference or False,
+            'mode_paiement': 'transfer',
+            'justificatif': justificatif,
+            'justificatif_filename': filename or False,
+            'state': 'to_verify',
+        })
+        self.state = 'payment_verification'
+        return payment
+
+    def action_reject_payment(self):
+        """La preuve déposée est rejetée : le dossier redevient à payer.
+
+        Le candidat peut alors en déposer une nouvelle ; le motif du rejet est
+        porté par le paiement rejeté, pas par le dossier.
+        """
+        for rec in self:
+            rec._ensure_state(('payment_verification',), _("Le rejet du paiement"))
+            rec.state = 'payment_pending'
+
     def action_confirm_payment(self):
         """Paiement encaissé -> Signature en attente.
 
