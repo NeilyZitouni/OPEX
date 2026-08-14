@@ -1,4 +1,6 @@
-from odoo import _, fields, http
+import base64
+
+from odoo import _, http
 from odoo.exceptions import AccessError, MissingError
 from odoo.http import request
 
@@ -18,6 +20,29 @@ class MembershipCustomerPortal(CustomerPortal):
     # `res.partner`. Liste fermée : elle est appliquée en `sudo()`, tout ajout
     # ici donne au candidat le droit d'écrire ce champ sur son contact.
     _CANDIDATE_PARTNER_FIELDS = ('secteur_activite', 'wilaya')
+
+    # Champs du dossier que le formulaire de dépôt renseigne directement.
+    # Le parcours en sept écrans des sections A à E (Extension 10) remplacera
+    # cette page unique ; d'ici là, elle couvre l'essentiel de la section A et
+    # les identifiants dont le Secrétariat a besoin pour instruire.
+    _CANDIDATE_FILE_FIELDS = (
+        'nom_legal', 'nom_commercial', 'forme_juridique', 'nif', 'rc',
+        'adresse', 'wilaya', 'commune', 'site_web', 'email_pro', 'telephone',
+        'secteur_activite', 'activite_principale',
+        'representant_nom', 'representant_prenom', 'representant_fonction',
+        'representant_email', 'representant_telephone',
+        'motivation',
+    )
+
+    # Pièces proposées à l'écran de dépôt, dans l'ordre de la section E : les
+    # deux obligatoires d'abord, les complémentaires ensuite.
+    _DOCUMENT_SLOTS = (
+        ('registre_commerce', "Registre de commerce", True),
+        ('statuts', "Statuts de l'organisation", True),
+        ('presentation_entreprise', "Présentation de l'entreprise", False),
+        ('certification', "Certifications", False),
+        ('autre', "Autre document", False),
+    )
 
     def _membership_file_domain(self):
         """Filtre applicatif ; la règle d'enregistrement le garantit côté base."""
@@ -101,7 +126,10 @@ class MembershipCustomerPortal(CustomerPortal):
         values = self._prepare_portal_layout_values()
         values.update({
             'page_name': 'membership_new',
-            'categories': request.env['opex.membership.category'].search([]),
+            'categories': request.env['opex.membership.category'].search(
+                [('subcategory_ids', '!=', False)]
+            ),
+            'document_slots': self._DOCUMENT_SLOTS,
             'partner': request.env.user.partner_id,
             'form': {},
             'errors': {},
@@ -116,9 +144,13 @@ class MembershipCustomerPortal(CustomerPortal):
             if not values['errors']:
                 # `partner_id` et `state` sont volontairement absents : le
                 # `create()` du modèle les impose côté serveur.
-                membership_file = MembershipFile.create({
-                    'category_id': int(post['category_id']),
+                file_values = {'subcategory_id': int(post['subcategory_id'])}
+                file_values.update({
+                    field: post[field].strip()
+                    for field in self._CANDIDATE_FILE_FIELDS
+                    if isinstance(post.get(field), str) and post[field].strip()
                 })
+                membership_file = MembershipFile.create(file_values)
                 self._update_candidate_profile(post)
                 self._attach_membership_documents(membership_file)
                 return request.redirect('/my/membership/%s' % membership_file.id)
@@ -127,11 +159,15 @@ class MembershipCustomerPortal(CustomerPortal):
 
     def _validate_membership_form(self, post):
         errors = {}
-        category_id = post.get('category_id')
-        if not category_id or not category_id.isdigit():
-            errors['category_id'] = _("Veuillez choisir une catégorie d'adhésion.")
-        elif not request.env['opex.membership.category'].browse(int(category_id)).exists():
-            errors['category_id'] = _("Cette catégorie d'adhésion n'existe pas.")
+        subcategory_id = post.get('subcategory_id')
+        if not subcategory_id or not subcategory_id.isdigit():
+            errors['subcategory_id'] = _("Veuillez choisir une sous-catégorie d'adhésion.")
+        elif not request.env['opex.membership.subcategory'].browse(
+            int(subcategory_id)
+        ).exists():
+            errors['subcategory_id'] = _("Cette sous-catégorie d'adhésion n'existe pas.")
+        if not (post.get('nom_legal') or '').strip():
+            errors['nom_legal'] = _("Le nom légal de l'organisation est obligatoire.")
         return errors
 
     def _update_candidate_profile(self, post):
@@ -145,27 +181,28 @@ class MembershipCustomerPortal(CustomerPortal):
             request.env.user.partner_id.sudo().write(partner_values)
 
     def _attach_membership_documents(self, membership_file):
-        """Joint les pièces téléversées au dossier.
+        """Crée une pièce de dossier par fichier téléversé, typée selon son champ.
 
-        `ir.attachment` n'est pas accessible au groupe portail : la création
-        passe donc par `sudo()`, sur un dossier dont `create()` vient de garantir
-        qu'il appartient au candidat connecté.
+        Le type n'est jamais déduit du nom du fichier : il vient du champ du
+        formulaire dans lequel le candidat a déposé la pièce. C'est lui qui
+        décide ensuite si le dossier est complet — un `Registre.pdf` déposé dans
+        « Autre document » reste une pièce complémentaire.
         """
-        uploads = [
-            upload for upload in request.httprequest.files.getlist('documents')
-            if upload.filename
-        ]
-        if not uploads:
-            return
-        attachments = request.env['ir.attachment'].sudo().create([{
-            'name': upload.filename,
-            'raw': upload.read(),
-            'res_model': membership_file._name,
-            'res_id': membership_file.id,
-        } for upload in uploads])
-        membership_file.sudo().write({
-            'document_ids': [fields.Command.link(attachment.id) for attachment in attachments],
-        })
+        Document = request.env['opex.membership.document']
+        values = []
+        for document_type, label, _is_required in self._DOCUMENT_SLOTS:
+            for upload in request.httprequest.files.getlist('document_%s' % document_type):
+                if not upload.filename:
+                    continue
+                values.append({
+                    'name': upload.filename,
+                    'filename': upload.filename,
+                    'membership_file_id': membership_file.id,
+                    'document_type': document_type,
+                    'file': base64.b64encode(upload.read()),
+                })
+        if values:
+            Document.create(values)
 
     # ------------------------------------------------------------
     # Détail d'un dossier

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Les 4 catégories officielles et leurs sous-catégories, reprises à la
+        lettre de la section 3 de la spécification UX validée.
+
+        `noupdate="1"` : ce sont des données de démarrage, pas des données de
+        référence figées. Le barème (`montant_cotisation`) et les critères sont
+        paramétrables par l'Administrateur — une mise à jour du module ne doit
+        pas écraser ce qu'il a saisi. Les montants sont donc volontairement
+        laissés à zéro : la spécification les note « XXX DA ».
+    -->
+    <data noupdate="1">
+
+        <!-- Catégorie 1 — Membres adhérents -->
+        <record id="category_membres_adherents" model="opex.membership.category">
+            <field name="name">Membres adhérents</field>
+            <field name="sequence">10</field>
+        </record>
+        <record id="subcategory_pme_pmi" model="opex.membership.subcategory">
+            <field name="name">PME / PMI</field>
+            <field name="category_id" ref="category_membres_adherents"/>
+            <field name="critere_eligibilite">50 à 2000 salariés</field>
+            <field name="sequence">10</field>
+        </record>
+
+        <!-- Catégorie 2 — Membres associés -->
+        <record id="category_membres_associes" model="opex.membership.category">
+            <field name="name">Membres associés</field>
+            <field name="sequence">20</field>
+        </record>
+        <record id="subcategory_universite" model="opex.membership.subcategory">
+            <field name="name">Université</field>
+            <field name="category_id" ref="category_membres_associes"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="subcategory_incubateur" model="opex.membership.subcategory">
+            <field name="name">Incubateur</field>
+            <field name="category_id" ref="category_membres_associes"/>
+            <field name="sequence">20</field>
+        </record>
+        <record id="subcategory_centre_recherche" model="opex.membership.subcategory">
+            <field name="name">Centre de recherche</field>
+            <field name="category_id" ref="category_membres_associes"/>
+            <field name="sequence">30</field>
+        </record>
+
+        <!-- Catégorie 3 — Partenaires / Sponsors -->
+        <record id="category_partenaires_sponsors" model="opex.membership.category">
+            <field name="name">Partenaires / Sponsors</field>
+            <field name="sequence">30</field>
+        </record>
+        <record id="subcategory_grande_entreprise" model="opex.membership.subcategory">
+            <field name="name">Grande entreprise</field>
+            <field name="category_id" ref="category_partenaires_sponsors"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="subcategory_banque" model="opex.membership.subcategory">
+            <field name="name">Banque</field>
+            <field name="category_id" ref="category_partenaires_sponsors"/>
+            <field name="sequence">20</field>
+        </record>
+        <record id="subcategory_institution" model="opex.membership.subcategory">
+            <field name="name">Institution</field>
+            <field name="category_id" ref="category_partenaires_sponsors"/>
+            <field name="sequence">30</field>
+        </record>
+
+        <!-- Catégorie 4 — Experts / Consultants -->
+        <record id="category_experts_consultants" model="opex.membership.category">
+            <field name="name">Experts / Consultants</field>
+            <field name="sequence">40</field>
+        </record>
+        <record id="subcategory_expert_aceo" model="opex.membership.subcategory">
+            <field name="name">Expert ACEO</field>
+            <field name="category_id" ref="category_experts_consultants"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="subcategory_cabinet" model="opex.membership.subcategory">
+            <field name="name">Cabinet</field>
+            <field name="category_id" ref="category_experts_consultants"/>
+            <field name="sequence">20</field>
+        </record>
+        <record id="subcategory_consultant_independant" model="opex.membership.subcategory">
+            <field name="name">Consultant indépendant</field>
+            <field name="category_id" ref="category_experts_consultants"/>
+            <field name="sequence">30</field>
+        </record>
+
+    </data>
+</odoo>

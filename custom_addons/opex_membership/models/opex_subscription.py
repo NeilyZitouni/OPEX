@@ -55,8 +55,14 @@ class OpexSubscription(models.Model):
             self._trigger_membership_activation()
         return res
 
+    # États d'un dossier qu'une cotisation soldée fait avancer vers la signature
+    # de la charte. Le règlement ne suffit plus à activer l'adhésion : depuis
+    # l'alignement sur la spécification UX (Partie V), l'activation exige aussi
+    # la charte signée.
+    _PAYABLE_FILE_STATES = ('payment_pending', 'payment_verification')
+
     def _trigger_membership_activation(self):
-        """Une cotisation soldée active le dossier d'adhésion validé par le COPIL.
+        """Une cotisation soldée fait passer le dossier à la signature de la charte.
 
         Vaut quelle que soit l'origine du paiement : facture Odoo réglée
         (sale.order) ou paiement hors Odoo saisi via opex.payment.
@@ -66,11 +72,11 @@ class OpexSubscription(models.Model):
             if not membership_file:
                 membership_file = self.env['opex.membership.file'].search([
                     ('partner_id', '=', rec.partner_id.id),
-                    ('state', '=', 'validated'),
+                    ('state', 'in', self._PAYABLE_FILE_STATES),
                 ], limit=1)
             membership_file.filtered(
-                lambda f: f.state == 'validated'
-            )._activate_membership()
+                lambda f: f.state in self._PAYABLE_FILE_STATES
+            ).action_confirm_payment()
 
     def _state_label(self):
         self.ensure_one()

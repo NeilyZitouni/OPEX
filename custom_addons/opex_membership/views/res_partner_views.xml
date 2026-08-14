@@ -11,7 +11,8 @@
                     <group>
                         <group string="Statut">
                             <field name="is_member"/>
-                            <field name="categorie_membre_id"/>
+                            <field name="membership_category_id" readonly="1"/>
+                            <field name="subcategory_id"/>
                             <field name="date_adhesion"/>
                             <field name="is_published_directory" readonly="1"/>
                         </group>
@@ -50,7 +51,7 @@
         <field name="arch" type="xml">
             <field name="phone" position="after">
                 <field name="is_member" optional="show"/>
-                <field name="categorie_membre_id" optional="show"/>
+                <field name="subcategory_id" optional="show"/>
             </field>
         </field>
     </record>

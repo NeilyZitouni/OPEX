@@ -80,9 +80,9 @@
                                     <div class="card h-100">
                                         <div class="card-body">
                                             <h5 class="card-title mb-1"><t t-out="member['name']"/></h5>
-                                            <span t-if="member['categorie_membre_id']"
+                                            <span t-if="member['subcategory_id']"
                                                   class="badge text-bg-primary mb-2">
-                                                <t t-out="member['categorie_membre_id']"/>
+                                                <t t-out="member['subcategory_id']"/>
                                             </span>
                                             <ul class="list-unstyled text-muted mb-0 mt-2">
                                                 <li t-if="member['secteur_activite']">

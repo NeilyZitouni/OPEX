@@ -5,10 +5,19 @@ class ResPartner(models.Model):
     _inherit = 'res.partner'
 
     is_member = fields.Boolean(string="Est membre du cluster")
-    categorie_membre_id = fields.Many2one(
-        'opex.membership.category',
-        string="Catégorie de membre",
+    subcategory_id = fields.Many2one(
+        'opex.membership.subcategory',
+        string="Sous-catégorie de membre",
         ondelete='restrict',
+    )
+    # Surtout pas `category_id` ici : sur `res.partner`, ce nom est déjà celui
+    # des étiquettes natives (Many2many vers `res.partner.category`). La
+    # catégorie d'adhésion se lit via `subcategory_id.category_id`.
+    membership_category_id = fields.Many2one(
+        'opex.membership.category',
+        string="Catégorie d'adhésion",
+        related='subcategory_id.category_id',
+        store=True,
     )
     secteur_activite = fields.Char(string="Secteur d'activité")
     wilaya = fields.Char(string="Wilaya")
@@ -32,5 +41,5 @@ class ResPartner(models.Model):
             'name': self.name,
             'secteur_activite': self.secteur_activite,
             'wilaya': self.wilaya,
-            'categorie_membre_id': self.categorie_membre_id.name if self.categorie_membre_id else False,
+            'subcategory_id': self.subcategory_id.display_name if self.subcategory_id else False,
         }

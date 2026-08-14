@@ -14,7 +14,7 @@ cotisations, paiements, annuaire des membres et événements du cluster.
     'website': "https://www.deltalog-conseil.com",
 
     'category': 'Services/Membership',
-    'version': '19.0.1.0.0',
+    'version': '19.0.1.2.0',
 
     'depends': ['base', 'mail', 'sale', 'portal', 'website'],
 
@@ -22,8 +22,11 @@ cotisations, paiements, annuaire des membres et événements du cluster.
         'security/security.xml',
         'security/ir.model.access.csv',
         'security/ir_rule.xml',
+        'data/membership_categories.xml',
         'data/website_menu.xml',
         'views/opex_membership_category_views.xml',
+        'views/opex_membership_subcategory_views.xml',
+        'views/opex_certification_views.xml',
         'views/res_partner_views.xml',
         'views/opex_membership_file_views.xml',
         'views/opex_subscription_views.xml',

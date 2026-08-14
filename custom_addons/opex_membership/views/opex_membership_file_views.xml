@@ -7,9 +7,13 @@
         <field name="arch" type="xml">
             <list string="Dossiers d'adhésion">
                 <field name="partner_id"/>
-                <field name="category_id"/>
+                <field name="nom_legal" optional="show"/>
+                <field name="category_id" optional="show"/>
+                <field name="subcategory_id"/>
                 <field name="date_depot"/>
-                <field name="state" widget="badge"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'active'"
+                       decoration-danger="state in ('rejected_control', 'rejected_committee', 'rejected_copil')"/>
             </list>
         </field>
     </record>
@@ -22,29 +26,140 @@
                 <header>
                     <button name="action_submit" type="object" string="Soumettre le dossier"
                             class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_resubmit" type="object" string="Re-soumettre après correction"
+                            class="oe_highlight" invisible="state != 'correction_requested'"/>
                     <button name="action_validate_secretariat" type="object" string="Valider (Secrétariat)"
                             class="oe_highlight" invisible="state != 'control'"
                             groups="opex_membership.group_secretariat"/>
-                    <button name="action_validate_copil" type="object" string="Valider (COPIL)"
+                    <button name="action_reject_control" type="object" string="Refuser (contrôle)"
+                            invisible="state != 'control'"
+                            groups="opex_membership.group_secretariat"/>
+                    <!-- L'avis est saisi dans l'onglet « Avis du comité »
+                         puis appliqué par ce bouton : les trois issues
+                         découlent de l'avis choisi, pas de trois boutons. -->
+                    <button name="action_record_avis_comite" type="object" string="Enregistrer l'avis"
                             class="oe_highlight" invisible="state != 'committee'"
+                            groups="opex_membership.group_comite"/>
+                    <button name="action_validate_copil" type="object" string="Valider (COPIL)"
+                            class="oe_highlight" invisible="state != 'copil_pending'"
                             groups="opex_membership.group_copil"/>
+                    <button name="action_reject_copil" type="object" string="Refuser (COPIL)"
+                            invisible="state != 'copil_pending'"
+                            groups="opex_membership.group_copil"/>
+                    <button name="action_sign_charte" type="object" string="Enregistrer la signature de la charte"
+                            class="oe_highlight" invisible="state != 'signature_pending'"
+                            groups="opex_membership.group_secretariat"/>
+                    <!-- Les états de refus sont volontairement hors de la barre
+                         d'avancement : un dossier refusé n'est pas « en retard »
+                         sur le parcours, il en est sorti. -->
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,control,committee,validated,active"/>
+                           statusbar_visible="draft,control,committee,copil_pending,payment_pending,signature_pending,active"/>
                 </header>
                 <sheet>
+                    <div class="oe_title">
+                        <h1><field name="nom_legal" placeholder="Nom légal de l'organisation"/></h1>
+                    </div>
                     <group>
                         <group>
                             <field name="partner_id"/>
-                            <field name="category_id"/>
-                            <field name="date_depot"/>
+                            <field name="category_id" readonly="1"/>
+                            <field name="subcategory_id"/>
                         </group>
                         <group>
+                            <field name="date_depot"/>
                             <field name="signature_date" readonly="1"/>
                         </group>
                     </group>
                     <notebook>
-                        <page string="Documents" name="documents">
-                            <field name="document_ids" widget="many2many_binary"/>
+                        <page string="Organisation" name="organisation">
+                            <group>
+                                <group string="Identité">
+                                    <field name="nom_commercial"/>
+                                    <field name="forme_juridique"/>
+                                    <field name="nif"/>
+                                    <field name="rc"/>
+                                </group>
+                                <group string="Coordonnées">
+                                    <field name="adresse"/>
+                                    <field name="wilaya"/>
+                                    <field name="commune"/>
+                                    <field name="site_web" widget="url"/>
+                                    <field name="email_pro" widget="email"/>
+                                    <field name="telephone" widget="phone"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Activité" name="activite">
+                            <group>
+                                <group>
+                                    <field name="secteur_activite"/>
+                                    <field name="activite_principale"/>
+                                    <field name="nombre_salaries"/>
+                                </group>
+                                <group>
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="chiffre_affaires"/>
+                                    <field name="certification_ids" widget="many2many_tags"
+                                           options="{'no_quick_create': False}"/>
+                                </group>
+                            </group>
+                            <separator string="Description de l'activité"/>
+                            <field name="description_activite"/>
+                        </page>
+                        <page string="Représentant" name="representant">
+                            <group>
+                                <group>
+                                    <field name="representant_nom"/>
+                                    <field name="representant_prenom"/>
+                                    <field name="representant_fonction"/>
+                                </group>
+                                <group>
+                                    <field name="representant_email" widget="email"/>
+                                    <field name="representant_telephone" widget="phone"/>
+                                </group>
+                            </group>
+                        </page>
+                        <page string="Complément" name="complement">
+                            <separator string="Présentation de l'organisation"/>
+                            <field name="presentation"/>
+                            <separator string="Pourquoi rejoindre le GIC OPEX Group ?"/>
+                            <field name="motivation"/>
+                            <separator string="Domaines d'expertise"/>
+                            <field name="domaines_expertise"/>
+                            <separator string="Partenariats existants"/>
+                            <field name="partenariats_existants"/>
+                        </page>
+                        <page string="Pièces du dossier" name="documents">
+                            <field name="document_ids">
+                                <list editable="bottom">
+                                    <field name="document_type"/>
+                                    <field name="name"/>
+                                    <field name="file" filename="filename" widget="binary"/>
+                                    <field name="filename" column_invisible="1"/>
+                                    <field name="is_required" widget="boolean_toggle" readonly="1"/>
+                                    <field name="date_depot" optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Avis du comité" name="avis_comite">
+                            <group>
+                                <field name="avis_comite"
+                                       readonly="state != 'committee'"/>
+                                <field name="commentaire_comite"
+                                       readonly="state != 'committee'"
+                                       placeholder="Motivation de l'avis ; obligatoire pour une demande de complément."/>
+                            </group>
+                        </page>
+                        <page string="Corrections" name="corrections">
+                            <field name="correction_ids" readonly="1">
+                                <list decoration-muted="resolved">
+                                    <field name="date_demande"/>
+                                    <field name="document_id"/>
+                                    <field name="motif"/>
+                                    <field name="commentaire"/>
+                                    <field name="resolved" widget="boolean_toggle"/>
+                                </list>
+                            </field>
                         </page>
                         <page string="Cotisations" name="subscriptions">
                             <field name="subscription_ids" readonly="1">
@@ -61,6 +176,36 @@
                 </sheet>
                 <chatter/>
             </form>
+        </field>
+    </record>
+
+    <record id="view_opex_membership_file_search" model="ir.ui.view">
+        <field name="name">opex.membership.file.search</field>
+        <field name="model">opex.membership.file</field>
+        <field name="arch" type="xml">
+            <search string="Dossiers d'adhésion">
+                <field name="partner_id"/>
+                <field name="nom_legal"/>
+                <field name="subcategory_id"/>
+                <filter name="filter_control" string="En contrôle"
+                        domain="[('state', '=', 'control')]"/>
+                <filter name="filter_correction" string="Correction demandée"
+                        domain="[('state', '=', 'correction_requested')]"/>
+                <filter name="filter_committee" string="Comité d'admission"
+                        domain="[('state', '=', 'committee')]"/>
+                <filter name="filter_copil" string="Validation COPIL"
+                        domain="[('state', '=', 'copil_pending')]"/>
+                <filter name="filter_active" string="Actifs"
+                        domain="[('state', '=', 'active')]"/>
+                <filter name="filter_rejected" string="Refusés"
+                        domain="[('state', 'in', ['rejected_control', 'rejected_committee', 'rejected_copil'])]"/>
+                <separator/>
+                <group name="group_by">
+                    <filter name="group_state" string="État" context="{'group_by': 'state'}"/>
+                    <filter name="group_category" string="Catégorie" context="{'group_by': 'category_id'}"/>
+                    <filter name="group_subcategory" string="Sous-catégorie" context="{'group_by': 'subcategory_id'}"/>
+                </group>
+            </search>
         </field>
     </record>
 

@@ -32,4 +32,48 @@
         <field name="perm_unlink" eval="False"/>
     </record>
 
+    <!--
+        Les pièces du dossier ne sont plus des `ir.attachment` (protégées par
+        les règles natives) mais un modèle du module : sans règle ici, un
+        candidat lirait et supprimerait les pièces de tous les autres.
+
+        Le dépôt et le retrait de pièces restent possibles tant que le dossier
+        est en Brouillon ou en Correction demandée — c'est précisément dans ce
+        second état que le Secrétariat attend un document remplacé.
+    -->
+    <record id="rule_membership_document_portal" model="ir.rule">
+        <field name="name">Pièce du dossier : le candidat n'accède qu'à ses propres pièces</field>
+        <field name="model_id" ref="model_opex_membership_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('membership_file_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_membership_document_portal_edit" model="ir.rule">
+        <field name="name">Pièce du dossier : dépôt et retrait tant que le dossier est modifiable</field>
+        <field name="model_id" ref="model_opex_membership_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('membership_file_id.partner_id', '=', user.partner_id.id), ('membership_file_id.state', 'in', ['draft', 'correction_requested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- La demande de correction est écrite par le Secrétariat ; le candidat
+         doit pouvoir la lire, jamais la modifier ni la déclarer traitée. -->
+    <record id="rule_membership_correction_portal" model="ir.rule">
+        <field name="name">Demande de correction : le candidat lit celles de ses dossiers</field>
+        <field name="model_id" ref="model_opex_membership_correction"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('file_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
 </odoo>

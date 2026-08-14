@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_opex_membership_subcategory_list" model="ir.ui.view">
+        <field name="name">opex.membership.subcategory.list</field>
+        <field name="model">opex.membership.subcategory</field>
+        <field name="arch" type="xml">
+            <list string="Sous-catégories d'adhésion">
+                <field name="sequence" widget="handle"/>
+                <field name="category_id"/>
+                <field name="name"/>
+                <field name="critere_eligibilite"/>
+                <field name="montant_cotisation"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_membership_subcategory_form" model="ir.ui.view">
+        <field name="name">opex.membership.subcategory.form</field>
+        <field name="model">opex.membership.subcategory</field>
+        <field name="arch" type="xml">
+            <form string="Sous-catégorie d'adhésion">
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="category_id"/>
+                            <field name="critere_eligibilite"
+                                   placeholder="ex. 50 à 2000 salariés"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="montant_cotisation"/>
+                            <field name="sequence"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_membership_subcategory" model="ir.actions.act_window">
+        <field name="name">Sous-catégories d'adhésion</field>
+        <field name="res_model">opex.membership.subcategory</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

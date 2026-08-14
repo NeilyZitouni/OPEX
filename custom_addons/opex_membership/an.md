@@ -438,14 +438,6 @@ explicitement un acteur séparé. Implémente-le pour de vrai.
 - Bouton "Enregistrer l'avis" → si favorable, transition vers `copil_pending`
   (visible pour COPIL) ; si défavorable → `rejected_committee` ; si
   complément → retour à `correction_requested`
-- `action_request_correction()` est un point d'entrée **partagé** entre
-  Secrétariat (depuis `control`) et Comité (depuis `committee`, via
-  "complément") — même méthode, pas de duplication
-- À chaque retour d'un dossier en `committee` après une ronde de
-  correction, `avis_comite`/`commentaire_comite` sont remis à vide — sinon
-  le COPIL verrait un avis obsolète et validerait sur une décision qui ne
-  tient plus. L'historique reste consultable dans le chatter (l'avis est
-  tracké avant remise à zéro)
 
 ---
 

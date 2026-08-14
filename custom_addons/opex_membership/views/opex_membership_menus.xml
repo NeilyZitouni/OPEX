@@ -44,4 +44,16 @@
               action="action_opex_membership_category"
               sequence="10"/>
 
+    <menuitem id="menu_opex_membership_subcategory"
+              name="Sous-catégories d'adhésion"
+              parent="menu_opex_membership_configuration"
+              action="action_opex_membership_subcategory"
+              sequence="20"/>
+
+    <menuitem id="menu_opex_certification"
+              name="Certifications"
+              parent="menu_opex_membership_configuration"
+              action="action_opex_certification"
+              sequence="30"/>
+
 </odoo>

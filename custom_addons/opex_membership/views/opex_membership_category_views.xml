@@ -6,8 +6,9 @@
         <field name="model">opex.membership.category</field>
         <field name="arch" type="xml">
             <list string="Catégories d'adhésion">
+                <field name="sequence" widget="handle"/>
                 <field name="name"/>
-                <field name="montant_cotisation"/>
+                <field name="subcategory_count"/>
             </list>
         </field>
     </record>
@@ -19,13 +20,29 @@
             <form string="Catégorie d'adhésion">
                 <sheet>
                     <group>
-                        <field name="name"/>
-                        <field name="currency_id" invisible="1"/>
-                        <field name="montant_cotisation"/>
+                        <group>
+                            <field name="name"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="droits_acces"/>
+                        </group>
                     </group>
-                    <group>
-                        <field name="droits_acces"/>
-                    </group>
+                    <notebook>
+                        <!-- Le barème vit sur la sous-catégorie : c'est elle
+                             que le candidat choisit et que la cotisation facture. -->
+                        <page string="Sous-catégories" name="subcategories">
+                            <field name="subcategory_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="critere_eligibilite"/>
+                                    <field name="montant_cotisation"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
                 </sheet>
             </form>
         </field>

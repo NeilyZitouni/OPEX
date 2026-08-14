@@ -15,6 +15,7 @@
                  candidat portail comme un visiteur anonyme n'a aucun des trois
                  groupes, le lien n'existe donc pas dans leur page. -->
             <li t-if="request.env.user.has_group('opex_membership.group_secretariat')
+                      or request.env.user.has_group('opex_membership.group_comite')
                       or request.env.user.has_group('opex_membership.group_copil')
                       or request.env.user.has_group('base.group_system')"
                 t-attf-class="#{_item_class} o_no_autohide_item">
@@ -77,7 +78,7 @@
                                                 Dossier n° <t t-out="membership_file.id"/>
                                             </div>
                                         </td>
-                                        <td><span t-field="membership_file.category_id"/></td>
+                                        <td><span t-field="membership_file.subcategory_id"/></td>
                                         <td>
                                             <span t-field="membership_file.date_depot"
                                                   t-options="{'widget': 'date'}"/>
@@ -141,7 +142,28 @@
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>Catégorie demandée</strong>
-                                        <div><span t-field="membership_file.category_id"/></div>
+                                        <div><span t-field="membership_file.subcategory_id"/></div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <strong>Organisation</strong>
+                                        <div>
+                                            <t t-out="membership_file.nom_legal or membership_file.partner_id.name"/>
+                                        </div>
+                                        <div t-if="membership_file.forme_juridique" class="text-muted small">
+                                            <t t-out="membership_file.forme_juridique"/>
+                                            <t t-if="membership_file.rc"> — RC <t t-out="membership_file.rc"/></t>
+                                            <t t-if="membership_file.nif"> — NIF <t t-out="membership_file.nif"/></t>
+                                        </div>
+                                    </div>
+                                    <div t-if="membership_file.representant_nom" class="col-md-6 mb-3">
+                                        <strong>Représentant</strong>
+                                        <div>
+                                            <t t-out="membership_file.representant_prenom or ''"/>
+                                            <t t-out="membership_file.representant_nom"/>
+                                            <t t-if="membership_file.representant_fonction">
+                                                — <t t-out="membership_file.representant_fonction"/>
+                                            </t>
+                                        </div>
                                     </div>
                                     <div class="col-md-6 mb-3">
                                         <strong>Date de dépôt</strong>
@@ -153,18 +175,63 @@
                                     </div>
                                 </div>
 
-                                <h6 class="mt-3">Pièces jointes</h6>
+                                <h6 class="mt-3">Pièces du dossier</h6>
                                 <div t-if="not membership_file.document_ids" class="text-muted">
                                     Aucune pièce jointe : le dossier ne peut pas être transmis au comité.
                                 </div>
                                 <ul t-else="" class="list-unstyled">
                                     <li t-foreach="membership_file.document_ids" t-as="document">
                                         <i class="fa fa-paperclip me-1"/>
-                                        <a t-attf-href="/web/content/#{document.id}?download=true">
+                                        <!-- Les pièces ne sont plus des `ir.attachment` :
+                                             le téléchargement passe par le champ binaire
+                                             du modèle, pas par l'id d'une pièce jointe. -->
+                                        <a t-attf-href="/web/content?model=opex.membership.document&amp;id=#{document.id}&amp;field=file&amp;filename_field=filename&amp;download=true">
                                             <t t-out="document.name"/>
                                         </a>
+                                        <span class="text-muted small">
+                                            — <t t-out="dict(document._fields['document_type'].selection)[document.document_type]"/>
+                                        </span>
+                                        <span t-if="document.is_required" class="badge text-bg-light">obligatoire</span>
                                     </li>
                                 </ul>
+
+                                <t t-set="missing" t-value="membership_file._missing_required_documents()"/>
+                                <div t-if="missing" class="alert alert-warning mt-2" role="alert">
+                                    Pièces obligatoires manquantes : <t t-out="', '.join(missing)"/>.
+                                </div>
+
+                                <!-- Avis rendu par le Comité : c'est l'élément
+                                     que le COPIL consulte avant de décider
+                                     (section 22 de la spécification). -->
+                                <t t-if="membership_file.avis_comite">
+                                    <h6 class="mt-4">Avis du Comité d'admission</h6>
+                                    <p class="mb-1">
+                                        <span t-attf-class="badge #{
+                                                'text-bg-success' if membership_file.avis_comite == 'favorable'
+                                                else 'text-bg-danger' if membership_file.avis_comite == 'defavorable'
+                                                else 'text-bg-warning'}">
+                                            <t t-out="dict(membership_file._fields['avis_comite'].selection)[membership_file.avis_comite]"/>
+                                        </span>
+                                    </p>
+                                    <p t-if="membership_file.commentaire_comite" class="text-muted mb-0">
+                                        <t t-out="membership_file.commentaire_comite"/>
+                                    </p>
+                                </t>
+
+                                <t t-if="membership_file.correction_ids">
+                                    <h6 class="mt-4">Demandes de correction</h6>
+                                    <ul class="list-unstyled">
+                                        <li t-foreach="membership_file.correction_ids" t-as="correction"
+                                            t-attf-class="#{'text-muted' if correction.resolved else ''}">
+                                            <i t-attf-class="fa me-1 #{'fa-check' if correction.resolved else 'fa-exclamation-triangle'}"/>
+                                            <t t-if="correction.document_id">
+                                                <t t-out="correction.document_id.name"/> —
+                                            </t>
+                                            <t t-out="correction.motif"/>
+                                            <span t-if="correction.resolved" class="badge text-bg-light">traitée</span>
+                                        </li>
+                                    </ul>
+                                </t>
 
                                 <t t-if="membership_file.subscription_ids">
                                     <h6 class="mt-4">Cotisations</h6>
@@ -191,6 +258,54 @@
                                 </t>
                             </div>
 
+                            <!-- Formulaire d'avis du Comité : trois choix
+                                 exclusifs et un commentaire, comme la
+                                 section 21. Il précède le pied de carte parce
+                                 qu'il ne se réduit pas à un bouton. -->
+                            <div t-if="can_record_avis" class="card-body border-top">
+                                <h6>Avis du Comité d'admission</h6>
+                                <form t-attf-action="/staff/membership/#{membership_file.id}/avis"
+                                      method="post">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="avis_comite"
+                                               id="avis_favorable" value="favorable"/>
+                                        <label class="form-check-label" for="avis_favorable">
+                                            Favorable — transmettre au COPIL
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="avis_comite"
+                                               id="avis_defavorable" value="defavorable"/>
+                                        <label class="form-check-label" for="avis_defavorable">
+                                            Défavorable — mettre fin au parcours
+                                        </label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="avis_comite"
+                                               id="avis_complement" value="complement"/>
+                                        <label class="form-check-label" for="avis_complement">
+                                            Demande de complément — renvoyer au candidat
+                                        </label>
+                                    </div>
+                                    <div class="mt-3">
+                                        <label class="form-label" for="commentaire_comite">
+                                            Commentaire
+                                        </label>
+                                        <textarea name="commentaire_comite" id="commentaire_comite"
+                                                  class="form-control" rows="3"/>
+                                        <small class="form-text text-muted">
+                                            Obligatoire pour une demande de complément : ce texte est
+                                            transmis au candidat.
+                                        </small>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary mt-3">
+                                        Enregistrer l'avis
+                                    </button>
+                                </form>
+                            </div>
+
                             <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">
                                 <t t-if="transition">
                                     <span class="text-muted">
@@ -209,7 +324,7 @@
                                         Cotisation de
                                         <span t-field="payable_subscription.montant"/>
                                         en attente de règlement — l'enregistrer solde le reste dû
-                                        et active l'adhésion.
+                                        et fait passer le dossier à la signature de la charte.
                                     </span>
                                     <form t-attf-action="/staff/membership/#{membership_file.id}/register_payment"
                                           method="post" class="mb-0">
@@ -219,6 +334,12 @@
                                         </button>
                                     </form>
                                 </t>
+                                <!-- L'avis du Comité se saisit dans le bloc
+                                     ci-dessus : ne pas annoncer ici qu'il n'y a
+                                     rien à faire alors que le formulaire attend. -->
+                                <span t-elif="can_record_avis" class="text-muted">
+                                    Rendez votre avis dans le formulaire ci-dessus.
+                                </span>
                                 <span t-else="" class="text-muted">
                                     Aucune action ne vous revient sur ce dossier à son état actuel.
                                 </span>
