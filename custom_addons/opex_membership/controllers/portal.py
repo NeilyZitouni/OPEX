@@ -265,6 +265,9 @@ class MembershipCustomerPortal(CustomerPortal):
                 slot for slot in self._DOCUMENT_SLOTS
                 if slot[2] and slot[0] not in membership_file.document_ids.mapped('document_type')
             ],
+            # Fil chronologique sans les notes internes du personnel : c'est le
+            # modèle qui applique la règle de visibilité, pas le gabarit.
+            'history_entries': membership_file._history_entries(internal=False),
             'error': error,
             'page_name': 'membership',
         })
@@ -461,6 +464,85 @@ class MembershipCustomerPortal(CustomerPortal):
         if montant <= 0:
             return 0.0, "Le montant du paiement doit être positif."
         return montant, None
+
+    # ------------------------------------------------------------
+    # Signature de la charte (voies A et B)
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/my/membership/<int:file_id>/charte'],
+        type='http', auth='user', website=True,
+    )
+    def portal_membership_charte(self, file_id, **kw):
+        """La charte d'adhésion, à lire (voie A) ou à imprimer et signer (voie B).
+
+        **Simplification assumée pour le POC** : la charte est un gabarit QWeb
+        statique, pas un PDF généré. Le candidat la consulte à l'écran et,
+        pour la voie document, l'imprime depuis son navigateur. Brancher un
+        vrai rapport PDF (ou servir un document fourni par l'Administrateur)
+        ne changerait que cette route — les deux voies de signature et leur
+        vérification restent identiques.
+        """
+        membership_file_sudo = self._readable_membership_file(file_id)
+        if not membership_file_sudo:
+            return request.redirect('/my')
+        return request.render('opex_membership.portal_charte_adhesion', {
+            'membership_file': membership_file_sudo,
+            'page_name': 'membership',
+        })
+
+    @http.route(
+        ['/my/membership/<int:file_id>/sign'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_membership_sign(self, file_id, **post):
+        """Voie A : signature électronique par confirmation horodatée.
+
+        La case de certification est exigée côté serveur, pas seulement dans
+        le navigateur : c'est le seul consentement que le POC enregistre.
+        """
+        membership_file_sudo = self._own_membership_file(file_id)
+        if not membership_file_sudo:
+            return request.redirect('/my')
+        if membership_file_sudo.state != 'signature_pending':
+            return request.redirect('/my/membership/%s' % file_id)
+        if not post.get('certifie'):
+            return self._render_membership_file_page(
+                membership_file_sudo,
+                error="Cochez la case de certification avant de signer la charte.",
+            )
+        return self._apply_candidate_action(
+            membership_file_sudo, membership_file_sudo.action_sign_charte_digital)
+
+    @http.route(
+        ['/my/membership/<int:file_id>/charte_document'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_membership_charte_document(self, file_id, **post):
+        """Voie B : dépôt de la charte signée à la main.
+
+        L'écriture passe par le dossier en `sudo()` — `charte_document` est un
+        champ du dossier, que la règle d'enregistrement du portail ne laisse
+        modifier qu'en Brouillon. L'appartenance et l'état sont donc réaffirmés
+        ici, comme pour la soumission et la re-soumission.
+        """
+        membership_file_sudo = self._own_membership_file(file_id)
+        if not membership_file_sudo:
+            return request.redirect('/my')
+        if membership_file_sudo.state != 'signature_pending':
+            return request.redirect('/my/membership/%s' % file_id)
+
+        upload = request.httprequest.files.get('charte_document')
+        if not upload or not upload.filename:
+            return self._render_membership_file_page(
+                membership_file_sudo,
+                error="Joignez la charte signée avant de l'envoyer.",
+            )
+        return self._apply_candidate_action(
+            membership_file_sudo,
+            lambda: membership_file_sudo.action_submit_charte_document(
+                base64.b64encode(upload.read()), upload.filename),
+        )
 
     @http.route(
         ['/my/membership/<int:file_id>/resubmit'],

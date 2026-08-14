@@ -106,4 +106,4 @@ class OpexPayment(models.Model):
             'motif_rejet': motif.strip(),
             'date_verification': fields.Datetime.now(),
         })
-        self.subscription_id.membership_file_id.action_reject_payment()
+        self.subscription_id.membership_file_id.action_reject_payment(motif=self.motif_rejet)

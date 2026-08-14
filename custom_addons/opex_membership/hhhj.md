@@ -493,10 +493,7 @@ existante (Extension 1) — bouton "Payer maintenant" natif Odoo si un
 fournisseur de paiement est configuré.
 
 **Voie B — Preuve de paiement** (nouveau, absent jusqu'ici) : formulaire
-candidat avec `reference_transaction` (Char — réutilise le champ déjà
-existant sur `opex.payment` depuis l'Extension 1, ne pas en créer un
-second ; seul le libellé du champ dans le formulaire dit "référence de
-paiement"), `date_paiement` (Date), `montant`
+candidat avec `reference_paiement` (Char), `date_paiement` (Date), `montant`
 (Monetary), `justificatif` (Binary, obligatoire) → crée/complète
 `opex.payment` avec `state='to_verify'`. Transition du dossier vers
 `payment_verification`.
@@ -505,26 +502,13 @@ paiement"), `date_paiement` (Date), `montant`
 dossier → `signature_pending`) ou "Rejeter" avec motif (→ dossier reste en
 `payment_pending`, candidat notifié pour re-soumettre une preuve).
 
-Deux règles à respecter dans l'implémentation :
-- Le calcul du montant réglé (pour savoir si la cotisation est soldée) ne
-  doit compter **que** les `opex.payment` à l'état `paid` — jamais les
-  preuves encore `to_verify`, sinon un candidat pourrait déclarer n'importe
-  quel montant et voir sa cotisation soldée avant toute vérification
-- Le bouton "Enregistrer le paiement" (Extension 1/7, côté staff) et le
-  couple "Confirmer/Rejeter" (cette extension) ne doivent jamais être
-  visibles simultanément sur la même cotisation — le premier ne s'affiche
-  que pour une cotisation en `payment_pending` sans preuve en attente,
-  le second seulement une fois une preuve déposée (`payment_verification`)
-
 ---
 
 ## Extension 13 — Signature de la Charte à deux voies + vérification
 
 Sur `opex.membership.file` : `signature_mode` (Selection : `digital`,
 `document`), `charte_document` (Binary, la charte signée si voie document),
-`signature_date` (déjà existant — pas `charte_signature_date` comme
-initialement supposé ici ; déjà affiché dans trois templates, à réutiliser
-tel quel).
+`charte_signature_date` (déjà existant).
 
 **Voie A — Digitale** : bouton "Consulter le document" (PDF généré ou
 statique) puis "Signer électroniquement" (pour le POC : simple confirmation
@@ -541,13 +525,6 @@ esprit que la vérification de paiement de l'Extension 12) ; c'est cette
 confirmation, une fois le paiement également confirmé, qui déclenche
 `active`. Remplace le stub `action_sign_charte()` ajouté en Extension 8 par
 ce vrai enchaînement à deux étapes.
-
-Même règle que pour le paiement (Extension 12) : `signature_pending` est le
-tour du **candidat** (signer), jamais du staff — aucun bouton de signature
-ne doit apparaître côté Secrétariat/COPIL à cet état. Le staff n'agit qu'à
-`signature_verification` (Confirmer/Rejeter). Ne mélange jamais les deux,
-y compris au niveau de la route (un POST direct à l'étape candidate doit
-échouer silencieusement, pas juste être caché dans l'UI).
 
 ---
 
@@ -657,51 +634,6 @@ comparable à l'exemple de la section 44. Pas de nouveau modèle nécessaire.
 
 ---
 
-## Extension 20 — Cloche de notification custom pour le portail candidat
-
-**Contexte (issu de l'Extension 18) :** Odoo interdit nativement le type de
-notification "inbox" pour un compte portail — contrainte `CHECK` en base de
-données (`notification_type = 'email' OR NOT share`), pas une question de
-configuration. Le systray natif ne peut donc jamais s'afficher pour un
-candidat. Le document UX validé décrit pourtant explicitement une cloche
-avec badge pour le candidat — décision actée : la construire nous-mêmes
-plutôt que de documenter l'écart.
-
-**Principe** : ne pas essayer de contourner ou forcer le système de
-notification natif d'Odoo. Construire une vue custom, alimentée par une
-simple requête sur les `mail.message` déjà existants (créés normalement par
-tous les `message_post()` de l'Extension 18) — ces messages existent
-indépendamment de leur `notification_type`, on peut les lire directement.
-
-**Nouveau champ** : `res.partner.notification_last_seen` (Datetime,
-nullable). Horodatage de la dernière consultation de la liste de
-notifications par ce partner.
-
-**Nouvelles routes** (`controllers/notifications.py`) :
-- `GET /my/notifications` — liste les `mail.message` postés sur les
-  enregistrements dont le candidat connecté est partenaire (ses
-  `opex.membership.file`, ses `opex.subscription`), triés par date
-  décroissante, chacun avec un lien vers l'enregistrement concerné.
-  **Filtrage de sécurité strict** : ne jamais renvoyer un message lié à un
-  enregistrement qui n'appartient pas au candidat connecté — revérifier
-  l'appartenance explicitement, ne pas faire confiance à un filtre côté
-  client
-- `POST /my/notifications/mark_seen` — met à jour
-  `notification_last_seen` à l'instant présent pour le candidat connecté
-
-**Widget** : icône cloche + badge (nombre de messages postés après
-`notification_last_seen`), visible sur toutes les pages du portail
-candidat (dans le header du layout portail). Au clic, affiche la liste
-(dropdown en AJAX léger, ou simple page dédiée si plus simple à fiabiliser
-pour un POC) ; l'ouverture déclenche `mark_seen`.
-
-**Hors périmètre volontairement** : pas de temps réel (pas de `bus`/
-websocket) — un simple chargement au rendu de page suffit, le document UX
-ne demande pas de mise à jour instantanée. Ne complique pas inutilement
-ce qui reste, fondamentalement, un compteur avec une liste.
-
----
-
 ## Ordre d'implémentation recommandé
 
 **Déjà fait et testé** : Extension 1 (sale.order), Extension 5 (espace
@@ -726,19 +658,15 @@ précédentes, ne pas réordonner :
    qu'à la fin : plus facile d'ajouter les `message_post()` au fil de l'eau
    sur des méthodes déjà stables que de tout reprendre après coup
 8. **Extension 19** (vérification de l'historique) — rapide, juste après 18
-9. **Extension 20** (cloche custom candidat) — décidé suite à la découverte
-   de l'Extension 18 (contrainte native Odoo bloquant la cloche pour un
-   compte portail) ; dépend de 18 (les messages doivent déjà exister) mais
-   pas de 19 directement, peut se faire indépendamment
-10. **Extension 14** (annuaire enrichi)
-11. **Extension 15** (cotisations post-adhésion)
-12. **Extension 2** (calendar.event) — toujours indépendante
-13. **Extension 17** (tableaux de bord) — a besoin que le reste existe déjà
+9. **Extension 14** (annuaire enrichi)
+10. **Extension 15** (cotisations post-adhésion)
+11. **Extension 2** (calendar.event) — toujours indépendante
+12. **Extension 17** (tableaux de bord) — a besoin que le reste existe déjà
     pour avoir quelque chose à agréger
-14. **Extension 16** (Vie du Cluster complète) — la plus grosse, en dernier,
+13. **Extension 16** (Vie du Cluster complète) — la plus grosse, en dernier,
     volontairement : c'est la partie la moins critique pour démontrer le
     cœur du parcours d'adhésion en soutenance
-15. **Extension 4** — seulement si tout le reste est stable
+14. **Extension 4** — seulement si tout le reste est stable
 
 Teste et commit après **chaque extension**, pas à la fin de tout. Pour
 chaque extension touchant au workflow (8, 9, 11, 12, 13), rejoue le test de

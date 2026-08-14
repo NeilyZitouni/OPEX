@@ -35,12 +35,39 @@
         </xpath>
     </template>
 
+    <!--
+        Historique du dossier (section 44), partagé par la page candidat et la
+        page staff. `history_entries` est préparé par le modèle : c'est lui qui
+        décide ce que chaque public a le droit de lire, pas le gabarit.
+    -->
+    <template id="membership_history" name="Historique du dossier">
+        <h6 class="mt-4">Historique</h6>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+                <tbody>
+                    <tr t-foreach="history_entries" t-as="entry">
+                        <td class="text-nowrap text-muted" style="width: 12rem;">
+                            <span t-out="entry['date']"
+                                  t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                        </td>
+                        <td>
+                            <div t-out="entry['body']"/>
+                            <div t-if="entry['author']" class="small text-muted">
+                                par <t t-out="entry['author']"/>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </template>
+
     <!-- Pastille d'état, réutilisée par la liste et le détail -->
     <template id="portal_membership_state_badge" name="Portail : état du dossier">
         <span t-attf-class="badge rounded-pill #{
                 'text-bg-success' if membership_file.state == 'active'
                 else 'text-bg-danger' if membership_file.is_rejected()
-                else 'text-bg-info' if membership_file.state in ('copil_validated', 'signature_pending')
+                else 'text-bg-info' if membership_file.state in ('copil_validated', 'signature_pending', 'signature_verification')
                 else 'text-bg-secondary' if membership_file.state == 'draft'
                 else 'text-bg-warning'}">
             <t t-out="membership_file._state_label()"/>
@@ -311,6 +338,77 @@
         </t>
     </template>
 
+    <!--
+        Charte d'adhésion, servie aux deux voies de signature.
+
+        Gabarit statique : le POC ne génère pas de PDF. Le candidat la lit ici
+        (voie A) ou l'imprime depuis son navigateur pour la signer (voie B).
+    -->
+    <template id="portal_charte_adhesion" name="Portail : charte d'adhésion">
+        <t t-call="portal.portal_layout">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0">Charte d'adhésion — GIC OPEX Group</h5>
+                    <button type="button" class="btn btn-sm btn-light d-print-none"
+                            onclick="window.print()">
+                        <i class="fa fa-print me-1"/>Imprimer
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p>
+                        Entre le <strong>GIC OPEX Group</strong> et
+                        <strong><t t-out="membership_file.nom_legal or membership_file.partner_id.name"/></strong>,
+                        candidat à l'adhésion en qualité de
+                        <span t-field="membership_file.subcategory_id"/>.
+                    </p>
+
+                    <h6 class="mt-4">Article 1 — Objet</h6>
+                    <p>
+                        La présente charte définit les engagements réciproques du Cluster et
+                        de ses membres dans la poursuite de l'excellence opérationnelle.
+                    </p>
+
+                    <h6 class="mt-4">Article 2 — Engagements du membre</h6>
+                    <ul>
+                        <li>Participer de bonne foi aux travaux et activités du Cluster.</li>
+                        <li>Respecter la confidentialité des informations échangées.</li>
+                        <li>S'acquitter de sa cotisation annuelle dans les délais impartis.</li>
+                        <li>Communiquer au Secrétariat toute évolution de sa situation.</li>
+                    </ul>
+
+                    <h6 class="mt-4">Article 3 — Engagements du Cluster</h6>
+                    <ul>
+                        <li>Donner accès aux services, événements et formations du Cluster.</li>
+                        <li>Assurer la représentation du membre au sein du réseau.</li>
+                        <li>Protéger les données transmises dans le cadre de l'adhésion.</li>
+                    </ul>
+
+                    <h6 class="mt-4">Article 4 — Durée</h6>
+                    <p>
+                        L'adhésion est conclue pour une période d'un an, renouvelable par
+                        le règlement de la cotisation de la période suivante.
+                    </p>
+
+                    <div class="row mt-5">
+                        <div class="col-6">
+                            <p class="mb-5">Pour le GIC OPEX Group</p>
+                            <hr/>
+                        </div>
+                        <div class="col-6">
+                            <p class="mb-5">Le membre (nom, qualité, signature)</p>
+                            <hr/>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer d-print-none">
+                    <a t-attf-href="/my/membership/#{membership_file.id}" class="btn btn-light">
+                        Retour à mon dossier
+                    </a>
+                </div>
+            </div>
+        </t>
+    </template>
+
     <!-- /my/membership/<id> : détail en lecture seule -->
     <template id="portal_membership_file_page" name="Portail : détail du dossier d'adhésion">
         <t t-call="portal.portal_layout">
@@ -340,7 +438,7 @@
                         (&quot;Comité d'admission&quot;, ['committee']),
                         ('Validation COPIL', ['copil_pending', 'copil_validated']),
                         ('Paiement', ['payment_pending', 'payment_verification']),
-                        ('Signature de la charte', ['signature_pending']),
+                        ('Signature de la charte', ['signature_pending', 'signature_verification']),
                         ('Activation', ['active']),
                     ]"/>
                     <t t-set="matches"
@@ -578,6 +676,80 @@
                         </div>
                     </div>
 
+                    <!--
+                        Signature de la charte (section 25). Deux voies, comme
+                        pour le paiement : signer en ligne, ou déposer la charte
+                        signée à la main.
+                    -->
+                    <t t-if="membership_file.state == 'signature_pending'">
+                        <div class="card border-primary mb-4">
+                            <div class="card-body">
+                                <h6 class="card-title">Signer la charte d'adhésion</h6>
+
+                                <div t-if="membership_file.charte_motif_rejet"
+                                     class="alert alert-danger" role="alert">
+                                    <strong>Votre signature précédente a été refusée.</strong>
+                                    <div class="small mb-0">
+                                        <t t-out="membership_file.charte_motif_rejet"/>
+                                    </div>
+                                </div>
+
+                                <a t-attf-href="/my/membership/#{membership_file.id}/charte"
+                                   class="btn btn-light mb-3">
+                                    <i class="fa fa-file-text-o me-1"/>Consulter le document
+                                </a>
+
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <h6 class="text-muted">Signer électroniquement</h6>
+                                        <form t-attf-action="/my/membership/#{membership_file.id}/sign"
+                                              method="post">
+                                            <input type="hidden" name="csrf_token"
+                                                   t-att-value="request.csrf_token()"/>
+                                            <div class="form-check mb-3">
+                                                <input class="form-check-input" type="checkbox"
+                                                       name="certifie" id="certifie" value="1"/>
+                                                <label class="form-check-label" for="certifie">
+                                                    Je certifie avoir lu la charte d'adhésion et
+                                                    j'en accepte les termes.
+                                                </label>
+                                            </div>
+                                            <button type="submit" class="btn btn-primary">
+                                                Signer électroniquement
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <div class="col-md-6 border-start">
+                                        <h6 class="text-muted">Déposer la charte signée</h6>
+                                        <p class="small text-muted">
+                                            Téléchargez la charte, signez-la, puis déposez-la ici.
+                                        </p>
+                                        <form t-attf-action="/my/membership/#{membership_file.id}/charte_document"
+                                              method="post" enctype="multipart/form-data">
+                                            <input type="hidden" name="csrf_token"
+                                                   t-att-value="request.csrf_token()"/>
+                                            <input type="file" name="charte_document"
+                                                   class="form-control mb-3"/>
+                                            <button type="submit" class="btn btn-secondary">
+                                                Envoyer la charte signée
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </t>
+
+                    <div t-if="membership_file.state == 'signature_verification'"
+                         class="alert alert-info" role="alert">
+                        <strong>Votre signature est en cours de vérification.</strong>
+                        <div class="small mb-0">
+                            Le Secrétariat contrôle votre charte signée.
+                            Vous n'avez rien à faire pour le moment.
+                        </div>
+                    </div>
+
                     <t t-if="membership_file.subscription_ids">
                         <h6 class="mt-4">Cotisations</h6>
                         <t t-call="portal.portal_table">
@@ -600,6 +772,8 @@
                             </tbody>
                         </t>
                     </t>
+
+                    <t t-call="opex_membership.membership_history"/>
                 </div>
 
                 <div class="card-footer d-flex justify-content-between align-items-center flex-wrap gap-2">

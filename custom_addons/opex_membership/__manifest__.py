@@ -14,7 +14,7 @@ cotisations, paiements, annuaire des membres et événements du cluster.
     'website': "https://www.deltalog-conseil.com",
 
     'category': 'Services/Membership',
-    'version': '19.0.1.4.0',
+    'version': '19.0.1.7.0',
 
     'depends': ['base', 'mail', 'sale', 'portal', 'website'],
 

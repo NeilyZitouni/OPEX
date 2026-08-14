@@ -46,8 +46,12 @@
                     <button name="action_reject_copil" type="object" string="Refuser (COPIL)"
                             invisible="state != 'copil_pending'"
                             groups="opex_membership.group_copil"/>
-                    <button name="action_sign_charte" type="object" string="Enregistrer la signature de la charte"
-                            class="oe_highlight" invisible="state != 'signature_pending'"
+                    <!-- En `signature_pending` la main est au candidat : le
+                         Secrétariat n'a de bouton qu'une fois la charte
+                         déposée, pour la confirmer ou la rejeter. -->
+                    <button name="action_confirm_signature" type="object"
+                            string="Confirmer la signature et activer l'adhésion"
+                            class="oe_highlight" invisible="state != 'signature_verification'"
                             groups="opex_membership.group_secretariat"/>
                     <!-- Les états de refus sont volontairement hors de la barre
                          d'avancement : un dossier refusé n'est pas « en retard »
@@ -67,7 +71,15 @@
                         </group>
                         <group>
                             <field name="date_depot"/>
+                            <field name="signature_mode" readonly="1"
+                                   invisible="not signature_mode"/>
                             <field name="signature_date" readonly="1"/>
+                            <field name="charte_document" filename="charte_document_filename"
+                                   widget="binary" readonly="1"
+                                   invisible="signature_mode != 'document'"/>
+                            <field name="charte_document_filename" invisible="1"/>
+                            <field name="charte_motif_rejet" readonly="1"
+                                   invisible="not charte_motif_rejet"/>
                         </group>
                     </group>
                     <notebook>

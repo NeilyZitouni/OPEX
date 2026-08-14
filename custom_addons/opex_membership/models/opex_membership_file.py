@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import format_amount, html2plaintext
 
 
 class OpexMembershipFile(models.Model):
@@ -59,6 +60,17 @@ class OpexMembershipFile(models.Model):
         'opex.subscription', 'membership_file_id', string="Cotisations"
     )
     signature_date = fields.Date(string="Date de signature de la charte")
+    signature_mode = fields.Selection(
+        [
+            ('digital', 'Signature électronique'),
+            ('document', 'Charte signée déposée'),
+        ],
+        string="Mode de signature",
+        help="Voie empruntée par le candidat pour signer la charte d'adhésion.",
+    )
+    charte_document = fields.Binary(string="Charte signée", attachment=True)
+    charte_document_filename = fields.Char(string="Nom de la charte signée")
+    charte_motif_rejet = fields.Char(string="Motif du rejet de la signature")
 
     # --- Avis du Comité d'admission (acteur 4 de la spécification) ----------
     avis_comite = fields.Selection(
@@ -187,6 +199,112 @@ class OpexMembershipFile(models.Model):
                 "à l'état « %(etat)s »."
             ) % {'action': action_label, 'etat': self._state_label()})
 
+    # ------------------------------------------------------------
+    # Notifications (section 43 de la spécification UX)
+    # ------------------------------------------------------------
+
+    _NOTIFY_GROUPS = {
+        'secretariat': 'opex_membership.group_secretariat',
+        'comite': 'opex_membership.group_comite',
+        'copil': 'opex_membership.group_copil',
+    }
+
+    def _candidate_label(self):
+        """Nom sous lequel le dossier est désigné au personnel interne."""
+        self.ensure_one()
+        return self.nom_legal or self.partner_id.name
+
+    def _format_montant(self, subscription):
+        return format_amount(self.env, subscription.montant, subscription.currency_id)
+
+    def _notify_candidate(self, body):
+        """Adresse un message au candidat sur son dossier.
+
+        Deux règles tiennent ici :
+
+        - le texte est rédigé pour un lecteur, jamais dérivé de `state` — un
+          candidat ne doit pas lire « payment_verification » (section 47) ;
+        - l'envoi passe par `sudo()` parce que l'auteur de la transition n'est
+          pas toujours le propriétaire du dossier (le Secrétariat écrit au
+          candidat), mais l'auteur du message reste l'utilisateur réel :
+          `sudo()` élève les droits, pas l'identité.
+        """
+        for rec in self:
+            rec.sudo().message_post(
+                body=body,
+                partner_ids=rec.partner_id.ids,
+                subtype_xmlid='mail.mt_comment',
+            )
+
+    def _notify_staff(self, group_key, body):
+        """Prévient les membres d'un rôle interne qu'un dossier les attend.
+
+        Les destinataires sont les utilisateurs du groupe — `all_user_ids`
+        plutôt que `user_ids`, pour ne pas oublier ceux qui le détiennent par
+        implication. Ils sont notifiés sans devenir abonnés : suivre chaque
+        dossier à vie transformerait la boîte du Secrétariat en journal.
+
+        **Note interne (`mt_note`), pas commentaire.** Le candidat est abonné à
+        son dossier : avec `mt_comment`, tout message de coordination interne
+        (« il attend votre contrôle », l'avis du Comité) lui serait notifié et
+        s'afficherait dans son historique. `mt_note` porte un sous-type
+        `internal`, qu'Odoo exclut des destinataires et des vues portail —
+        les destinataires explicites, eux, sont notifiés normalement.
+        """
+        group = self.env.ref(self._NOTIFY_GROUPS[group_key], raise_if_not_found=False)
+        partners = group.sudo().all_user_ids.partner_id if group else self.env['res.partner']
+        for rec in self:
+            rec.sudo().message_post(
+                body=body,
+                partner_ids=partners.ids,
+                subtype_xmlid='mail.mt_note',
+            )
+
+    def _history_entries(self, internal=False):
+        """Fil chronologique du dossier — date, auteur, action (section 44).
+
+        Rendu en lecture seule plutôt qu'avec le chatter portail natif : le
+        dossier n'hérite pas de `portal.mixin` (pas de jeton d'accès), et la
+        section 44 décrit un journal de traçabilité, pas un espace de
+        discussion où le candidat pourrait écrire.
+
+        `internal=False` reprend la définition d'Odoo lui-même de ce qu'un
+        utilisateur portail a le droit de voir (`_get_search_domain_share`),
+        plutôt que d'en réécrire une variante qui divergerait au premier
+        changement de version : les notes internes du personnel restent au
+        personnel.
+
+        La création n'a pas de message dédié — l'abonnement du candidat est le
+        seul effet de `create()` — mais elle ouvre le fil : elle est reconstruite
+        depuis `create_date`, ce qui évite d'inventer un message pour un
+        événement que l'enregistrement date déjà.
+        """
+        self.ensure_one()
+        record = self.sudo()
+        entries = [{
+            'date': record.create_date,
+            'author': record.create_uid.name,
+            'body': _("Dossier créé"),
+        }]
+
+        messages = record.message_ids
+        if not internal:
+            messages = messages.filtered_domain(
+                self.env['mail.message']._get_search_domain_share()
+            )
+        for message in messages.sorted('id'):
+            # Les messages de suivi purs (changement de champ tracé) n'ont pas
+            # de corps : les afficher donnerait des lignes vides, alors que
+            # chaque transition a déjà son message rédigé.
+            if not html2plaintext(message.body or '').strip():
+                continue
+            entries.append({
+                'date': message.date,
+                'author': message.author_id.name or message.email_from or _("Système"),
+                'body': message.body,
+            })
+        return entries
+
     @api.model_create_multi
     def create(self, vals_list):
         """Un candidat portail ne dépose de dossier qu'en son propre nom.
@@ -201,7 +319,14 @@ class OpexMembershipFile(models.Model):
             for vals in vals_list:
                 vals['partner_id'] = partner_id
                 vals['state'] = 'draft'
-        return super().create(vals_list)
+        records = super().create(vals_list)
+        # Un seul abonnement, à la création : le candidat suit son dossier pour
+        # toute sa vie. Le refaire à chaque transition dupliquerait l'abonné et
+        # ferait repartir des notifications déjà envoyées.
+        for record in records:
+            if record.partner_id:
+                record.sudo().message_subscribe(partner_ids=record.partner_id.ids)
+        return records
 
     # ------------------------------------------------------------
     # Dépôt et contrôle du Secrétariat
@@ -217,6 +342,14 @@ class OpexMembershipFile(models.Model):
             rec._ensure_state(('draft',), _("Le dépôt du dossier"))
             rec._check_documents_complete()
             rec.state = 'control'
+            rec._notify_candidate(_(
+                "Votre dossier d'adhésion a bien été transmis au Secrétariat du "
+                "GIC OPEX Group. Vous recevrez une notification dès qu'il aura "
+                "été examiné."
+            ))
+            rec._notify_staff('secretariat', _(
+                "Nouveau dossier d'adhésion déposé par %s : il attend votre contrôle."
+            ) % rec._candidate_label())
 
     def action_request_correction(self, motif, commentaire=False, document=None):
         """Renvoie le dossier au candidat pour correction.
@@ -241,6 +374,16 @@ class OpexMembershipFile(models.Model):
             'commentaire': commentaire or False,
         })
         self.state = 'correction_requested'
+        document_label = _(" concernant « %s »") % document.name if document else ''
+        self._notify_candidate(_(
+            "Votre dossier nécessite une correction%(document)s : %(motif)s"
+            "%(commentaire)s Connectez-vous à votre espace pour le mettre à jour, "
+            "puis renvoyez-le au Secrétariat."
+        ) % {
+            'document': document_label,
+            'motif': motif,
+            'commentaire': ' %s' % commentaire if commentaire else '',
+        })
         return correction
 
     def action_resubmit(self):
@@ -250,6 +393,10 @@ class OpexMembershipFile(models.Model):
             rec._check_documents_complete()
             rec.correction_ids.filtered(lambda c: not c.resolved).resolved = True
             rec.state = 'control'
+            rec._notify_staff('secretariat', _(
+                "Le dossier de %s a été corrigé et renvoyé : il attend un nouveau "
+                "contrôle."
+            ) % rec._candidate_label())
 
     def action_validate_secretariat(self):
         """validerParSecretariat : En contrôle -> Comité d'admission.
@@ -263,17 +410,32 @@ class OpexMembershipFile(models.Model):
         for rec in self:
             rec._ensure_state(('control',), _("La validation par le Secrétariat"))
             rec._check_documents_complete()
+            # Un dossier déjà passé par une correction revient devant le Comité :
+            # c'est la « nouvelle demande de décision » de la section 43, pas un
+            # premier examen.
+            already_seen = bool(rec.correction_ids)
             rec.write({
                 'state': 'committee',
                 'avis_comite': False,
                 'commentaire_comite': False,
             })
+            if already_seen:
+                rec._notify_staff('comite', _(
+                    "Le dossier de %s, complété à la suite d'une demande de "
+                    "correction, revient devant le Comité d'admission pour décision."
+                ) % rec._candidate_label())
+            else:
+                rec._notify_staff('comite', _(
+                    "Le dossier de %s a été validé par le Secrétariat : il attend "
+                    "l'examen du Comité d'admission."
+                ) % rec._candidate_label())
 
     def action_reject_control(self):
         """Sortie négative du contrôle (section 15)."""
         for rec in self:
             rec._ensure_state(('control',), _("Le refus au contrôle"))
             rec.state = 'rejected_control'
+            rec._notify_candidate(rec._rejection_message())
 
     # ------------------------------------------------------------
     # Comité d'admission et COPIL
@@ -316,16 +478,30 @@ class OpexMembershipFile(models.Model):
                     commentaire=rec.commentaire_comite,
                 )
 
+    def _rejection_message(self):
+        """Un refus s'annonce sans jargon et sans laisser le candidat sans interlocuteur."""
+        self.ensure_one()
+        return _(
+            "Après examen, votre demande d'adhésion au GIC OPEX Group n'a pas été "
+            "retenue. Le Secrétariat reste à votre disposition pour vous en "
+            "préciser les motifs."
+        )
+
     def action_send_to_copil(self):
         """Comité d'admission -> Validation COPIL, sur avis favorable."""
         for rec in self:
             rec._ensure_state(('committee',), _("La transmission au COPIL"))
             rec.state = 'copil_pending'
+            rec._notify_staff('copil', _(
+                "Le Comité d'admission a rendu un avis favorable sur le dossier "
+                "de %s : il est prêt pour votre validation."
+            ) % rec._candidate_label())
 
     def action_reject_committee(self):
         for rec in self:
             rec._ensure_state(('committee',), _("Le refus par le comité"))
             rec.state = 'rejected_committee'
+            rec._notify_candidate(rec._rejection_message())
 
     def action_validate_copil(self):
         """validerParCOPIL : Validation COPIL -> Validé COPIL -> Paiement en attente.
@@ -337,13 +513,27 @@ class OpexMembershipFile(models.Model):
         for rec in self:
             rec._ensure_state(('copil_pending',), _("La validation par le COPIL"))
             rec.state = 'copil_validated'
-            rec.action_create_subscription()
+            subscription = rec.action_create_subscription()
             rec.state = 'payment_pending'
+            rec._notify_candidate(_(
+                "Bonne nouvelle : votre demande d'adhésion au GIC OPEX Group a "
+                "été acceptée."
+            ))
+            rec._notify_candidate(_(
+                "Étape suivante : le règlement de votre cotisation de %(montant)s"
+                "%(echeance)s. Depuis votre espace, vous pouvez payer en ligne ou "
+                "envoyer une preuve de paiement si vous avez déjà réglé."
+            ) % {
+                'montant': rec._format_montant(subscription),
+                'echeance': _(", à régler avant le %s") % subscription.date_echeance
+                            if subscription.date_echeance else '',
+            })
 
     def action_reject_copil(self):
         for rec in self:
             rec._ensure_state(('copil_pending',), _("Le refus par le COPIL"))
             rec.state = 'rejected_copil'
+            rec._notify_candidate(rec._rejection_message())
 
     # ------------------------------------------------------------
     # Cotisation
@@ -434,17 +624,30 @@ class OpexMembershipFile(models.Model):
             'state': 'to_verify',
         })
         self.state = 'payment_verification'
+        self._notify_staff('secretariat', _(
+            "%(candidat)s a déposé une preuve de paiement de %(montant)s pour sa "
+            "cotisation : elle attend votre vérification."
+        ) % {
+            'candidat': self._candidate_label(),
+            'montant': format_amount(self.env, montant, subscription.currency_id),
+        })
         return payment
 
-    def action_reject_payment(self):
+    def action_reject_payment(self, motif=False):
         """La preuve déposée est rejetée : le dossier redevient à payer.
 
         Le candidat peut alors en déposer une nouvelle ; le motif du rejet est
-        porté par le paiement rejeté, pas par le dossier.
+        porté par le paiement rejeté, pas par le dossier, mais il est repris
+        dans la notification — sinon le candidat devrait aller le chercher.
         """
         for rec in self:
             rec._ensure_state(('payment_verification',), _("Le rejet du paiement"))
             rec.state = 'payment_pending'
+            rec._notify_candidate(_(
+                "Votre preuve de paiement n'a pas pu être acceptée%(motif)s. "
+                "Vous pouvez en déposer une nouvelle depuis votre espace, ou "
+                "régler votre cotisation en ligne."
+            ) % {'motif': _(" : %s") % motif if motif else ''})
 
     def action_confirm_payment(self):
         """Paiement encaissé -> Signature en attente.
@@ -460,25 +663,111 @@ class OpexMembershipFile(models.Model):
                 _("La confirmation du paiement"),
             )
             rec.state = 'signature_pending'
+            rec._notify_candidate(_(
+                "Votre paiement a bien été confirmé. Merci."
+            ))
+            rec._notify_candidate(_(
+                "Il ne reste qu'une étape : signer la charte d'adhésion. Depuis "
+                "votre espace, vous pouvez la signer en ligne ou la télécharger, "
+                "la signer et la déposer."
+            ))
 
     # ------------------------------------------------------------
     # Signature de la charte et activation
     # ------------------------------------------------------------
 
-    def action_sign_charte(self):
-        """Signature de la charte -> activation de l'adhésion.
+    def action_sign_charte_digital(self):
+        """Voie A : le candidat signe électroniquement la charte.
 
-        **Raccourci assumé, à remplacer en Extension 13.** La séquence complète
-        passe par `signature_verification` : le candidat dépose sa signature
-        (voie digitale ou charte signée, section 25), puis le Secrétariat la
-        contrôle avant l'activation. Ce stub enregistre la signature horodatée
-        et active directement, ce qui suffit à jouer le parcours de bout en
-        bout tant que les deux voies n'existent pas.
+        **Simplification assumée pour le POC.** Il ne s'agit pas d'une
+        signature cryptographique : aucun certificat n'est émis, aucun condensat
+        du document n'est scellé, rien ne prouverait l'intégrité de la charte
+        devant un tiers. On enregistre une *confirmation horodatée* — qui a
+        cliqué, quand — ce qui suffit à dérouler le processus métier et à le
+        démontrer, mais ne vaut pas signature électronique au sens légal. Une
+        vraie intégration (Odoo Sign, prestataire externe) remplacerait cette
+        méthode sans toucher au reste du parcours : seul le mode change, les
+        transitions restent les mêmes.
         """
         for rec in self:
             rec._ensure_state(('signature_pending',), _("La signature de la charte"))
-            rec.signature_date = fields.Date.context_today(rec)
+            rec.write({
+                'signature_mode': 'digital',
+                'signature_date': fields.Date.context_today(rec),
+                'charte_motif_rejet': False,
+                'state': 'signature_verification',
+            })
+            rec._notify_staff('secretariat', _(
+                "%s a signé la charte d'adhésion en ligne : la signature attend "
+                "votre vérification."
+            ) % rec._candidate_label())
+
+    def action_submit_charte_document(self, charte_document, filename=False):
+        """Voie B : le candidat dépose la charte qu'il a signée à la main."""
+        self.ensure_one()
+        self._ensure_state(('signature_pending',), _("Le dépôt de la charte signée"))
+        if not charte_document:
+            raise UserError(_("La charte signée est obligatoire pour cette voie."))
+        self.write({
+            'signature_mode': 'document',
+            'signature_date': fields.Date.context_today(self),
+            'charte_document': charte_document,
+            'charte_document_filename': filename or False,
+            'charte_motif_rejet': False,
+            'state': 'signature_verification',
+        })
+        self._notify_staff('secretariat', _(
+            "%s a déposé sa charte d'adhésion signée : elle attend votre "
+            "vérification."
+        ) % self._candidate_label())
+
+    def action_confirm_signature(self):
+        """Le Secrétariat valide la signature : l'adhésion s'active.
+
+        Dernier des deux verrous de la Partie V. Le paiement est structurellement
+        acquis à ce stade — on ne parvient à la signature qu'après lui — mais la
+        condition est vérifiée explicitement plutôt que supposée : c'est le seul
+        endroit où l'adhésion devient effective, et un état forcé à la main dans
+        le back-office ne doit pas suffire à contourner l'encaissement.
+        """
+        for rec in self:
+            rec._ensure_state(
+                ('signature_verification',), _("La confirmation de la signature"))
+            unpaid = rec.subscription_ids.filtered(lambda s: s.state != 'paid')
+            if unpaid or not rec.subscription_ids:
+                raise UserError(_(
+                    "L'adhésion de %s ne peut pas être activée : sa cotisation "
+                    "n'est pas soldée. Le paiement et la signature doivent être "
+                    "confirmés tous les deux."
+                ) % rec.partner_id.name)
             rec._activate_membership()
+
+    def action_reject_signature(self, motif):
+        """La signature déposée est refusée : le candidat doit recommencer.
+
+        La signature elle-même est effacée, pas seulement l'état : laisser une
+        date et un mode derrière soi ferait croire, sur la page du candidat
+        comme dans le back-office, qu'une charte valide est déjà en place.
+        """
+        self.ensure_one()
+        self._ensure_state(('signature_verification',), _("Le rejet de la signature"))
+        if not (motif or '').strip():
+            raise UserError(_(
+                "Indiquez le motif du rejet : c'est ce texte que le candidat "
+                "recevra pour redéposer sa charte."
+            ))
+        self.write({
+            'state': 'signature_pending',
+            'signature_mode': False,
+            'signature_date': False,
+            'charte_document': False,
+            'charte_document_filename': False,
+            'charte_motif_rejet': motif.strip(),
+        })
+        self._notify_candidate(_(
+            "Votre charte signée n'a pas pu être acceptée : %s. Merci de la "
+            "signer à nouveau depuis votre espace."
+        ) % motif.strip())
 
     def _activate_membership(self):
         """Dernière étape du parcours : le candidat devient membre actif.
@@ -496,3 +785,8 @@ class OpexMembershipFile(models.Model):
             if subcategory:
                 partner_values['subcategory_id'] = subcategory.id
             rec.partner_id.write(partner_values)
+            rec._notify_candidate(_(
+                "Félicitations ! Votre adhésion au GIC OPEX Group est maintenant "
+                "active. Vous pouvez accéder à votre espace membre et votre "
+                "organisation apparaît désormais dans l'annuaire du cluster."
+            ))

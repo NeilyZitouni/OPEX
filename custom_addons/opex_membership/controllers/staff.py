@@ -83,8 +83,11 @@ class OpexStaff(http.Controller):
                         "Valider le contrôle et transmettre au comité"),
             'copil_pending': (is_copil, 'action_validate_copil',
                               "Valider en COPIL et émettre la cotisation"),
-            'signature_pending': (is_secretariat, 'action_sign_charte',
-                                  "Enregistrer la signature de la charte et activer l'adhésion"),
+            # Pas d'entrée pour `signature_pending` : à ce stade la main est au
+            # candidat, qui signe en ligne ou dépose sa charte. Le Secrétariat
+            # n'intervient qu'ensuite, en `signature_verification`, via
+            # `_signature_to_verify()` — comme pour le paiement, laisser ici un
+            # bouton reviendrait à offrir deux façons de conclure la même étape.
         }
         allowed, method, label = transitions.get(
             membership_file.state, (False, None, None)
@@ -147,6 +150,18 @@ class OpexStaff(http.Controller):
             lambda payment: payment.state == 'to_verify'
         )[:1]
 
+    def _signature_to_verify(self, membership_file):
+        """Le dossier attend-il que *cet* utilisateur contrôle sa signature ?
+
+        Même partage que pour le paiement : le contrôle des pièces revient au
+        Secrétariat, pas au Comité ni au COPIL.
+        """
+        user = request.env.user
+        if membership_file.state != 'signature_verification':
+            return False
+        return (user.has_group('opex_membership.group_secretariat')
+                or user.has_group('base.group_system'))
+
     def _get_membership_file(self, file_id):
         """Dossier accessible en lecture à l'utilisateur courant, sinon `None`."""
         membership_file = request.env['opex.membership.file'].browse(file_id).exists()
@@ -197,6 +212,9 @@ class OpexStaff(http.Controller):
             'can_record_avis': self._can_record_avis(membership_file),
             'can_request_correction': self._can_request_correction(membership_file),
             'payment_to_verify': self._payment_to_verify(membership_file),
+            'signature_to_verify': self._signature_to_verify(membership_file),
+            # Le personnel voit le fil complet, notes internes comprises.
+            'history_entries': membership_file._history_entries(internal=True),
             'error': error,
             'page_name': 'staff_membership',
         }
@@ -404,6 +422,46 @@ class OpexStaff(http.Controller):
             )
         return self._apply_staff_action(
             membership_file, lambda: payment.action_reject(motif))
+
+    # ------------------------------------------------------------
+    # Vérification de la signature de la charte
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/staff/membership/<int:file_id>/signature/<any(confirm,reject):verdict>'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def staff_membership_verify_signature(self, file_id, verdict, **post):
+        """Confirme ou rejette la charte signée (section 25).
+
+        Confirmer active l'adhésion — c'est le modèle qui vérifie que la
+        cotisation est bien soldée avant de le faire.
+        """
+        if not self._is_staff():
+            return request.redirect('/my')
+
+        membership_file = self._get_membership_file(file_id)
+        if not membership_file:
+            return request.redirect('/staff/membership')
+        if not self._signature_to_verify(membership_file):
+            return request.redirect('/staff/membership/%s' % file_id)
+
+        if verdict == 'confirm':
+            return self._apply_staff_action(
+                membership_file, membership_file.action_confirm_signature)
+
+        motif = (post.get('motif_rejet') or '').strip()
+        if not motif:
+            return request.render(
+                'opex_membership.staff_membership_file_page',
+                self._staff_file_values(
+                    membership_file,
+                    error="Indiquez le motif du rejet : le candidat doit savoir "
+                          "quoi corriger avant de redéposer sa charte.",
+                ),
+            )
+        return self._apply_staff_action(
+            membership_file, lambda: membership_file.action_reject_signature(motif))
 
     # ------------------------------------------------------------
     # Encaissement de la cotisation

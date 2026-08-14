@@ -1,5 +1,6 @@
 from odoo import _, fields, models
 from odoo.exceptions import UserError
+from odoo.tools import format_amount
 
 
 class OpexSubscription(models.Model):
@@ -83,16 +84,50 @@ class OpexSubscription(models.Model):
         return dict(self._fields['state'].selection).get(self.state)
 
     def action_generate_reminder(self):
-        """genererRelances : envoie une relance si la cotisation est En retard."""
+        """genererRelances : envoie une relance si la cotisation est En retard.
+
+        Deux destinataires, deux textes : le membre reçoit une relance qui lui
+        dit quoi faire, le Secrétariat un signalement de retard (section 43).
+        Le message précédent décrivait l'envoi au lieu d'être l'envoi — il ne
+        partait à personne.
+        """
+        secretariat = self.env.ref(
+            'opex_membership.group_secretariat', raise_if_not_found=False)
+        staff_partners = (
+            secretariat.sudo().all_user_ids.partner_id
+            if secretariat else self.env['res.partner']
+        )
         for rec in self:
             if rec.state != 'late':
                 raise UserError(_(
                     "Une relance ne peut être envoyée que pour une cotisation "
                     "En retard. La cotisation de %s est actuellement à l'état « %s »."
                 ) % (rec.partner_id.name, rec._state_label()))
-            rec.message_post(body=_(
-                "Relance envoyée à %s pour la cotisation de %s (échéance : %s)."
-            ) % (rec.partner_id.name, rec.montant, rec.date_echeance))
+            montant = format_amount(self.env, rec.montant, rec.currency_id)
+            rec.sudo().message_post(
+                body=_(
+                    "Votre cotisation de %(montant)s est en retard (échéance : "
+                    "%(echeance)s). Merci de la régulariser depuis votre espace "
+                    "membre."
+                ) % {'montant': montant, 'echeance': rec.date_echeance},
+                partner_ids=rec.partner_id.ids,
+                subtype_xmlid='mail.mt_comment',
+            )
+            rec.sudo().message_post(
+                body=_(
+                    "La cotisation de %(membre)s (%(montant)s, échéance "
+                    "%(echeance)s) est en retard : une relance vient de lui être "
+                    "envoyée."
+                ) % {
+                    'membre': rec.partner_id.name,
+                    'montant': montant,
+                    'echeance': rec.date_echeance,
+                },
+                partner_ids=staff_partners.ids,
+                # Note interne : le suivi du retard regarde le Secrétariat, pas
+                # le membre, qui a déjà reçu sa relance juste au-dessus.
+                subtype_xmlid='mail.mt_note',
+            )
 
     def _amount_paid(self):
         """Total réellement encaissé : seuls les paiements confirmés comptent.

@@ -256,6 +256,8 @@
                                         </table>
                                     </div>
                                 </t>
+
+                                <t t-call="opex_membership.membership_history"/>
                             </div>
 
                             <!-- Vérification de la preuve de paiement (voie B).
@@ -293,6 +295,62 @@
                                         </button>
                                     </form>
                                     <form t-attf-action="/staff/membership/#{membership_file.id}/payment/reject"
+                                          method="post" class="mb-0 flex-grow-1">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <div class="input-group">
+                                            <input type="text" name="motif_rejet" class="form-control"
+                                                   placeholder="Motif du rejet (obligatoire)"/>
+                                            <button type="submit" class="btn btn-outline-danger">
+                                                Rejeter
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            <!-- Vérification de la signature de la charte.
+                                 Ce qu'il y a à contrôler dépend de la voie :
+                                 un document à ouvrir, ou une confirmation
+                                 horodatée à constater. -->
+                            <div t-if="signature_to_verify" class="card-body border-top">
+                                <h6>Signature de la charte à vérifier</h6>
+                                <dl class="row mb-3">
+                                    <dt class="col-sm-3">Voie</dt>
+                                    <dd class="col-sm-9">
+                                        <t t-if="membership_file.signature_mode">
+                                            <t t-out="dict(membership_file._fields['signature_mode'].selection)[membership_file.signature_mode]"/>
+                                        </t>
+                                    </dd>
+                                    <dt class="col-sm-3">Date de signature</dt>
+                                    <dd class="col-sm-9"><span t-field="membership_file.signature_date"/></dd>
+                                    <t t-if="membership_file.signature_mode == 'document'">
+                                        <dt class="col-sm-3">Charte signée</dt>
+                                        <dd class="col-sm-9">
+                                            <a t-attf-href="/web/content?model=opex.membership.file&amp;id=#{membership_file.id}&amp;field=charte_document&amp;filename_field=charte_document_filename&amp;download=true">
+                                                <i class="fa fa-paperclip me-1"/>
+                                                <t t-out="membership_file.charte_document_filename or 'Télécharger la charte signée'"/>
+                                            </a>
+                                        </dd>
+                                    </t>
+                                    <t t-else="">
+                                        <dt class="col-sm-3">Nature</dt>
+                                        <dd class="col-sm-9 text-muted">
+                                            Confirmation électronique horodatée du candidat
+                                            (POC : pas de signature cryptographique).
+                                        </dd>
+                                    </t>
+                                </dl>
+                                <div class="d-flex flex-wrap gap-3 align-items-start">
+                                    <form t-attf-action="/staff/membership/#{membership_file.id}/signature/confirm"
+                                          method="post" class="mb-0">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <button type="submit" class="btn btn-success">
+                                            Confirmer la signature et activer l'adhésion
+                                        </button>
+                                    </form>
+                                    <form t-attf-action="/staff/membership/#{membership_file.id}/signature/reject"
                                           method="post" class="mb-0 flex-grow-1">
                                         <input type="hidden" name="csrf_token"
                                                t-att-value="request.csrf_token()"/>
@@ -431,6 +489,9 @@
                                 </span>
                                 <span t-elif="payment_to_verify" class="text-muted">
                                     Vérifiez la preuve de paiement dans le bloc ci-dessus.
+                                </span>
+                                <span t-elif="signature_to_verify" class="text-muted">
+                                    Vérifiez la charte signée dans le bloc ci-dessus.
                                 </span>
                                 <span t-elif="can_request_correction" class="text-muted">
                                     Vous pouvez demander une correction au candidat ci-dessus.
