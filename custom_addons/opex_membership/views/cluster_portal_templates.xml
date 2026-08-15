@@ -45,7 +45,8 @@
     <template id="portal_breadcrumbs_cluster" name="Portail : fil d'Ariane vie du cluster"
               inherit_id="portal.portal_breadcrumbs" priority="50">
         <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
-            <li t-if="page_name in ('cluster_news', 'cluster_events', 'cluster_trainings')"
+            <li t-if="page_name in ('cluster_news', 'cluster_events', 'cluster_trainings',
+                                    'cluster_documents', 'cluster_groups')"
                 class="breadcrumb-item active">
                 Vie du Cluster
             </li>
@@ -66,6 +67,14 @@
             <li class="nav-item">
                 <a t-attf-class="nav-link #{'active' if cluster_page == 'trainings' else ''}"
                    href="/my/cluster/trainings">Formations</a>
+            </li>
+            <li class="nav-item">
+                <a t-attf-class="nav-link #{'active' if cluster_page == 'documents' else ''}"
+                   href="/my/cluster/documents">Documents</a>
+            </li>
+            <li class="nav-item">
+                <a t-attf-class="nav-link #{'active' if cluster_page == 'groups' else ''}"
+                   href="/my/cluster/groups">Forums et groupes</a>
             </li>
         </ul>
     </template>
@@ -228,6 +237,98 @@
                     </div>
                 </div>
             </div>
+        </t>
+    </template>
+
+    <!-- /my/cluster/documents -->
+    <template id="portal_cluster_documents" name="Portail : documents du cluster">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Vie du Cluster</t>
+            </t>
+            <t t-call="opex_membership.portal_cluster_nav"/>
+
+            <!-- Le personnel qui prévisualise doit savoir qu'il voit plus que
+                 les membres, sans quoi il croirait la page identique. -->
+            <div t-if="sees_committee_documents" class="alert alert-light border" role="alert">
+                <i class="fa fa-eye me-1"/>
+                Prévisualisation interne : les documents de niveau « Comité » sont
+                inclus ici, un membre ne les voit pas.
+            </div>
+
+            <div t-if="not document_folders" class="alert alert-info" role="alert">
+                Aucun document partagé pour le moment.
+            </div>
+
+            <t t-else="">
+                <t t-foreach="document_folders" t-as="folder">
+                    <h6 class="mt-4">
+                        <i class="fa fa-folder-open-o me-1"/><t t-out="folder[0]"/>
+                    </h6>
+                    <div class="list-group">
+                        <div t-foreach="folder[1]" t-as="document"
+                             class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <t t-out="document.name"/>
+                                <span t-if="document.version" class="badge text-bg-light ms-2">
+                                    v<t t-out="document.version"/>
+                                </span>
+                                <span t-if="document.confidentiality == 'committee'"
+                                      class="badge text-bg-warning ms-1">Comité</span>
+                            </div>
+                            <a t-if="document.file"
+                               t-attf-href="/web/content?model=opex.cluster.document&amp;id=#{document.id}&amp;field=file&amp;filename_field=filename&amp;download=true"
+                               class="btn btn-sm btn-light">
+                                <i class="fa fa-download me-1"/>Télécharger
+                            </a>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- /my/cluster/groups -->
+    <template id="portal_cluster_groups" name="Portail : forums et groupes du cluster">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Vie du Cluster</t>
+            </t>
+            <t t-call="opex_membership.portal_cluster_nav"/>
+
+            <div t-if="not groups" class="alert alert-info" role="alert">
+                Aucun forum ni groupe de travail pour le moment.
+            </div>
+
+            <div t-else="" class="row g-3">
+                <div t-foreach="groups" t-as="group" class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <h6 class="card-title mb-1"><t t-out="group.name"/></h6>
+                                <span t-if="group.id in my_group_ids"
+                                      class="badge text-bg-success">
+                                    <i class="fa fa-check me-1"/>Vous en faites partie
+                                </span>
+                            </div>
+                            <p t-if="group.description" class="text-muted small mb-2">
+                                <t t-out="group.description"/>
+                            </p>
+                            <span class="badge text-bg-light">
+                                <t t-out="group.member_count"/>
+                                membre<t t-if="group.member_count &gt; 1">s</t>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-muted small mt-3">
+                L'adhésion à un forum ou groupe de travail est gérée par le Secrétariat
+                du GIC OPEX Group.
+            </p>
         </t>
     </template>
 

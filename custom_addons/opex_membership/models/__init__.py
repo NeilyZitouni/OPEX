@@ -12,4 +12,9 @@ from . import opex_cluster_news
 from . import opex_cluster_training
 from . import opex_cluster_event
 from . import opex_cluster_event_registration
+from . import opex_cluster_document
+from . import opex_cluster_group
+from . import opex_cluster_committee
+from . import opex_cluster_vote
+from . import opex_cluster_assembly
 from . import account_move

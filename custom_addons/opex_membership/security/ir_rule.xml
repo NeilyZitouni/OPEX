@@ -115,6 +115,27 @@
         <field name="perm_unlink" eval="False"/>
     </record>
 
+    <!--
+        Documents du cluster : le niveau « Comité » ne sort pas du personnel
+        interne. Le controller filtre déjà sur la confidentialité, mais un
+        compte portail ne doit pas non plus pouvoir atteindre ces pièces par
+        un autre chemin (téléchargement direct du binaire, par exemple) — d'où
+        ce second verrou, en base.
+
+        Les utilisateurs internes ne sont pas concernés : ils n'appartiennent
+        pas au groupe portail.
+    -->
+    <record id="rule_cluster_document_portal" model="ir.rule">
+        <field name="name">Document du cluster : le membre ne voit pas les pièces de comité</field>
+        <field name="model_id" ref="model_opex_cluster_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('confidentiality', 'in', ['public', 'members'])]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
     <!-- La demande de correction est écrite par le Secrétariat ; le candidat
          doit pouvoir la lire, jamais la modifier ni la déclarer traitée. -->
     <record id="rule_membership_correction_portal" model="ir.rule">

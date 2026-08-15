@@ -120,6 +120,224 @@
         <field name="view_mode">list</field>
     </record>
 
+    <!-- Documents du cluster -->
+    <record id="view_opex_cluster_document_list" model="ir.ui.view">
+        <field name="name">opex.cluster.document.list</field>
+        <field name="model">opex.cluster.document</field>
+        <field name="arch" type="xml">
+            <list string="Documents du cluster">
+                <field name="folder"/>
+                <field name="name"/>
+                <field name="version"/>
+                <field name="confidentiality" widget="badge"
+                       decoration-warning="confidentiality == 'committee'"
+                       decoration-success="confidentiality == 'public'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_cluster_document_form" model="ir.ui.view">
+        <field name="name">opex.cluster.document.form</field>
+        <field name="model">opex.cluster.document</field>
+        <field name="arch" type="xml">
+            <form string="Document du cluster">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Nom du document"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="folder"/>
+                            <field name="version" placeholder="ex. 1.0"/>
+                        </group>
+                        <group>
+                            <field name="confidentiality"/>
+                            <field name="file" filename="filename" widget="binary"/>
+                            <field name="filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert"
+                         invisible="confidentiality != 'committee'">
+                        Ce document est réservé au personnel interne : il n'apparaîtra
+                        pas dans l'espace Vie du Cluster des membres.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_document" model="ir.actions.act_window">
+        <field name="name">Documents du cluster</field>
+        <field name="res_model">opex.cluster.document</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Forums et groupes -->
+    <record id="view_opex_cluster_group_list" model="ir.ui.view">
+        <field name="name">opex.cluster.group.list</field>
+        <field name="model">opex.cluster.group</field>
+        <field name="arch" type="xml">
+            <list string="Forums et groupes">
+                <field name="name"/>
+                <field name="member_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_cluster_group_form" model="ir.ui.view">
+        <field name="name">opex.cluster.group.form</field>
+        <field name="model">opex.cluster.group</field>
+        <field name="arch" type="xml">
+            <form string="Forum / groupe">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="ex. Groupe Industrie"/></h1>
+                    </div>
+                    <group>
+                        <field name="description"/>
+                        <field name="member_count"/>
+                    </group>
+                    <separator string="Membres"/>
+                    <field name="member_ids" widget="many2many_tags"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_group" model="ir.actions.act_window">
+        <field name="name">Forums et groupes</field>
+        <field name="res_model">opex.cluster.group</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Comités -->
+    <record id="view_opex_cluster_committee_list" model="ir.ui.view">
+        <field name="name">opex.cluster.committee.list</field>
+        <field name="model">opex.cluster.committee</field>
+        <field name="arch" type="xml">
+            <list string="Comités">
+                <field name="name"/>
+                <field name="member_ids" widget="many2many_tags" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_cluster_committee_form" model="ir.ui.view">
+        <field name="name">opex.cluster.committee.form</field>
+        <field name="model">opex.cluster.committee</field>
+        <field name="arch" type="xml">
+            <form string="Comité">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="ex. Comité d'admission"/></h1>
+                    </div>
+                    <group>
+                        <field name="description"/>
+                    </group>
+                    <notebook>
+                        <page string="Membres" name="members">
+                            <field name="member_ids" widget="many2many_tags"/>
+                        </page>
+                        <page string="Documents" name="documents">
+                            <!-- Bibliothèque commune du cluster : un comité y
+                                 rattache ses pièces, il n'a pas les siennes. -->
+                            <field name="document_ids" widget="many2many_tags"/>
+                        </page>
+                        <page string="Réunions" name="meetings">
+                            <!-- Réunions = événements du cluster de type
+                                 « Réunion », synchronisés à l'agenda natif. -->
+                            <field name="meeting_ids">
+                                <list>
+                                    <field name="name"/>
+                                    <field name="date_debut"/>
+                                    <field name="lieu"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_committee" model="ir.actions.act_window">
+        <field name="name">Comités</field>
+        <field name="res_model">opex.cluster.committee</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Assemblées générales -->
+    <record id="view_opex_cluster_assembly_list" model="ir.ui.view">
+        <field name="name">opex.cluster.assembly.list</field>
+        <field name="model">opex.cluster.assembly</field>
+        <field name="arch" type="xml">
+            <list string="Assemblées générales">
+                <field name="date"/>
+                <field name="name"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_cluster_assembly_form" model="ir.ui.view">
+        <field name="name">opex.cluster.assembly.form</field>
+        <field name="model">opex.cluster.assembly</field>
+        <field name="arch" type="xml">
+            <form string="Assemblée générale">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Assemblée générale"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                        </group>
+                        <group>
+                            <field name="report" filename="report_filename" widget="binary"/>
+                            <field name="report_filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Ordre du jour" name="agenda">
+                            <field name="agenda"/>
+                        </page>
+                        <page string="Participants" name="participants">
+                            <field name="participant_ids" widget="many2many_tags"/>
+                        </page>
+                        <page string="Documents" name="documents">
+                            <field name="document_ids" widget="many2many_tags"/>
+                        </page>
+                        <page string="Décisions" name="decisions">
+                            <field name="decisions"/>
+                        </page>
+                        <page string="Votes" name="votes">
+                            <!-- Stub assumé : questions et options seulement.
+                                 Aucun bulletin, aucun dépouillement — cf.
+                                 `opex.cluster.vote`, section 40 marquée
+                                 « évolution » par le document de référence. -->
+                            <div class="alert alert-warning" role="alert">
+                                Les votes ne sont pas implémentés dans ce POC : on
+                                enregistre ici les questions soumises et leurs options,
+                                sans bulletin ni dépouillement.
+                            </div>
+                            <field name="vote_ids">
+                                <list editable="bottom">
+                                    <field name="question"/>
+                                    <field name="option_ids" widget="many2many_tags"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_assembly" model="ir.actions.act_window">
+        <field name="name">Assemblées générales</field>
+        <field name="res_model">opex.cluster.assembly</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
     <!-- Menus -->
     <menuitem id="menu_opex_cluster_news"
               name="Actualités"
@@ -138,5 +356,29 @@
               parent="menu_opex_membership_root"
               action="action_opex_cluster_registration"
               sequence="60"/>
+
+    <menuitem id="menu_opex_cluster_document"
+              name="Documents du cluster"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_document"
+              sequence="65"/>
+
+    <menuitem id="menu_opex_cluster_group"
+              name="Forums et groupes"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_group"
+              sequence="70"/>
+
+    <menuitem id="menu_opex_cluster_committee"
+              name="Comités"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_committee"
+              sequence="75"/>
+
+    <menuitem id="menu_opex_cluster_assembly"
+              name="Assemblées générales"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_assembly"
+              sequence="80"/>
 
 </odoo>

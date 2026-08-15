@@ -645,12 +645,18 @@ dans ce module. S'applique aux 3 routes déjà livrées (news/events/
 trainings) **et** aux routes de la seconde moitié (documents/groupes) à
 venir.
 
-**✅ Exception actée** : Secrétariat, COPIL et Admin (les 3 groupes internes
-du module) peuvent prévisualiser ces pages depuis le portail même sans
-être eux-mêmes membres — ajoute cette exception directement dans
-`_cluster_access_denied()` (un utilisateur interne appartenant à l'un des
-3 groupes passe, en plus d'`is_member = True`), pas une route dupliquée
-séparée pour le staff.
+**✅ Exception actée (implémentée)** : Secrétariat, Comité, COPIL — les 3
+vrais groupes internes du module (`opex_membership.group_*`) — et Admin
+(`base.group_system`, natif Odoo, pas un groupe du module à proprement
+parler mais avec accès complet partout par construction) peuvent
+prévisualiser ces pages depuis le portail même sans être eux-mêmes membres.
+
+Implémenté via `res.users._is_opex_staff()` — **source unique** de la liste
+des rôles internes, réutilisée à la fois par `_cluster_access_denied()` et
+par la vérification `/staff/...` (`OpexStaff._is_staff()`), qui pointe
+maintenant vers la même méthode. Ne jamais recréer une seconde liste de
+rôles ailleurs — c'est exactement le risque de divergence que la règle
+transversale plus haut dans ce document vise à éviter.
 
 ---
 

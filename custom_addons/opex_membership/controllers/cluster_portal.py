@@ -163,6 +163,60 @@ class ClusterPortal(CustomerPortal):
         return self._register_to(training, '/my/cluster/trainings')
 
     # ------------------------------------------------------------
+    # Documents et groupes
+    # ------------------------------------------------------------
+
+    @http.route(['/my/cluster/documents'], type='http', auth='user', website=True)
+    def portal_cluster_documents(self, **kw):
+        denied = self._cluster_access_denied()
+        if denied:
+            return denied
+
+        Document = request.env['opex.cluster.document']
+        # Le personnel interne prévisualise aussi les pièces de comité ; un
+        # membre ne les voit pas. Même notion de « personnel » que le garde-fou
+        # d'accès, pas une seconde définition.
+        is_staff = request.env.user._is_opex_staff()
+        documents = Document.sudo().search(Document._portal_domain(is_staff=is_staff))
+
+        # Regroupement par dossier, dans l'ordre de la sélection : c'est
+        # l'arborescence de la section 37, pas une liste plate.
+        folders = dict(Document._fields['folder'].selection)
+        grouped = []
+        for key, label in folders.items():
+            in_folder = documents.filtered(lambda d: d.folder == key)
+            if in_folder:
+                grouped.append((label, in_folder))
+
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'document_folders': grouped,
+            'sees_committee_documents': is_staff,
+            'page_name': 'cluster_documents',
+            'cluster_page': 'documents',
+        })
+        return request.render('opex_membership.portal_cluster_documents', values)
+
+    @http.route(['/my/cluster/groups'], type='http', auth='user', website=True)
+    def portal_cluster_groups(self, **kw):
+        denied = self._cluster_access_denied()
+        if denied:
+            return denied
+
+        groups = request.env['opex.cluster.group'].sudo().search(
+            [], limit=self._items_per_page)
+
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'groups': groups,
+            'my_group_ids': set(groups.filtered(
+                lambda g: request.env.user.partner_id in g.member_ids).ids),
+            'page_name': 'cluster_groups',
+            'cluster_page': 'groups',
+        })
+        return request.render('opex_membership.portal_cluster_groups', values)
+
+    # ------------------------------------------------------------
 
     def _register_to(self, activity, redirect_url):
         """Inscrit le membre connecté à l'activité, et rapporte un refus lisible.
