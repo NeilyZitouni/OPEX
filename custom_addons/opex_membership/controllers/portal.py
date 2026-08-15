@@ -1,4 +1,5 @@
 import base64
+from urllib.parse import quote
 
 from odoo import _, http
 from odoo.exceptions import AccessError, MissingError, UserError
@@ -56,6 +57,13 @@ class MembershipCustomerPortal(CustomerPortal):
                 MembershipFile.search_count(self._membership_file_domain())
                 if MembershipFile.has_access('read') else 0
             )
+        if 'subscription_count' in counters:
+            Subscription = request.env['opex.subscription']
+            values['subscription_count'] = (
+                Subscription.search_count(
+                    [('partner_id', '=', request.env.user.partner_id.id)])
+                if Subscription.has_access('read') else 0
+            )
         return values
 
     # ------------------------------------------------------------
@@ -109,6 +117,102 @@ class MembershipCustomerPortal(CustomerPortal):
             'searchbar_sortings': searchbar_sortings,
         })
         return request.render('opex_membership.portal_my_membership_files', values)
+
+    # ------------------------------------------------------------
+    # Cotisations du membre (historique, reçu, renouvellement)
+    # ------------------------------------------------------------
+
+    def _own_subscriptions(self):
+        """Cotisations du membre connecté, résolues côté serveur.
+
+        Aucun identifiant ne vient du client : la liste est construite depuis
+        `partner_id`, comme la cloche de l'Extension 20. Un identifiant reçu en
+        URL n'est jamais lu directement, il est recherché *dans* cet ensemble.
+        """
+        return request.env['opex.subscription'].sudo().search(
+            [('partner_id', '=', request.env.user.partner_id.id)],
+            order='date_echeance desc, id desc',
+        )
+
+    def _own_subscription(self, subscription_id):
+        """Cotisation appartenant au membre connecté, sinon recordset vide."""
+        return self._own_subscriptions().filtered(
+            lambda s: s.id == subscription_id)[:1]
+
+    def _renewable_membership_file(self):
+        """Dossier actif du membre pouvant porter un renouvellement, sinon vide.
+
+        Le renouvellement se rattache au dossier qui a fait de ce contact un
+        membre : c'est lui qui porte la sous-catégorie, donc le barème.
+        """
+        return request.env['opex.membership.file'].sudo().search([
+            ('partner_id', '=', request.env.user.partner_id.id),
+            ('state', '=', 'active'),
+        ], order='id desc', limit=1)
+
+    @http.route(['/my/subscriptions'], type='http', auth='user', website=True)
+    def portal_my_subscriptions(self, **kw):
+        """Historique année par année des cotisations (section 29)."""
+        subscriptions = self._own_subscriptions()
+
+        # Regroupement par année, la plus récente en tête : c'est la lecture
+        # qu'attend la spécification (2026 payée, 2027 à renouveler…).
+        years = {}
+        for subscription in subscriptions:
+            years.setdefault(subscription._portal_year(), []).append(subscription)
+
+        membership_file = self._renewable_membership_file()
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'subscription_years': sorted(
+                years.items(), key=lambda item: item[0] or 0, reverse=True),
+            'membership_file': membership_file,
+            'can_renew': bool(membership_file) and not membership_file._pending_subscription(),
+            'error': kw.get('error'),
+            'page_name': 'subscriptions',
+        })
+        return request.render('opex_membership.portal_my_subscriptions', values)
+
+    @http.route(
+        ['/my/subscriptions/<int:subscription_id>/receipt'],
+        type='http', auth='user', website=True, sitemap=False,
+    )
+    def portal_subscription_receipt(self, subscription_id, **kw):
+        """Reçu d'une cotisation réglée (section 31).
+
+        Page imprimable plutôt que PDF généré, comme la charte de l'Extension
+        13 : le POC n'embarque pas wkhtmltopdf. Le navigateur suffit à en tirer
+        un PDF, et brancher un vrai rapport ne toucherait que cette route.
+        """
+        subscription = self._own_subscription(subscription_id)
+        if not subscription or subscription.state != 'paid':
+            return request.redirect('/my/subscriptions')
+        return request.render('opex_membership.portal_subscription_receipt', {
+            'subscription': subscription,
+            'page_name': 'subscriptions',
+        })
+
+    @http.route(
+        ['/my/subscriptions/renew'],
+        type='http', auth='user', website=True, methods=['POST'],
+    )
+    def portal_subscription_renew(self, **post):
+        """Renouvellement demandé par le membre lui-même.
+
+        Le dossier concerné n'est pas reçu du formulaire : il est retrouvé
+        depuis le contact connecté. Les règles (adhésion active, pas de
+        cotisation déjà en attente) restent dans `action_renew()`.
+        """
+        membership_file = self._renewable_membership_file()
+        if not membership_file:
+            return request.redirect('/my/subscriptions')
+        try:
+            with request.env.cr.savepoint():
+                membership_file.action_renew()
+        except UserError as error:
+            return request.redirect(
+                '/my/subscriptions?error=%s' % quote(error.args[0]))
+        return request.redirect('/my/subscriptions')
 
     # ------------------------------------------------------------
     # Dépôt d'un dossier

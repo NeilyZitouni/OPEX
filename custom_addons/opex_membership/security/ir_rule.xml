@@ -94,6 +94,27 @@
         <field name="perm_unlink" eval="False"/>
     </record>
 
+    <!--
+        Inscriptions aux activités du cluster : un membre ne voit que les
+        siennes. Sans cette règle, la liste des participants d'une formation
+        serait lisible par n'importe quel titulaire d'un compte portail.
+
+        Création autorisée, modification non : c'est le Secrétariat qui marque
+        un participant « Présent », pas l'intéressé. Le `partner_id` est de
+        toute façon imposé côté serveur par le controller, jamais reçu du
+        formulaire ; cette règle est le second verrou.
+    -->
+    <record id="rule_cluster_registration_portal" model="ir.rule">
+        <field name="name">Inscription cluster : le membre n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_cluster_event_registration"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
     <!-- La demande de correction est écrite par le Secrétariat ; le candidat
          doit pouvoir la lire, jamais la modifier ni la déclarer traitée. -->
     <record id="rule_membership_correction_portal" model="ir.rule">

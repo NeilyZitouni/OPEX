@@ -53,33 +53,6 @@ d'abord dans `docs/` avant de faire une supposition.
 - Les 2 groupes `Secrétariat` et `COPIL`
 - Les vues formulaire/liste pour tous les modèles
 
-## ⚠️ Règle transversale : collisions de nommage avec l'API interne d'Odoo
-
-Rencontré deux fois déjà (`res.partner.category_id` en Extension 8,
-`_register` en Extension 16) : Odoo a une très large surface de noms déjà
-pris en interne — champs natifs, attributs de classe (`BaseModel._register`
-notamment), méthodes système. Un nom qui semble générique et libre
-(`category_id`, `_register`, `_name`, `_state`...) peut déjà exister,
-auquel cas la nouvelle définition ne lève pas forcément d'erreur explicite
-— elle peut être silencieusement masquée, avec un comportement qui échoue
-de façon confuse au runtime plutôt qu'au chargement du module.
-
-**Avant de nommer un nouveau champ ou une nouvelle méthode dans une
-extension, vérifie qu'il n'entre pas en collision avec quelque chose
-d'existant sur le modèle parent ou sur `BaseModel`.** En cas de doute,
-préfixe (`opex_`, ou un nom plus spécifique comme `_register_participant`
-plutôt que `_register`).
-
-## ⚠️ Règle transversale : un contrôle d'accès = une seule fonction, jamais recopié
-
-Dès qu'une même condition d'accès doit être vérifiée sur plusieurs routes
-(voir Extension 16, `_cluster_access_denied()` appelée par les 5 routes
-concernées plutôt que le test dupliqué cinq fois), centralise-la dans une
-seule fonction/méthode réutilisée partout. Une vérification recopiée finit
-tôt ou tard par en oublier une occurrence — et c'est précisément celle-là
-qui reçoit la requête forgée. S'applique à toute future extension qui
-ajoute plusieurs routes partageant une même règle de visibilité.
-
 ---
 
 ## Extension 1 — Intégration `sale.order` pour les cotisations
@@ -612,17 +585,8 @@ extension couvre la Partie VIII du PDF (sections 33 à 40) :
 | Nouveau modèle | Champs clés |
 |---|---|
 | `opex.cluster.news` (Actualités) | `title`, `image`, `content`, `category`, `publish_date`, `attachment_ids` |
-| `opex.cluster.event` (existant, enrichi) | + `registration_ids` (One2many vers `opex.cluster.event.registration` : `partner_id`, `event_id`, `training_id`, `state` inscrit/présent) |
+| `opex.cluster.event` (existant, enrichi) | + `registration_ids` (One2many vers un nouveau `opex.cluster.event.registration` : `partner_id`, `event_id`, `state` inscrit/présent) |
 | `opex.cluster.training` (Formations) | `name`, `date`, `duration`, `seats_total`, `seats_available` (computed), `registration_ids` |
-
-**✅ Décision actée (première moitié implémentée)** : pas de modèle
-`opex.cluster.training.registration` séparé — `opex.cluster.event.registration`
-sert aux deux (événements et formations), avec `event_id`/`training_id`
-tous deux optionnels mais une contrainte imposant qu'exactement un des deux
-soit renseigné. Un événement et une formation partagent la même structure
-d'inscription ; un second modèle aurait juste dupliqué une table à
-maintenir en double. Garde ce principe pour Documents/Groupes/Comités/
-Assemblée si un besoin similaire se présente dans la seconde moitié.
 | `opex.cluster.document` | `name`, `folder` (Selection : AG / Règlements / Chartes / Formations / Documents du Cluster), `file`, `version`, `confidentiality` (Selection : public/membres/comité) |
 | `opex.cluster.group` (Forums/Groupes) | `name`, `description`, `member_ids` (Many2many res.partner) |
 | `opex.cluster.committee` (Comités) | `name`, `member_ids`, `document_ids`, `meeting_ids` |
@@ -635,22 +599,6 @@ clairement dans le code que le calcul de résultats est hors périmètre actuel.
 
 Routes portail à ajouter : `/my/cluster/news`, `/my/cluster/events`,
 `/my/cluster/trainings`, `/my/cluster/documents`, `/my/cluster/groups`.
-
-**✅ Décision actée : accès réservé aux membres actifs (`is_member = True`)**,
-pas ouvert à tout compte portail connecté. Un candidat encore en cours
-d'adhésion (`state` différent de `active`) ne doit voir aucune des pages
-Vie du Cluster. Vérification côté serveur sur chaque route (redirection
-propre, pas juste un lien caché côté template) — même exigence qu'ailleurs
-dans ce module. S'applique aux 3 routes déjà livrées (news/events/
-trainings) **et** aux routes de la seconde moitié (documents/groupes) à
-venir.
-
-**✅ Exception actée** : Secrétariat, COPIL et Admin (les 3 groupes internes
-du module) peuvent prévisualiser ces pages depuis le portail même sans
-être eux-mêmes membres — ajoute cette exception directement dans
-`_cluster_access_denied()` (un utilisateur interne appartenant à l'un des
-3 groupes passe, en plus d'`is_member = True`), pas une route dupliquée
-séparée pour le staff.
 
 ---
 
@@ -701,23 +649,11 @@ Règles techniques :
 
 ## Extension 19 — Historique complet (fil chronologique)
 
-Section 44 du PDF. **✅ Fait** — ce n'était pas une simple vérification comme
-supposé initialement ici : `opex.membership.file` n'hérite pas de
-`portal.mixin`, donc le chatter natif ne s'affichait sur aucune des deux
-pages portail (`/my/membership/<id>`, `/staff/membership/<id>`), seulement
-en back-office. Un bloc QWeb dédié en lecture seule (journal, pas un widget
-de discussion — choix délibéré) a été construit, partagé entre les deux
-pages, alimenté par une méthode `_history_entries()` sur le modèle qui
-décide elle-même ce que chaque audience peut voir.
-
-**Règle découverte à cette occasion, à respecter pour tout futur
-`message_post()` destiné au staff uniquement** : utiliser le sous-type
-`mail.mt_note` (interne), jamais `mail.mt_comment` (public) — sinon tout
-follower du dossier (le candidat y compris, abonné automatiquement depuis
-l'Extension 18) reçoit la notification par email, même quand le message ne
-lui est pas destiné. C'est exactement le bug retrouvé et corrigé sur
-`_notify_staff` : les destinataires explicites restent notifiés, les
-followers non concernés ne le sont plus.
+Section 44 du PDF. Le chatter natif Odoo (déjà actif via `mail.thread`)
+couvre déjà l'essentiel : vérifie simplement qu'il s'affiche de façon
+lisible sur `/my/membership/<id>` (candidat) et `/staff/membership/<id>`
+(staff), dans l'ordre chronologique, avec date/heure/auteur/action —
+comparable à l'exemple de la section 44. Pas de nouveau modèle nécessaire.
 
 ---
 

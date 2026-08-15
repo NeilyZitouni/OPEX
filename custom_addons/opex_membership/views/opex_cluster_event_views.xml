@@ -29,9 +29,13 @@
                     <group>
                         <group>
                             <field name="date_debut"/>
+                            <field name="date_fin"/>
                         </group>
                         <group>
-                            <field name="date_fin"/>
+                            <!-- Miroir dans l'agenda natif : en lecture seule,
+                                 c'est l'événement du cluster qui fait foi. -->
+                            <field name="calendar_event_id" readonly="1"
+                                   invisible="not calendar_event_id"/>
                         </group>
                     </group>
                     <notebook>

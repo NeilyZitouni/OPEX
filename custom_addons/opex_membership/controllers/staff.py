@@ -29,11 +29,13 @@ class OpexStaff(http.Controller):
     # ------------------------------------------------------------
 
     def _is_staff(self):
-        user = request.env.user
-        return (user.has_group('opex_membership.group_secretariat')
-                or user.has_group('opex_membership.group_comite')
-                or user.has_group('opex_membership.group_copil')
-                or user.has_group('base.group_system'))
+        """Rôles internes du module, définis une seule fois sur `res.users`.
+
+        La même liste sert à la prévisualisation de la Vie du Cluster : la
+        garder ici *et* là-bas reviendrait à devoir penser aux deux endroits le
+        jour où un rôle s'ajoute.
+        """
+        return request.env.user._is_opex_staff()
 
     # File d'attente de chaque rôle dans le workflow étendu. Les trois files
     # sont disjointes : un dossier n'attend jamais deux acteurs à la fois.

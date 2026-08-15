@@ -1,0 +1,234 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Carte « Vie du Cluster » sur l'accueil du portail.
+
+        Réservée aux membres actifs, comme les pages elles-mêmes : proposer une
+        tuile qui renvoie aussitôt sur cette même page serait déroutant. Ce
+        `t-if` reste un confort d'affichage — c'est le controller qui refuse
+        réellement l'accès.
+    -->
+    <template id="portal_my_home_cluster" name="Portail : vie du cluster"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="50">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+
+            <!-- Refus expliqué au candidat qui a tenté d'ouvrir une page
+                 Vie du Cluster : le drapeau vient de l'URL, le texte non. -->
+            <div t-if="request.params.get('cluster') == 'members_only'"
+                 class="alert alert-info" role="alert">
+                <strong>La Vie du Cluster est réservée aux membres actifs.</strong>
+                <div class="small mb-0">
+                    Vos actualités, événements et formations s'ouvriront dès que
+                    votre adhésion au GIC OPEX Group sera activée. Vous pouvez
+                    suivre l'avancement de votre dossier depuis
+                    <a href="/my/membership">Mes dossiers d'adhésion</a>.
+                </div>
+            </div>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <!-- Même condition que le controller : membre actif, ou personnel
+                 interne venu prévisualiser. -->
+            <t t-if="request.env.user.partner_id.sudo().is_member
+                     or request.env.user._is_opex_staff()">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Vie du Cluster</t>
+                    <t t-set="text">Actualités, événements et formations du GIC OPEX Group</t>
+                    <t t-set="url" t-value="'/my/cluster/news'"/>
+                </t>
+            </t>
+        </div>
+    </template>
+
+    <!-- Fil d'Ariane des pages Vie du Cluster -->
+    <template id="portal_breadcrumbs_cluster" name="Portail : fil d'Ariane vie du cluster"
+              inherit_id="portal.portal_breadcrumbs" priority="50">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name in ('cluster_news', 'cluster_events', 'cluster_trainings')"
+                class="breadcrumb-item active">
+                Vie du Cluster
+            </li>
+        </xpath>
+    </template>
+
+    <!-- Navigation commune aux trois pages -->
+    <template id="portal_cluster_nav" name="Portail : navigation vie du cluster">
+        <ul class="nav nav-pills mb-4">
+            <li class="nav-item">
+                <a t-attf-class="nav-link #{'active' if cluster_page == 'news' else ''}"
+                   href="/my/cluster/news">Actualités</a>
+            </li>
+            <li class="nav-item">
+                <a t-attf-class="nav-link #{'active' if cluster_page == 'events' else ''}"
+                   href="/my/cluster/events">Événements</a>
+            </li>
+            <li class="nav-item">
+                <a t-attf-class="nav-link #{'active' if cluster_page == 'trainings' else ''}"
+                   href="/my/cluster/trainings">Formations</a>
+            </li>
+        </ul>
+    </template>
+
+    <!-- /my/cluster/news -->
+    <template id="portal_cluster_news" name="Portail : actualités du cluster">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Vie du Cluster</t>
+            </t>
+            <t t-call="opex_membership.portal_cluster_nav"/>
+
+            <div t-if="not news_items" class="alert alert-info" role="alert">
+                Aucune actualité publiée pour le moment.
+            </div>
+
+            <div t-else="" class="row g-3">
+                <div t-foreach="news_items" t-as="news" class="col-md-6">
+                    <div class="card h-100">
+                        <img t-if="news.image" class="card-img-top"
+                             t-attf-src="/web/image/opex.cluster.news/#{news.id}/image"
+                             t-att-alt="news.title"/>
+                        <div class="card-body">
+                            <span t-if="news.category" class="badge text-bg-light mb-2">
+                                <t t-out="news.category"/>
+                            </span>
+                            <h5 class="card-title"><t t-out="news.title"/></h5>
+                            <p class="text-muted small mb-2">
+                                <i class="fa fa-calendar fa-fw me-1"/>
+                                <span t-field="news.publish_date"/>
+                            </p>
+                            <div t-if="news.content" t-out="news.content"/>
+                            <div t-if="news.attachment_ids" class="mt-3">
+                                <a t-foreach="news.attachment_ids" t-as="attachment"
+                                   t-attf-href="/web/content/#{attachment.id}?download=true"
+                                   class="d-block small">
+                                    <i class="fa fa-paperclip me-1"/><t t-out="attachment.name"/>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- /my/cluster/events -->
+    <template id="portal_cluster_events" name="Portail : événements du cluster">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Vie du Cluster</t>
+            </t>
+            <t t-call="opex_membership.portal_cluster_nav"/>
+
+            <div t-if="error" class="alert alert-danger" role="alert">
+                <t t-out="error"/>
+            </div>
+
+            <div t-if="not events" class="alert alert-info" role="alert">
+                Aucun événement programmé pour le moment.
+            </div>
+
+            <div t-else="" class="list-group">
+                <div t-foreach="events" t-as="event"
+                     class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h6 class="mb-1"><t t-out="event.name"/></h6>
+                        <div class="text-muted small">
+                            <span class="badge text-bg-light me-2">
+                                <t t-out="dict(event._fields['type'].selection)[event.type]"/>
+                            </span>
+                            <i class="fa fa-calendar fa-fw me-1"/>
+                            <span t-field="event.date_debut"/>
+                            <t t-if="event.lieu">
+                                <i class="fa fa-map-marker fa-fw ms-2 me-1"/>
+                                <t t-out="event.lieu"/>
+                            </t>
+                        </div>
+                    </div>
+                    <div>
+                        <span t-if="event.id in registered_event_ids"
+                              class="badge text-bg-success">
+                            <i class="fa fa-check me-1"/>Vous participez
+                        </span>
+                        <form t-else=""
+                              t-attf-action="/my/cluster/events/#{event.id}/register"
+                              method="post" class="mb-0">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                Participer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- /my/cluster/trainings -->
+    <template id="portal_cluster_trainings" name="Portail : formations du cluster">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Vie du Cluster</t>
+            </t>
+            <t t-call="opex_membership.portal_cluster_nav"/>
+
+            <div t-if="error" class="alert alert-danger" role="alert">
+                <t t-out="error"/>
+            </div>
+
+            <div t-if="not trainings" class="alert alert-info" role="alert">
+                Aucune formation programmée pour le moment.
+            </div>
+
+            <div t-else="" class="list-group">
+                <div t-foreach="trainings" t-as="training"
+                     class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h6 class="mb-1"><t t-out="training.name"/></h6>
+                        <div class="text-muted small">
+                            <t t-if="training.date">
+                                <i class="fa fa-calendar fa-fw me-1"/>
+                                <span t-field="training.date"/>
+                            </t>
+                            <t t-if="training.duration">
+                                <i class="fa fa-clock-o fa-fw ms-2 me-1"/>
+                                <t t-out="training.duration"/> h
+                            </t>
+                            <span t-attf-class="ms-2 badge #{
+                                    'text-bg-secondary' if not training.seats_available
+                                    else 'text-bg-light'}">
+                                <t t-out="training.seats_available"/>
+                                place<t t-if="training.seats_available &gt; 1">s</t>
+                                sur <t t-out="training.seats_total"/>
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <span t-if="training.id in registered_training_ids"
+                              class="badge text-bg-success">
+                            <i class="fa fa-check me-1"/>Vous êtes inscrit
+                        </span>
+                        <!-- Bouton neutralisé quand il n'y a plus de place ;
+                             le modèle refuse de toute façon l'inscription. -->
+                        <span t-elif="not training.seats_available"
+                              class="badge text-bg-secondary">Complet</span>
+                        <form t-else=""
+                              t-attf-action="/my/cluster/trainings/#{training.id}/register"
+                              method="post" class="mb-0">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                S'inscrire
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

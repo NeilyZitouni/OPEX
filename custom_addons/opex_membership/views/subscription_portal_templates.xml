@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Carte « Mes cotisations » sur l'accueil du portail -->
+    <template id="portal_my_home_subscriptions" name="Portail : mes cotisations"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes cotisations</t>
+                <t t-set="text">Historique, reçus et renouvellement de ma cotisation</t>
+                <t t-set="url" t-value="'/my/subscriptions'"/>
+                <t t-set="placeholder_count" t-value="'subscription_count'"/>
+            </t>
+        </div>
+    </template>
+
+    <!-- Fil d'Ariane -->
+    <template id="portal_breadcrumbs_subscriptions" name="Portail : fil d'Ariane cotisations"
+              inherit_id="portal.portal_breadcrumbs" priority="40">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'subscriptions'" class="breadcrumb-item active">
+                Mes cotisations
+            </li>
+        </xpath>
+    </template>
+
+    <!-- /my/subscriptions : historique année par année -->
+    <template id="portal_my_subscriptions" name="Portail : mes cotisations">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mes cotisations</t>
+            </t>
+
+            <div t-if="error" class="alert alert-danger" role="alert">
+                <t t-out="error"/>
+            </div>
+
+            <div t-if="not subscription_years" class="alert alert-info" role="alert">
+                Aucune cotisation ne vous a encore été adressée.
+            </div>
+
+            <t t-else="">
+                <!-- Une section par année : c'est la lecture demandée par la
+                     section 29, pas une liste plate de lignes. -->
+                <t t-foreach="subscription_years" t-as="year_group">
+                    <h5 class="mt-4">
+                        <t t-out="year_group[0] or 'Sans échéance'"/>
+                    </h5>
+                    <div class="list-group">
+                        <div t-foreach="year_group[1]" t-as="subscription"
+                             class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <t t-set="status" t-value="subscription._portal_status()"/>
+                                <span t-attf-class="badge #{status['css']} me-2">
+                                    <t t-out="status['icon']"/>
+                                    <t t-out="status['label']"/>
+                                </span>
+                                <strong><span t-field="subscription.montant"/></strong>
+                                <span t-if="subscription.date_echeance" class="text-muted small ms-2">
+                                    échéance <span t-field="subscription.date_echeance"/>
+                                </span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <!-- Reçu : seulement quand il y a effectivement
+                                     quelque chose à attester. -->
+                                <a t-if="subscription.state == 'paid'"
+                                   t-attf-href="/my/subscriptions/#{subscription.id}/receipt"
+                                   class="btn btn-sm btn-light">
+                                    <i class="fa fa-file-text-o me-1"/>Télécharger le reçu
+                                </a>
+                                <a t-if="subscription.state in ('waiting', 'late') and subscription.sale_order_id"
+                                   t-att-href="subscription.sale_order_id.get_portal_url()"
+                                   class="btn btn-sm btn-primary">
+                                    Régulariser
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+            </t>
+
+            <!-- Renouvellement : le membre actif ne repasse par aucune étape
+                 du parcours d'adhésion, il émet simplement la période suivante. -->
+            <div t-if="membership_file" class="card mt-4">
+                <div class="card-body d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div>
+                        <h6 class="card-title mb-1">Renouveler mon adhésion</h6>
+                        <p class="text-muted small mb-0">
+                            <t t-if="can_renew">
+                                Émettez la cotisation de la période suivante sans refaire
+                                votre dossier d'adhésion.
+                            </t>
+                            <t t-else="">
+                                Une cotisation est déjà en attente de règlement : réglez-la
+                                avant d'en émettre une nouvelle.
+                            </t>
+                        </p>
+                    </div>
+                    <form t-if="can_renew" action="/my/subscriptions/renew" method="post" class="mb-0">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button type="submit" class="btn btn-primary">
+                            Renouveler pour la période suivante
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        Reçu de cotisation (section 31).
+
+        Gabarit imprimable, pas de PDF généré : même parti pris que la charte
+        d'adhésion — le POC n'embarque pas wkhtmltopdf, et le navigateur produit
+        un PDF correct depuis cette page.
+    -->
+    <template id="portal_subscription_receipt" name="Portail : reçu de cotisation">
+        <t t-call="portal.portal_layout">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <h5 class="mb-0">Reçu de cotisation</h5>
+                    <button type="button" class="btn btn-sm btn-light d-print-none"
+                            onclick="window.print()">
+                        <i class="fa fa-print me-1"/>Imprimer
+                    </button>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">
+                        Le GIC OPEX Group atteste avoir reçu le règlement de la cotisation
+                        ci-dessous.
+                    </p>
+
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Membre</dt>
+                        <dd class="col-sm-8"><span t-field="subscription.partner_id"/></dd>
+
+                        <dt class="col-sm-4">Référence</dt>
+                        <dd class="col-sm-8">COT-<t t-out="subscription.id"/></dd>
+
+                        <dt class="col-sm-4">Montant réglé</dt>
+                        <dd class="col-sm-8"><strong><span t-field="subscription.montant"/></strong></dd>
+
+                        <dt class="col-sm-4">Date d'émission</dt>
+                        <dd class="col-sm-8"><span t-field="subscription.date_emission"/></dd>
+
+                        <dt t-if="subscription.date_echeance" class="col-sm-4">Échéance</dt>
+                        <dd t-if="subscription.date_echeance" class="col-sm-8">
+                            <span t-field="subscription.date_echeance"/>
+                        </dd>
+
+                        <t t-if="subscription.payment_ids.filtered(lambda p: p.state == 'paid')">
+                            <dt class="col-sm-4">Paiements</dt>
+                            <dd class="col-sm-8">
+                                <div t-foreach="subscription.payment_ids.filtered(lambda p: p.state == 'paid')"
+                                     t-as="payment">
+                                    <span t-field="payment.montant"/>
+                                    le <span t-field="payment.date_paiement"/>
+                                    <t t-if="payment.reference_transaction">
+                                        — réf. <t t-out="payment.reference_transaction"/>
+                                    </t>
+                                </div>
+                            </dd>
+                        </t>
+                    </dl>
+                </div>
+                <div class="card-footer d-print-none">
+                    <a href="/my/subscriptions" class="btn btn-light">
+                        <i class="fa fa-arrow-left me-1"/>Retour à mes cotisations
+                    </a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

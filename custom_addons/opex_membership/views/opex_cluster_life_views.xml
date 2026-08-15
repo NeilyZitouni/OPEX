@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Actualités -->
+    <record id="view_opex_cluster_news_list" model="ir.ui.view">
+        <field name="name">opex.cluster.news.list</field>
+        <field name="model">opex.cluster.news</field>
+        <field name="arch" type="xml">
+            <list string="Actualités">
+                <field name="publish_date"/>
+                <field name="title"/>
+                <field name="category"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_cluster_news_form" model="ir.ui.view">
+        <field name="name">opex.cluster.news.form</field>
+        <field name="model">opex.cluster.news</field>
+        <field name="arch" type="xml">
+            <form string="Actualité">
+                <sheet>
+                    <field name="image" widget="image" class="oe_avatar"/>
+                    <div class="oe_title">
+                        <h1><field name="title" placeholder="Titre de l'actualité"/></h1>
+                    </div>
+                    <group>
+                        <field name="category" placeholder="ex. Assemblée générale"/>
+                        <field name="publish_date"/>
+                    </group>
+                    <separator string="Contenu"/>
+                    <field name="content"/>
+                    <separator string="Pièces jointes"/>
+                    <field name="attachment_ids" widget="many2many_binary"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_news" model="ir.actions.act_window">
+        <field name="name">Actualités</field>
+        <field name="res_model">opex.cluster.news</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Formations -->
+    <record id="view_opex_cluster_training_list" model="ir.ui.view">
+        <field name="name">opex.cluster.training.list</field>
+        <field name="model">opex.cluster.training</field>
+        <field name="arch" type="xml">
+            <list string="Formations">
+                <field name="date"/>
+                <field name="name"/>
+                <field name="duration"/>
+                <field name="seats_total"/>
+                <field name="seats_available"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_cluster_training_form" model="ir.ui.view">
+        <field name="name">opex.cluster.training.form</field>
+        <field name="model">opex.cluster.training</field>
+        <field name="arch" type="xml">
+            <form string="Formation">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Intitulé de la formation"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="date"/>
+                            <field name="duration"/>
+                        </group>
+                        <group>
+                            <field name="seats_total"/>
+                            <field name="seats_available"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Inscriptions" name="registrations">
+                            <field name="registration_ids">
+                                <list editable="bottom">
+                                    <field name="partner_id"/>
+                                    <field name="date_inscription" readonly="1"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_training" model="ir.actions.act_window">
+        <field name="name">Formations</field>
+        <field name="res_model">opex.cluster.training</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Inscriptions (vue transverse, utile au Secrétariat pour l'émargement) -->
+    <record id="view_opex_cluster_registration_list" model="ir.ui.view">
+        <field name="name">opex.cluster.event.registration.list</field>
+        <field name="model">opex.cluster.event.registration</field>
+        <field name="arch" type="xml">
+            <list string="Inscriptions">
+                <field name="partner_id"/>
+                <field name="event_id" optional="show"/>
+                <field name="training_id" optional="show"/>
+                <field name="date_inscription"/>
+                <field name="state" widget="badge"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_opex_cluster_registration" model="ir.actions.act_window">
+        <field name="name">Inscriptions</field>
+        <field name="res_model">opex.cluster.event.registration</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <!-- Menus -->
+    <menuitem id="menu_opex_cluster_news"
+              name="Actualités"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_news"
+              sequence="45"/>
+
+    <menuitem id="menu_opex_cluster_training"
+              name="Formations"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_training"
+              sequence="55"/>
+
+    <menuitem id="menu_opex_cluster_registration"
+              name="Inscriptions"
+              parent="menu_opex_membership_root"
+              action="action_opex_cluster_registration"
+              sequence="60"/>
+
+</odoo>

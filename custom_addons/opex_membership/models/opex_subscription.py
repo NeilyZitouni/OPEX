@@ -1,4 +1,6 @@
-from odoo import _, fields, models
+from datetime import timedelta
+
+from odoo import _, api, fields, models
 from odoo.exceptions import UserError
 from odoo.tools import format_amount
 
@@ -38,6 +40,13 @@ class OpexSubscription(models.Model):
         tracking=True,
     )
     payment_ids = fields.One2many('opex.payment', 'subscription_id', string="Paiements")
+    date_relance_echeance = fields.Date(
+        string="Relance avant échéance envoyée le",
+        readonly=True,
+        help="Empêche le cron de renvoyer chaque jour la même relance "
+             "pré-échéance ; le rappel de retard, lui, ne part qu'une fois "
+             "puisque la cotisation change alors d'état.",
+    )
     membership_file_id = fields.Many2one(
         'opex.membership.file',
         string="Dossier d'adhésion",
@@ -82,6 +91,102 @@ class OpexSubscription(models.Model):
     def _state_label(self):
         self.ensure_one()
         return dict(self._fields['state'].selection).get(self.state)
+
+    # Nombre de jours avant l'échéance où part la première relance. Réglable
+    # sans toucher au code, comme le « X jours » de la spécification.
+    _REMINDER_DAYS_PARAM = 'opex_membership.relance_jours_avant'
+    _REMINDER_DAYS_DEFAULT = 15
+
+    @api.model
+    def _reminder_days_before(self):
+        raw = self.env['ir.config_parameter'].sudo().get_param(
+            self._REMINDER_DAYS_PARAM, self._REMINDER_DAYS_DEFAULT)
+        try:
+            return max(0, int(raw))
+        except (TypeError, ValueError):
+            return self._REMINDER_DAYS_DEFAULT
+
+    @api.model
+    def _cron_process_reminders(self):
+        """Relances automatiques des cotisations (section 30).
+
+        Deux passes distinctes, et une seule notification par situation :
+
+        - avant l'échéance, un rappel au membre ; `date_relance_echeance` sert
+          de garde, sans quoi le cron répéterait le même message chaque jour de
+          la fenêtre ;
+        - après l'échéance, la cotisation passe En retard *puis* la relance
+          existante part telle quelle. Aucune garde n'est nécessaire ici : le
+          changement d'état sort la cotisation du domaine, elle ne sera pas
+          reprise au passage suivant.
+
+        `action_generate_reminder()` n'est pas modifiée — elle exige déjà
+        l'état En retard, ce que cette méthode lui garantit avant de l'appeler.
+        """
+        today = fields.Date.context_today(self)
+        horizon = today + timedelta(days=self._reminder_days_before())
+
+        upcoming = self.search([
+            ('state', '=', 'waiting'),
+            ('date_echeance', '!=', False),
+            ('date_echeance', '>=', today),
+            ('date_echeance', '<=', horizon),
+            ('date_relance_echeance', '=', False),
+        ])
+        upcoming.action_notify_upcoming_due()
+
+        overdue = self.search([
+            ('state', '=', 'waiting'),
+            ('date_echeance', '!=', False),
+            ('date_echeance', '<', today),
+        ])
+        if overdue:
+            overdue.write({'state': 'late'})
+            overdue.action_generate_reminder()
+
+        return {'relances_echeance': len(upcoming), 'passees_en_retard': len(overdue)}
+
+    def action_notify_upcoming_due(self):
+        """Rappel amont : la cotisation arrive à échéance, elle n'est pas en retard.
+
+        Message distinct de `action_generate_reminder()` — annoncer un retard
+        qui n'existe pas encore serait faux, et pousserait le membre à croire
+        qu'il a manqué quelque chose.
+        """
+        for rec in self:
+            rec.sudo().message_post(
+                body=_(
+                    "Votre cotisation de %(montant)s arrive à échéance le "
+                    "%(echeance)s. Vous pouvez la régulariser dès maintenant "
+                    "depuis votre espace membre."
+                ) % {
+                    'montant': format_amount(self.env, rec.montant, rec.currency_id),
+                    'echeance': rec.date_echeance,
+                },
+                partner_ids=rec.partner_id.ids,
+                subtype_xmlid='mail.mt_comment',
+            )
+            rec.sudo().date_relance_echeance = fields.Date.context_today(rec)
+
+    def _portal_status(self):
+        """État lisible par le membre (section 29), jamais le code interne."""
+        self.ensure_one()
+        today = fields.Date.context_today(self)
+        if self.state == 'paid':
+            return {'icon': '✓', 'label': _("Payée"), 'css': 'text-bg-success'}
+        if self.state == 'cancelled':
+            return {'icon': '—', 'label': _("Annulée"), 'css': 'text-bg-secondary'}
+        if self.state == 'late':
+            return {'icon': '⚠', 'label': _("En retard"), 'css': 'text-bg-danger'}
+        if self.date_echeance and self.date_echeance > today:
+            return {'icon': '⏳', 'label': _("À venir"), 'css': 'text-bg-info'}
+        return {'icon': '○', 'label': _("À renouveler"), 'css': 'text-bg-warning'}
+
+    def _portal_year(self):
+        """Année de rattachement de la cotisation, pour l'historique annuel."""
+        self.ensure_one()
+        reference = self.date_echeance or self.date_emission
+        return reference.year if reference else False
 
     def action_generate_reminder(self):
         """genererRelances : envoie une relance si la cotisation est En retard.

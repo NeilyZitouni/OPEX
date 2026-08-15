@@ -649,6 +649,39 @@ class OpexMembershipFile(models.Model):
                 "régler votre cotisation en ligne."
             ) % {'motif': _(" : %s") % motif if motif else ''})
 
+    def action_renew(self):
+        """Renouvellement de l'adhésion pour la période suivante (section 32).
+
+        Le membre actif ne recommence pas son adhésion : ni contrôle du
+        Secrétariat, ni Comité, ni COPIL, ni signature. Le dossier reste
+        `active` d'un bout à l'autre — seule une nouvelle cotisation est émise,
+        par la méthode qui émet déjà celle de l'adhésion initiale. L'historique
+        des périodes précédentes est conservé, puisque rien n'est écrasé.
+        """
+        self.ensure_one()
+        if self.state != 'active':
+            raise UserError(_(
+                "Seule une adhésion active peut être renouvelée. Ce dossier est "
+                "actuellement à l'état « %s »."
+            ) % self._state_label())
+        pending = self._pending_subscription()
+        if pending:
+            raise UserError(_(
+                "Une cotisation est déjà en attente de règlement pour %s : "
+                "réglez-la avant d'en émettre une nouvelle."
+            ) % self.partner_id.name)
+
+        subscription = self.action_create_subscription()
+        self._notify_candidate(_(
+            "Votre adhésion au GIC OPEX Group est renouvelée pour la période "
+            "suivante. La cotisation de %(montant)s est à régler avant le "
+            "%(echeance)s depuis votre espace membre."
+        ) % {
+            'montant': self._format_montant(subscription),
+            'echeance': subscription.date_echeance,
+        })
+        return subscription
+
     def action_confirm_payment(self):
         """Paiement encaissé -> Signature en attente.
 
