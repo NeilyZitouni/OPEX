@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Tableau de bord du membre (section 41), greffé sur l'accueil du portail.
+
+        Choix d'intégration : pas de route `/my/dashboard` séparée. La section 41
+        décrit ce que le membre voit *en arrivant* dans son espace ; le portail
+        a déjà cette page, avec ses tuiles et sa cloche. Ajouter une seconde
+        page d'accueil aurait obligé à choisir laquelle est la vraie.
+
+        Les chiffres viennent de `_opex_member_dashboard()`, recalculé à chaque
+        rendu — même principe que le compteur de la cloche, aucune valeur
+        mémorisée.
+    -->
+    <template id="portal_my_home_dashboard" name="Portail : tableau de bord du membre"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="20">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-if="not request.env.user._is_public()">
+                <t t-set="dashboard"
+                   t-value="request.env.user.partner_id._opex_member_dashboard()"/>
+
+                <t t-if="dashboard['membership_file']">
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title mb-3">
+                                Bonjour <t t-out="request.env.user.partner_id.name"/> 👋
+                            </h5>
+
+                            <div class="row g-3">
+                                <!-- Mon adhésion -->
+                                <div class="col-md-6 col-lg-3">
+                                    <div class="text-muted small">Mon adhésion</div>
+                                    <t t-set="membership_file" t-value="dashboard['membership_file']"/>
+                                    <t t-call="opex_membership.portal_membership_state_badge"/>
+                                    <div class="small mt-1">
+                                        <a t-attf-href="/my/membership/#{membership_file.id}">
+                                            Voir mon dossier
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- Cotisation en cours -->
+                                <div class="col-md-6 col-lg-3">
+                                    <div class="text-muted small">Cotisation</div>
+                                    <t t-if="dashboard['subscription']">
+                                        <t t-set="status"
+                                           t-value="dashboard['subscription']._portal_status()"/>
+                                        <span t-attf-class="badge #{status['css']}">
+                                            <t t-out="status['icon']"/> <t t-out="status['label']"/>
+                                        </span>
+                                        <div class="small mt-1">
+                                            <span t-field="dashboard['subscription'].montant"/>
+                                            — <a href="/my/subscriptions">mes cotisations</a>
+                                        </div>
+                                    </t>
+                                    <div t-else="" class="text-muted small">
+                                        Aucune cotisation émise
+                                    </div>
+                                </div>
+
+                                <!-- Documents -->
+                                <div class="col-md-6 col-lg-3">
+                                    <div class="text-muted small">Documents</div>
+                                    <div class="fs-4 fw-bold"><t t-out="dashboard['document_count']"/></div>
+                                    <div class="small text-muted">
+                                        pièce<t t-if="dashboard['document_count'] &gt; 1">s</t>
+                                        au dossier
+                                    </div>
+                                </div>
+
+                                <!-- Prochaines activités -->
+                                <div class="col-md-6 col-lg-3">
+                                    <div class="text-muted small">Mes prochaines activités</div>
+                                    <div t-if="not dashboard['upcoming_activities']"
+                                         class="text-muted small">
+                                        Aucune inscription à venir
+                                    </div>
+                                    <ul t-else="" class="list-unstyled mb-0 small">
+                                        <li t-foreach="dashboard['upcoming_activities']" t-as="activity">
+                                            <span class="badge text-bg-light">
+                                                <t t-out="activity['kind']"/>
+                                            </span>
+                                            <t t-out="activity['name']"/>
+                                            <div class="text-muted">
+                                                <span t-out="activity['date']"
+                                                      t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                                            </div>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Dernières actualités : membres actifs uniquement,
+                                 comme les pages Vie du Cluster. -->
+                            <t t-if="dashboard['latest_news']">
+                                <hr class="my-3"/>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-muted small">Dernières actualités du cluster</div>
+                                    <a href="/my/cluster/news" class="small">Tout voir</a>
+                                </div>
+                                <ul class="list-unstyled mb-0 mt-2">
+                                    <li t-foreach="dashboard['latest_news']" t-as="news" class="mb-1">
+                                        <span t-if="news.category" class="badge text-bg-light me-1">
+                                            <t t-out="news.category"/>
+                                        </span>
+                                        <t t-out="news.title"/>
+                                        <span class="text-muted small ms-1">
+                                            <span t-field="news.publish_date"/>
+                                        </span>
+                                    </li>
+                                </ul>
+                            </t>
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </xpath>
+    </template>
+
+</odoo>

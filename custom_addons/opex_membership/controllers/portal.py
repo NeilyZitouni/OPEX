@@ -1,7 +1,7 @@
 import base64
 from urllib.parse import quote
 
-from odoo import _, http
+from odoo import _, fields, http
 from odoo.exceptions import AccessError, MissingError, UserError
 from odoo.http import request
 
@@ -218,61 +218,327 @@ class MembershipCustomerPortal(CustomerPortal):
     # Dépôt d'un dossier
     # ------------------------------------------------------------
 
+    # Champs saisis à chaque écran de saisie libre. Une seule table : elle
+    # décide à la fois ce que l'écran affiche et ce que le `write()` accepte,
+    # de sorte qu'un champ ajouté au gabarit sans l'être ici est simplement
+    # ignoré côté serveur.
+    _STEP_FIELDS = {
+        'organisation': (
+            'nom_legal', 'nom_commercial', 'forme_juridique', 'nif', 'rc',
+            'adresse', 'wilaya', 'commune', 'site_web', 'email_pro', 'telephone',
+        ),
+        'activite': ('secteur_activite', 'activite_principale', 'description_activite'),
+        'representant': (
+            'representant_nom', 'representant_prenom', 'representant_fonction',
+            'representant_email', 'representant_telephone',
+        ),
+        'complement': (
+            'presentation', 'motivation', 'domaines_expertise', 'partenariats_existants',
+        ),
+    }
+
+    # Enchaînement des sept écrans (sections 5 à 14). L'ordre vit ici seul :
+    # « écran suivant » et « écran précédent » s'en déduisent.
+    _PARCOURS_STEPS = (
+        ('category', '/my/membership/new'),
+        ('organisation', '/my/membership/new/organisation'),
+        ('activite', '/my/membership/new/activite'),
+        ('representant', '/my/membership/new/representant'),
+        ('complement', '/my/membership/new/complement'),
+        ('documents', '/my/membership/new/documents'),
+        ('recap', '/my/membership/new/recap'),
+    )
+
+    def _step_url(self, step):
+        return dict(self._PARCOURS_STEPS)[step]
+
+    def _next_step(self, step):
+        keys = [key for key, _url in self._PARCOURS_STEPS]
+        return keys[min(keys.index(step) + 1, len(keys) - 1)]
+
+    def _current_draft(self):
+        """Brouillon en cours du candidat connecté, ou recordset vide.
+
+        Retrouvé par une recherche sur `partner_id`, jamais par un
+        identifiant reçu du client : le parcours n'expose aucun id de dossier
+        dans ses URL, il n'y a donc rien à forger. La restriction à `draft`
+        garantit qu'un dossier déjà soumis ne peut plus être réécrit par ces
+        écrans, même en rejouant une URL d'étape.
+        """
+        return request.env['opex.membership.file'].sudo().search([
+            ('partner_id', '=', request.env.user.partner_id.id),
+            ('state', '=', 'draft'),
+        ], order='id desc', limit=1)
+
+    def _parcours_values(self, membership_file, step, **extra):
+        values = self._prepare_portal_layout_values()
+        values.update({
+            'membership_file': membership_file,
+            'steps': self._PARCOURS_STEPS,
+            'step': step,
+            'step_index': [key for key, _url in self._PARCOURS_STEPS].index(step),
+            'step_url': self._step_url,
+            'page_name': 'membership_new',
+        })
+        values.update(extra)
+        return values
+
+    def _render_step(self, step, membership_file, **extra):
+        return request.render(
+            'opex_membership.portal_membership_step_%s' % step,
+            self._parcours_values(membership_file, step, **extra))
+
+    def _require_draft(self):
+        """Brouillon en cours, ou renvoi au premier écran s'il n'y en a pas."""
+        membership_file = self._current_draft()
+        if not membership_file:
+            return None, request.redirect('/my/membership/new')
+        return membership_file, None
+
+    def _save_step(self, membership_file, step, post):
+        """Écrit la part du dossier saisie à cet écran, puis avance l'étape.
+
+        Écriture partielle : seuls les champs de l'écran courant sont touchés,
+        ce qui rend chaque validation indépendante — quitter en cours de route
+        ne perd que ce qui n'a pas encore été envoyé.
+        """
+        # Les écrans « pièces » et « récapitulatif » n'ont pas de champ de
+        # saisie libre : ils n'en font pas moins avancer le parcours, d'où le
+        # défaut à vide plutôt qu'une entrée factice dans la table.
+        values = {
+            field: (post.get(field) or '').strip()
+            for field in self._STEP_FIELDS.get(step, ())
+            if isinstance(post.get(field), str)
+        }
+        # L'étape n'est jamais reculée : un candidat qui revient corriger un
+        # écran précédent ne doit pas perdre sa progression.
+        keys = [key for key, _url in self._PARCOURS_STEPS]
+        reached = self._next_step(step)
+        if keys.index(reached) > keys.index(membership_file.parcours_step):
+            values['parcours_step'] = reached
+        membership_file.write(values)
+
+    # ------------------------------------------------------------
+    # Écran 1 — catégorie puis sous-catégorie
+    # ------------------------------------------------------------
+
     @http.route(
         ['/my/membership/new'],
         type='http', auth='user', website=True, methods=['GET', 'POST'],
     )
-    def portal_membership_file_new(self, **post):
+    def portal_membership_new(self, **post):
+        """Choix de la catégorie, puis de la sous-catégorie (section 6).
+
+        Deux temps, pas un menu déroulant unique : la catégorie se choisit
+        d'abord, et l'écran ne propose ensuite que les sous-catégories qui en
+        dépendent. Le passage de l'une à l'autre se fait par un paramètre
+        d'URL, ce qui laisse le candidat revenir en arrière.
+        """
         MembershipFile = request.env['opex.membership.file']
         if not MembershipFile.has_access('create'):
             return request.redirect('/my')
 
-        values = self._prepare_portal_layout_values()
-        values.update({
-            'page_name': 'membership_new',
-            'categories': request.env['opex.membership.category'].search(
-                [('subcategory_ids', '!=', False)]
-            ),
-            'document_slots': self._DOCUMENT_SLOTS,
-            'partner': request.env.user.partner_id,
-            'form': {},
-            'errors': {},
-        })
+        Category = request.env['opex.membership.category']
+        categories = Category.sudo().search([('subcategory_ids', '!=', False)])
+        draft = self._current_draft()
 
         if request.httprequest.method == 'POST':
-            values['form'] = {
-                key: value for key, value in post.items()
-                if isinstance(value, str) and key != 'csrf_token'
-            }
-            values['errors'] = self._validate_membership_form(post)
-            if not values['errors']:
+            subcategory = self._selected_subcategory(post.get('subcategory_id'))
+            if not subcategory:
+                return self._render_step(
+                    'category', draft, categories=categories, category=None,
+                    draft=draft,
+                    error=_("Veuillez choisir une sous-catégorie d'adhésion."))
+            if draft:
+                draft.subcategory_id = subcategory.id
+                membership_file = draft
+            else:
                 # `partner_id` et `state` sont volontairement absents : le
                 # `create()` du modèle les impose côté serveur.
-                file_values = {'subcategory_id': int(post['subcategory_id'])}
-                file_values.update({
-                    field: post[field].strip()
-                    for field in self._CANDIDATE_FILE_FIELDS
-                    if isinstance(post.get(field), str) and post[field].strip()
-                })
-                membership_file = MembershipFile.create(file_values)
-                self._update_candidate_profile(post)
-                self._attach_membership_documents(membership_file)
-                return request.redirect('/my/membership/%s' % membership_file.id)
+                membership_file = MembershipFile.create(
+                    {'subcategory_id': subcategory.id})
+            if membership_file.parcours_step == 'category':
+                membership_file.sudo().parcours_step = 'organisation'
+            return request.redirect(self._step_url('organisation'))
 
-        return request.render('opex_membership.portal_membership_file_new', values)
+        # Deuxième temps : les sous-catégories d'une catégorie choisie.
+        category = None
+        raw_category = (post.get('category') or '').strip()
+        if raw_category.isdigit():
+            category = categories.filtered(lambda c: c.id == int(raw_category))[:1]
 
-    def _validate_membership_form(self, post):
-        errors = {}
-        subcategory_id = post.get('subcategory_id')
-        if not subcategory_id or not subcategory_id.isdigit():
-            errors['subcategory_id'] = _("Veuillez choisir une sous-catégorie d'adhésion.")
-        elif not request.env['opex.membership.subcategory'].browse(
-            int(subcategory_id)
-        ).exists():
-            errors['subcategory_id'] = _("Cette sous-catégorie d'adhésion n'existe pas.")
-        if not (post.get('nom_legal') or '').strip():
-            errors['nom_legal'] = _("Le nom légal de l'organisation est obligatoire.")
-        return errors
+        return self._render_step(
+            'category', draft, categories=categories, category=category,
+            draft=draft, error=None)
+
+    def _selected_subcategory(self, raw_value):
+        """Sous-catégorie choisie, validée contre la base."""
+        raw_value = (raw_value or '').strip()
+        if not raw_value.isdigit():
+            return request.env['opex.membership.subcategory']
+        return request.env['opex.membership.subcategory'].sudo().search(
+            [('id', '=', int(raw_value))], limit=1)
+
+    # ------------------------------------------------------------
+    # Écrans 2 à 5 — sections A à D
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/my/membership/new/organisation'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_membership_step_organisation(self, **post):
+        membership_file, redirect = self._require_draft()
+        if redirect:
+            return redirect
+        if request.httprequest.method == 'POST':
+            if not (post.get('nom_legal') or '').strip():
+                return self._render_step(
+                    'organisation', membership_file,
+                    error=_("Le nom légal de l'organisation est obligatoire."))
+            self._save_step(membership_file, 'organisation', post)
+            self._update_candidate_profile(post)
+            return request.redirect(self._step_url('activite'))
+        return self._render_step('organisation', membership_file)
+
+    @http.route(
+        ['/my/membership/new/activite'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_membership_step_activite(self, **post):
+        membership_file, redirect = self._require_draft()
+        if redirect:
+            return redirect
+
+        certifications = request.env['opex.certification'].sudo().search([])
+        if request.httprequest.method == 'POST':
+            self._save_step(membership_file, 'activite', post)
+            self._save_activity_extras(membership_file, post, certifications)
+            self._update_candidate_profile(post)
+            return request.redirect(self._step_url('representant'))
+        return self._render_step(
+            'activite', membership_file, certifications=certifications)
+
+    def _save_activity_extras(self, membership_file, post, certifications):
+        """Champs de la section B qui ne sont pas du texte libre.
+
+        Les certifications cochées sont recoupées avec celles qui existent
+        réellement : un identifiant inventé côté navigateur est écarté au lieu
+        d'être écrit.
+        """
+        values = {}
+        salaries = (post.get('nombre_salaries') or '').strip()
+        if salaries:
+            values['nombre_salaries'] = int(salaries) if salaries.isdigit() else 0
+        chiffre = (post.get('chiffre_affaires') or '').replace(',', '.').replace(' ', '')
+        if chiffre:
+            try:
+                values['chiffre_affaires'] = float(chiffre)
+            except ValueError:
+                values['chiffre_affaires'] = 0.0
+        raw_ids = request.httprequest.form.getlist('certification_ids')
+        selected = certifications.filtered(lambda c: str(c.id) in raw_ids)
+        values['certification_ids'] = [fields.Command.set(selected.ids)]
+        membership_file.write(values)
+
+    @http.route(
+        ['/my/membership/new/representant'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_membership_step_representant(self, **post):
+        membership_file, redirect = self._require_draft()
+        if redirect:
+            return redirect
+        if request.httprequest.method == 'POST':
+            self._save_step(membership_file, 'representant', post)
+            return request.redirect(self._step_url('complement'))
+        return self._render_step('representant', membership_file)
+
+    @http.route(
+        ['/my/membership/new/complement'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_membership_step_complement(self, **post):
+        membership_file, redirect = self._require_draft()
+        if redirect:
+            return redirect
+        if request.httprequest.method == 'POST':
+            self._save_step(membership_file, 'complement', post)
+            return request.redirect(self._step_url('documents'))
+        return self._render_step('complement', membership_file)
+
+    # ------------------------------------------------------------
+    # Écran 6 — pièces du dossier
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/my/membership/new/documents'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_membership_step_documents(self, **post):
+        membership_file, redirect = self._require_draft()
+        if redirect:
+            return redirect
+        if request.httprequest.method == 'POST':
+            self._save_parcours_documents(membership_file)
+            self._save_step(membership_file, 'documents', post)
+            return request.redirect(self._step_url('recap'))
+        return self._render_step(
+            'documents', membership_file, document_slots=self._DOCUMENT_SLOTS)
+
+    def _save_parcours_documents(self, membership_file):
+        """Enregistre les pièces déposées, une par type.
+
+        Redéposer une pièce du même type remplace la précédente au lieu d'en
+        empiler une seconde : le candidat qui se trompe de fichier corrige
+        simplement son erreur.
+        """
+        Document = request.env['opex.membership.document']
+        for document_type, _label, _required in self._DOCUMENT_SLOTS:
+            upload = request.httprequest.files.get('document_%s' % document_type)
+            if not upload or not upload.filename:
+                continue
+            values = {
+                'name': upload.filename,
+                'filename': upload.filename,
+                'file': base64.b64encode(upload.read()),
+            }
+            existing = Document.search([
+                ('membership_file_id', '=', membership_file.id),
+                ('document_type', '=', document_type),
+            ], limit=1)
+            if existing:
+                existing.write(values)
+            else:
+                Document.create(dict(
+                    values, membership_file_id=membership_file.id,
+                    document_type=document_type))
+
+    # ------------------------------------------------------------
+    # Écran 7 — récapitulatif et dépôt
+    # ------------------------------------------------------------
+
+    @http.route(
+        ['/my/membership/new/recap'],
+        type='http', auth='user', website=True, methods=['GET', 'POST'],
+    )
+    def portal_membership_step_recap(self, **post):
+        """Récapitulatif, certification sur l'honneur, puis dépôt (sections 13-14)."""
+        membership_file, redirect = self._require_draft()
+        if redirect:
+            return redirect
+
+        if request.httprequest.method == 'POST':
+            if not post.get('certifie'):
+                return self._render_step(
+                    'recap', membership_file,
+                    error=_("Cochez la case de certification avant de déposer "
+                            "votre dossier."))
+            # `action_submit()` vérifie lui-même les pièces obligatoires : la
+            # règle reste dans le modèle, cet écran ne la rejoue pas.
+            return self._apply_candidate_action(
+                membership_file, membership_file.action_submit)
+        return self._render_step('recap', membership_file)
 
     def _update_candidate_profile(self, post):
         """Complète le contact du candidat avec ce qu'il a saisi au dépôt."""
@@ -283,30 +549,6 @@ class MembershipCustomerPortal(CustomerPortal):
         }
         if partner_values:
             request.env.user.partner_id.sudo().write(partner_values)
-
-    def _attach_membership_documents(self, membership_file):
-        """Crée une pièce de dossier par fichier téléversé, typée selon son champ.
-
-        Le type n'est jamais déduit du nom du fichier : il vient du champ du
-        formulaire dans lequel le candidat a déposé la pièce. C'est lui qui
-        décide ensuite si le dossier est complet — un `Registre.pdf` déposé dans
-        « Autre document » reste une pièce complémentaire.
-        """
-        Document = request.env['opex.membership.document']
-        values = []
-        for document_type, label, _is_required in self._DOCUMENT_SLOTS:
-            for upload in request.httprequest.files.getlist('document_%s' % document_type):
-                if not upload.filename:
-                    continue
-                values.append({
-                    'name': upload.filename,
-                    'filename': upload.filename,
-                    'membership_file_id': membership_file.id,
-                    'document_type': document_type,
-                    'file': base64.b64encode(upload.read()),
-                })
-        if values:
-            Document.create(values)
 
     # ------------------------------------------------------------
     # Détail d'un dossier

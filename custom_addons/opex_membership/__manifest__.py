@@ -14,7 +14,7 @@ cotisations, paiements, annuaire des membres et événements du cluster.
     'website': "https://www.deltalog-conseil.com",
 
     'category': 'Services/Membership',
-    'version': '19.0.1.13.0',
+    'version': '19.0.1.15.1',
 
     # `calendar` : l'agenda natif vers lequel les événements du cluster sont
     # reflétés (Extension 2). Ajouter cette dépendance installe l'application
@@ -39,9 +39,11 @@ cotisations, paiements, annuaire des membres et événements du cluster.
         'views/opex_membership_menus.xml',
         'views/opex_cluster_life_views.xml',
         'views/portal_templates.xml',
+        'views/parcours_templates.xml',
         'views/notification_templates.xml',
         'views/subscription_portal_templates.xml',
         'views/cluster_portal_templates.xml',
+        'views/dashboard_templates.xml',
         'views/directory_templates.xml',
         'views/website_homepage.xml',
         'views/staff_templates.xml',

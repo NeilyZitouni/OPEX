@@ -50,6 +50,24 @@ class OpexMembershipFile(models.Model):
         store=True,
     )
     date_depot = fields.Datetime(string="Date de dépôt", default=fields.Datetime.now)
+    # Étape atteinte dans le parcours de dépôt en sept écrans. Mémorisée sur le
+    # dossier plutôt que déduite des champs remplis : la plupart sont
+    # facultatifs, un candidat qui les laisse vides serait sinon renvoyé
+    # indéfiniment au même écran.
+    parcours_step = fields.Selection(
+        [
+            ('category', "Choix de la catégorie"),
+            ('organisation', "Organisation"),
+            ('activite', "Activité"),
+            ('representant', "Représentant"),
+            ('complement', "Informations complémentaires"),
+            ('documents', "Pièces du dossier"),
+            ('recap', "Récapitulatif"),
+        ],
+        string="Étape du parcours",
+        default='category',
+        readonly=True,
+    )
     document_ids = fields.One2many(
         'opex.membership.document', 'membership_file_id', string="Pièces du dossier"
     )
@@ -149,6 +167,38 @@ class OpexMembershipFile(models.Model):
         required=True,
         tracking=True,
     )
+
+    @api.model
+    def _dashboard_counts(self):
+        """Dossiers par état, comptés en direct (section 42).
+
+        `_read_group` fait le décompte côté base : rien n'est stocké, rien
+        n'est mis en cache. Le tableau de bord reflète donc toujours l'état
+        réel, y compris après une transition déclenchée à la seconde d'avant.
+
+        Les états sans dossier sont volontairement conservés à zéro : une file
+        vide est une information, sa disparition de l'écran en serait une autre.
+        """
+        counts = dict(self._read_group([], ['state'], ['__count']))
+        labels = dict(self._fields['state'].selection)
+        return [
+            {'state': state, 'label': label, 'count': counts.get(state, 0)}
+            for state, label in labels.items()
+        ]
+
+    @api.model
+    def _dashboard_new_members(self, since):
+        """Adhésions activées depuis `since`.
+
+        S'appuie sur `signature_date` plutôt que sur `res.partner.date_adhesion` :
+        la signature est enregistrée dans la même transaction que l'activation
+        (`action_confirm_signature`), alors que `date_adhesion` n'est renseigné
+        par aucune étape du workflow et reste vide sur la plupart des membres.
+        """
+        return self.search_count([
+            ('state', '=', 'active'),
+            ('signature_date', '>=', since),
+        ])
 
     def _state_label(self):
         self.ensure_one()
@@ -849,6 +899,14 @@ class OpexMembershipFile(models.Model):
             if subcategory:
                 partner_values['subcategory_id'] = subcategory.id
             partner_values.update(rec._public_profile_values())
+            # Date d'adhésion, écrite ici parce que c'est ici que le contact
+            # devient membre — la spécification l'annonçait « Système, à
+            # l'activation », mais aucune étape ne la renseignait réellement.
+            # Seulement si elle est vide : elle marque l'entrée dans le
+            # cluster, qu'un second dossier activé plus tard ne doit pas
+            # repousser. Même précaution que pour la sous-catégorie.
+            if not rec.partner_id.date_adhesion:
+                partner_values['date_adhesion'] = fields.Date.context_today(rec)
             rec.partner_id.write(partner_values)
             rec._notify_candidate(_(
                 "Félicitations ! Votre adhésion au GIC OPEX Group est maintenant "

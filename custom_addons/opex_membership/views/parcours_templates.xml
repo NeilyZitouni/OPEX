@@ -1,0 +1,528 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Parcours de dépôt en sept écrans (sections 5 à 14).
+
+        Chaque écran enregistre sa propre part du dossier : le brouillon existe
+        dès le choix de la sous-catégorie, et rien de ce qui a été validé n'est
+        perdu si le candidat s'interrompt.
+    -->
+
+    <!-- Fil d'étapes, commun aux sept écrans -->
+    <template id="portal_parcours_progress" name="Parcours : fil d'étapes">
+        <ol class="list-unstyled d-flex flex-wrap gap-3 mb-4">
+            <li t-foreach="steps" t-as="entry" class="d-flex align-items-center gap-2">
+                <i t-attf-class="fa #{
+                    'fa-check-circle text-success' if entry_index &lt; step_index
+                    else 'fa-dot-circle-o text-primary' if entry_index == step_index
+                    else 'fa-circle-o text-muted'}"/>
+                <span t-attf-class="small #{
+                        'fw-bold' if entry_index == step_index else 'text-muted'}">
+                    <t t-out="dict(request.env['opex.membership.file']._fields['parcours_step'].selection)[entry[0]]"/>
+                </span>
+            </li>
+        </ol>
+    </template>
+
+    <!-- En-tête commun : titre, fil d'étapes, message d'erreur éventuel -->
+    <template id="portal_parcours_header" name="Parcours : en-tête">
+        <t t-call="portal.portal_searchbar">
+            <t t-set="title">Déposer un dossier d'adhésion</t>
+        </t>
+        <t t-call="opex_membership.portal_parcours_progress"/>
+        <div t-if="error" class="alert alert-danger" role="alert">
+            <t t-out="error"/>
+        </div>
+    </template>
+
+    <!-- Pied de formulaire : retour à l'écran précédent + suite -->
+    <template id="portal_parcours_footer" name="Parcours : pied de formulaire">
+        <div class="d-flex justify-content-between align-items-center mt-4">
+            <a t-if="step_index &gt; 0" t-att-href="steps[step_index - 1][1]"
+               class="btn btn-light">
+                <i class="fa fa-arrow-left me-1"/>Précédent
+            </a>
+            <span t-else=""/>
+            <button type="submit" class="btn btn-primary">
+                <t t-out="submit_label or 'Continuer'"/>
+                <i class="fa fa-arrow-right ms-1"/>
+            </button>
+        </div>
+    </template>
+
+    <!-- ÉCRAN 1 — catégorie puis sous-catégorie (section 6) -->
+    <template id="portal_membership_step_category" name="Parcours : choix de la catégorie">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <!--
+                Brouillon déjà entamé : la spécification (section 12) veut que le
+                candidat sache que rien n'est perdu, et qu'il reprenne là où il
+                s'était arrêté — pas au premier écran.
+            -->
+            <div t-if="draft and draft.parcours_step != 'category'"
+                 class="alert alert-info d-flex justify-content-between align-items-center flex-wrap gap-2"
+                 role="alert">
+                <div>
+                    <strong>Votre demande a été sauvegardée.</strong>
+                    <div class="small mb-0">
+                        Vous pourrez continuer plus tard. État : Brouillon.
+                    </div>
+                </div>
+                <a t-att-href="step_url(draft.parcours_step)" class="btn btn-primary">
+                    Continuer ma demande
+                </a>
+            </div>
+
+            <!-- Premier temps : la catégorie -->
+            <t t-if="not category">
+                <h5 class="mb-3">Quelle est votre catégorie ?</h5>
+                <div class="list-group">
+                    <a t-foreach="categories" t-as="category_option"
+                       t-attf-href="/my/membership/new?category=#{category_option.id}"
+                       class="list-group-item list-group-item-action">
+                        <strong><t t-out="category_option.name"/></strong>
+                        <div class="small text-muted">
+                            <t t-out="', '.join(category_option.subcategory_ids.mapped('name'))"/>
+                        </div>
+                    </a>
+                </div>
+            </t>
+
+            <!-- Second temps : la sous-catégorie de la catégorie choisie -->
+            <t t-else="">
+                <h5 class="mb-1">Sous-catégorie</h5>
+                <p class="text-muted small">
+                    Catégorie choisie : <strong><t t-out="category.name"/></strong>
+                    — <a href="/my/membership/new">changer</a>
+                </p>
+                <form action="/my/membership/new" method="post">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div class="list-group mb-3">
+                        <label t-foreach="category.subcategory_ids" t-as="subcategory"
+                               class="list-group-item d-flex align-items-start gap-2">
+                            <input class="form-check-input mt-1" type="radio"
+                                   name="subcategory_id" t-att-value="subcategory.id"
+                                   t-att-checked="'checked' if membership_file and membership_file.subcategory_id.id == subcategory.id else None"/>
+                            <span>
+                                <strong><t t-out="subcategory.name"/></strong>
+                                <span t-if="subcategory.critere_eligibilite"
+                                      class="d-block small text-muted">
+                                    <t t-out="subcategory.critere_eligibilite"/>
+                                </span>
+                            </span>
+                        </label>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <a href="/my/membership/new" class="btn btn-light">
+                            <i class="fa fa-arrow-left me-1"/>Précédent
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            Continuer<i class="fa fa-arrow-right ms-1"/>
+                        </button>
+                    </div>
+                </form>
+            </t>
+        </t>
+    </template>
+
+    <!-- ÉCRAN 2 — Section A : organisation -->
+    <template id="portal_membership_step_organisation" name="Parcours : organisation">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <h5 class="mb-3">Informations de l'organisation</h5>
+            <form action="/my/membership/new/organisation" method="post">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="nom_legal">Nom légal *</label>
+                        <input type="text" name="nom_legal" id="nom_legal" class="form-control"
+                               t-att-value="membership_file.nom_legal or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="nom_commercial">Nom commercial</label>
+                        <input type="text" name="nom_commercial" id="nom_commercial"
+                               class="form-control"
+                               t-att-value="membership_file.nom_commercial or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="forme_juridique">Forme juridique</label>
+                        <input type="text" name="forme_juridique" id="forme_juridique"
+                               class="form-control"
+                               t-att-value="membership_file.forme_juridique or ''"/>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="nif">NIF</label>
+                        <input type="text" name="nif" id="nif" class="form-control"
+                               t-att-value="membership_file.nif or ''"/>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="rc">RC</label>
+                        <input type="text" name="rc" id="rc" class="form-control"
+                               t-att-value="membership_file.rc or ''"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="adresse">Adresse</label>
+                        <input type="text" name="adresse" id="adresse" class="form-control"
+                               t-att-value="membership_file.adresse or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="wilaya">Wilaya</label>
+                        <input type="text" name="wilaya" id="wilaya" class="form-control"
+                               t-att-value="membership_file.wilaya or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="commune">Commune</label>
+                        <input type="text" name="commune" id="commune" class="form-control"
+                               t-att-value="membership_file.commune or ''"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="site_web">Site web</label>
+                        <input type="text" name="site_web" id="site_web" class="form-control"
+                               t-att-value="membership_file.site_web or ''"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="email_pro">Email professionnel</label>
+                        <input type="email" name="email_pro" id="email_pro" class="form-control"
+                               t-att-value="membership_file.email_pro or ''"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="telephone">Téléphone</label>
+                        <input type="text" name="telephone" id="telephone" class="form-control"
+                               t-att-value="membership_file.telephone or ''"/>
+                    </div>
+                </div>
+                <t t-call="opex_membership.portal_parcours_footer"/>
+            </form>
+        </t>
+    </template>
+
+    <!-- ÉCRAN 3 — Section B : activité -->
+    <template id="portal_membership_step_activite" name="Parcours : activité">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <h5 class="mb-3">Activité</h5>
+            <form action="/my/membership/new/activite" method="post">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="secteur_activite">Secteur d'activité</label>
+                        <input type="text" name="secteur_activite" id="secteur_activite"
+                               class="form-control"
+                               t-att-value="membership_file.secteur_activite or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="activite_principale">Activité principale</label>
+                        <input type="text" name="activite_principale" id="activite_principale"
+                               class="form-control"
+                               t-att-value="membership_file.activite_principale or ''"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="description_activite">
+                            Description de l'activité
+                        </label>
+                        <textarea name="description_activite" id="description_activite"
+                                  class="form-control" rows="3"
+                                  t-esc="membership_file.description_activite or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="nombre_salaries">Nombre de salariés</label>
+                        <input type="number" min="0" name="nombre_salaries" id="nombre_salaries"
+                               class="form-control"
+                               t-att-value="membership_file.nombre_salaries or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="chiffre_affaires">
+                            Chiffre d'affaires <span class="text-muted small">(optionnel)</span>
+                        </label>
+                        <input type="text" name="chiffre_affaires" id="chiffre_affaires"
+                               class="form-control"
+                               t-att-value="membership_file.chiffre_affaires or ''"/>
+                    </div>
+                    <div class="col-12" t-if="certifications">
+                        <label class="form-label">Certifications</label>
+                        <div class="d-flex flex-wrap gap-3">
+                            <div t-foreach="certifications" t-as="certification"
+                                 class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       name="certification_ids"
+                                       t-att-value="certification.id"
+                                       t-attf-id="certification_#{certification.id}"
+                                       t-att-checked="'checked' if certification in membership_file.certification_ids else None"/>
+                                <label class="form-check-label"
+                                       t-attf-for="certification_#{certification.id}">
+                                    <t t-out="certification.name"/>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <t t-call="opex_membership.portal_parcours_footer"/>
+            </form>
+        </t>
+    </template>
+
+    <!-- ÉCRAN 4 — Section C : représentant -->
+    <template id="portal_membership_step_representant" name="Parcours : représentant">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <h5 class="mb-3">Représentant de l'organisation</h5>
+            <form action="/my/membership/new/representant" method="post">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="representant_nom">Nom</label>
+                        <input type="text" name="representant_nom" id="representant_nom"
+                               class="form-control"
+                               t-att-value="membership_file.representant_nom or ''"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="representant_prenom">Prénom</label>
+                        <input type="text" name="representant_prenom" id="representant_prenom"
+                               class="form-control"
+                               t-att-value="membership_file.representant_prenom or ''"/>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="representant_fonction">Fonction</label>
+                        <input type="text" name="representant_fonction" id="representant_fonction"
+                               class="form-control"
+                               t-att-value="membership_file.representant_fonction or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="representant_email">Email</label>
+                        <input type="email" name="representant_email" id="representant_email"
+                               class="form-control"
+                               t-att-value="membership_file.representant_email or ''"/>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="representant_telephone">Téléphone</label>
+                        <input type="text" name="representant_telephone"
+                               id="representant_telephone" class="form-control"
+                               t-att-value="membership_file.representant_telephone or ''"/>
+                    </div>
+                </div>
+                <t t-call="opex_membership.portal_parcours_footer"/>
+            </form>
+        </t>
+    </template>
+
+    <!-- ÉCRAN 5 — Section D : informations complémentaires -->
+    <template id="portal_membership_step_complement" name="Parcours : complément">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <h5 class="mb-3">Informations complémentaires</h5>
+            <form action="/my/membership/new/complement" method="post">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label class="form-label" for="presentation">
+                            Présentation de l'organisation
+                        </label>
+                        <textarea name="presentation" id="presentation" class="form-control"
+                                  rows="3" t-esc="membership_file.presentation or ''"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="motivation">
+                            Pourquoi souhaitez-vous rejoindre le GIC OPEX Group ?
+                        </label>
+                        <textarea name="motivation" id="motivation" class="form-control"
+                                  rows="3" t-esc="membership_file.motivation or ''"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="domaines_expertise">
+                            Domaines d'expertise
+                        </label>
+                        <textarea name="domaines_expertise" id="domaines_expertise"
+                                  class="form-control" rows="2"
+                                  t-esc="membership_file.domaines_expertise or ''"/>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label" for="partenariats_existants">
+                            Partenariats existants
+                        </label>
+                        <textarea name="partenariats_existants" id="partenariats_existants"
+                                  class="form-control" rows="2"
+                                  t-esc="membership_file.partenariats_existants or ''"/>
+                    </div>
+                </div>
+                <t t-call="opex_membership.portal_parcours_footer"/>
+            </form>
+        </t>
+    </template>
+
+    <!-- ÉCRAN 6 — Section E : pièces du dossier -->
+    <template id="portal_membership_step_documents" name="Parcours : pièces du dossier">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <h5 class="mb-1">Pièces du dossier</h5>
+            <p class="text-muted small">
+                Les pièces marquées d'une étoile sont obligatoires. Vous pourrez
+                revenir les compléter tant que votre dossier n'est pas déposé.
+            </p>
+
+            <form action="/my/membership/new/documents" method="post"
+                  enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                <!-- Obligatoire / optionnel vient du type de pièce déjà défini
+                     sur le modèle (`is_required`, dérivé de `document_type`) :
+                     ce gabarit l'affiche, il ne le redéfinit pas. -->
+                <t t-foreach="[('Documents obligatoires', True), ('Documents complémentaires', False)] "
+                   t-as="section">
+                    <h6 class="mt-4"><t t-out="section[0]"/></h6>
+                    <div class="row g-3">
+                        <t t-foreach="document_slots" t-as="slot">
+                            <div t-if="slot[2] == section[1]" class="col-md-6">
+                                <t t-set="existing"
+                                   t-value="membership_file.document_ids.filtered(lambda d: d.document_type == slot[0])[:1]"/>
+                                <label class="form-label" t-attf-for="document_#{slot[0]}">
+                                    <t t-out="slot[1]"/>
+                                    <span t-if="slot[2]" class="text-danger"> *</span>
+                                    <span t-else="" class="text-muted small"> (optionnel)</span>
+                                </label>
+                                <div t-if="existing" class="small text-success mb-1">
+                                    <i class="fa fa-check me-1"/>
+                                    <t t-out="existing.name"/>
+                                    <span class="text-muted">— déposer à nouveau remplace ce fichier</span>
+                                </div>
+                                <input type="file" t-attf-name="document_#{slot[0]}"
+                                       t-attf-id="document_#{slot[0]}" class="form-control"/>
+                            </div>
+                        </t>
+                    </div>
+                </t>
+
+                <t t-set="missing" t-value="membership_file._missing_required_documents()"/>
+                <div t-if="missing" class="alert alert-warning mt-3" role="alert">
+                    Pièces obligatoires encore manquantes :
+                    <t t-out="', '.join(missing)"/>.
+                </div>
+
+                <t t-call="opex_membership.portal_parcours_footer"/>
+            </form>
+        </t>
+    </template>
+
+    <!-- ÉCRAN 7 — récapitulatif et dépôt (sections 13-14) -->
+    <template id="portal_membership_step_recap" name="Parcours : récapitulatif">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+            <t t-call="opex_membership.portal_parcours_header"/>
+
+            <h5 class="mb-3">Récapitulatif</h5>
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Catégorie</dt>
+                        <dd class="col-sm-8">
+                            <span t-field="membership_file.category_id"/>
+                        </dd>
+                        <dt class="col-sm-4">Sous-catégorie</dt>
+                        <dd class="col-sm-8">
+                            <span t-field="membership_file.subcategory_id"/>
+                        </dd>
+
+                        <dt class="col-sm-4">Organisation</dt>
+                        <dd class="col-sm-8">
+                            <t t-out="membership_file.nom_legal or '—'"/>
+                            <div t-if="membership_file.forme_juridique" class="small text-muted">
+                                <t t-out="membership_file.forme_juridique"/>
+                                <t t-if="membership_file.rc"> — RC <t t-out="membership_file.rc"/></t>
+                                <t t-if="membership_file.nif"> — NIF <t t-out="membership_file.nif"/></t>
+                            </div>
+                        </dd>
+                        <dt class="col-sm-4">Wilaya</dt>
+                        <dd class="col-sm-8">
+                            <t t-out="membership_file.wilaya or '—'"/>
+                            <t t-if="membership_file.commune">, <t t-out="membership_file.commune"/></t>
+                        </dd>
+
+                        <dt class="col-sm-4">Activité</dt>
+                        <dd class="col-sm-8">
+                            <t t-out="membership_file.secteur_activite or '—'"/>
+                            <t t-if="membership_file.activite_principale">
+                                — <t t-out="membership_file.activite_principale"/>
+                            </t>
+                            <div t-if="membership_file.nombre_salaries" class="small text-muted">
+                                <t t-out="membership_file.nombre_salaries"/> salariés
+                            </div>
+                            <div t-if="membership_file.certification_ids" class="mt-1">
+                                <span t-foreach="membership_file.certification_ids"
+                                      t-as="certification" class="badge text-bg-light me-1">
+                                    <t t-out="certification.name"/>
+                                </span>
+                            </div>
+                        </dd>
+
+                        <dt class="col-sm-4">Représentant</dt>
+                        <dd class="col-sm-8">
+                            <t t-if="membership_file.representant_nom">
+                                <t t-out="membership_file.representant_prenom or ''"/>
+                                <t t-out="membership_file.representant_nom"/>
+                                <t t-if="membership_file.representant_fonction">
+                                    — <t t-out="membership_file.representant_fonction"/>
+                                </t>
+                            </t>
+                            <t t-else="">—</t>
+                        </dd>
+
+                        <dt t-if="membership_file.motivation" class="col-sm-4">Motivation</dt>
+                        <dd t-if="membership_file.motivation" class="col-sm-8">
+                            <t t-out="membership_file.motivation"/>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <h6>Documents</h6>
+            <ul class="list-unstyled">
+                <li t-foreach="membership_file.document_ids" t-as="document">
+                    <i class="fa fa-check text-success me-1"/>
+                    <t t-out="document.name"/>
+                    <span class="text-muted small">
+                        — <t t-out="dict(document._fields['document_type'].selection)[document.document_type]"/>
+                    </span>
+                </li>
+            </ul>
+
+            <t t-set="missing" t-value="membership_file._missing_required_documents()"/>
+            <div t-if="missing" class="alert alert-warning" role="alert">
+                Pièces obligatoires manquantes : <t t-out="', '.join(missing)"/>.
+                <a href="/my/membership/new/documents">Compléter mes pièces</a>
+            </div>
+
+            <form action="/my/membership/new/recap" method="post" class="mt-4">
+                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="certifie"
+                           id="certifie" value="1"/>
+                    <label class="form-check-label" for="certifie">
+                        Je certifie que les informations fournies sont exactes.
+                    </label>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="/my/membership/new/documents" class="btn btn-light">
+                        <i class="fa fa-arrow-left me-1"/>Précédent
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        DÉPOSER LE DOSSIER
+                    </button>
+                </div>
+            </form>
+        </t>
+    </template>
+
+</odoo>

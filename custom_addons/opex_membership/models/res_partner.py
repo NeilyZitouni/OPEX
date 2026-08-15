@@ -1,4 +1,4 @@
-from odoo import fields, models
+from odoo import _, fields, models
 from odoo.tools import html2plaintext
 
 
@@ -154,6 +154,83 @@ class ResPartner(models.Model):
     def _opex_mark_notifications_seen(self):
         self.ensure_one()
         self.sudo().notification_last_seen = fields.Datetime.now()
+
+    # ------------------------------------------------------------
+    # Tableau de bord du membre (section 41)
+    # ------------------------------------------------------------
+
+    def _opex_member_dashboard(self):
+        """Synthèse de l'espace membre, recalculée à chaque affichage.
+
+        Aucun compteur n'est stocké : tout est compté à la demande sur les
+        modèles existants. Un agrégat mémorisé se serait décorrélé du réel dès
+        la première transition de dossier ou le premier paiement — et un
+        tableau de bord faux est pire qu'absent.
+
+        Les actualités du cluster ne sont servies qu'aux membres actifs, par
+        cohérence avec la règle d'accès des pages Vie du Cluster : le tableau
+        de bord ne doit pas devenir une porte dérobée vers ce contenu.
+        """
+        self.ensure_one()
+        membership_file = self.env['opex.membership.file'].sudo().search(
+            [('partner_id', '=', self.id)], order='id desc', limit=1)
+
+        Subscription = self.env['opex.subscription'].sudo()
+        # Cotisation « en cours » : celle qui reste à régler, la plus proche de
+        # son échéance ; à défaut, la dernière connue, pour afficher « payée ».
+        subscription = Subscription.search(
+            [('partner_id', '=', self.id), ('state', 'in', ('waiting', 'late'))],
+            order='date_echeance asc, id asc', limit=1)
+        if not subscription:
+            subscription = Subscription.search(
+                [('partner_id', '=', self.id)],
+                order='date_echeance desc, id desc', limit=1)
+
+        return {
+            'membership_file': membership_file,
+            'subscription': subscription,
+            'document_count': self.env['opex.membership.document'].sudo().search_count(
+                [('membership_file_id.partner_id', '=', self.id)]),
+            'upcoming_activities': self._opex_upcoming_activities(),
+            'latest_news': self._opex_latest_news(),
+        }
+
+    def _opex_upcoming_activities(self, limit=5):
+        """Événements et formations à venir auxquels ce contact est inscrit.
+
+        Les deux tiennent dans le même modèle d'inscription (décision de la
+        première moitié de l'Extension 16) : une seule lecture suffit, il n'y a
+        pas deux tables à interroger.
+        """
+        self.ensure_one()
+        now = fields.Datetime.now()
+        registrations = self.env['opex.cluster.event.registration'].sudo().search(
+            [('partner_id', '=', self.id)])
+
+        activities = []
+        for registration in registrations:
+            event = registration.event_id
+            training = registration.training_id
+            if event and event.date_debut and event.date_debut >= now:
+                activities.append({
+                    'name': event.name, 'date': event.date_debut,
+                    'kind': _("Événement"), 'lieu': event.lieu,
+                })
+            elif training and training.date and training.date >= now:
+                activities.append({
+                    'name': training.name, 'date': training.date,
+                    'kind': _("Formation"), 'lieu': False,
+                })
+        activities.sort(key=lambda activity: activity['date'])
+        return activities[:limit]
+
+    def _opex_latest_news(self, limit=3):
+        """Dernières actualités publiées, réservées aux membres actifs."""
+        self.ensure_one()
+        News = self.env['opex.cluster.news'].sudo()
+        if not self.is_member:
+            return News.browse()
+        return News.search(News._portal_domain(), limit=limit)
 
     def get_public_profile(self):
         """Champs exposables dans l'annuaire public des membres.

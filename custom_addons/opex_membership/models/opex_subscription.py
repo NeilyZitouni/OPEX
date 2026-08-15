@@ -88,6 +88,16 @@ class OpexSubscription(models.Model):
                 lambda f: f.state in self._PAYABLE_FILE_STATES
             ).action_confirm_payment()
 
+    @api.model
+    def _dashboard_counts(self):
+        """Cotisations par état, comptées en direct (section 42)."""
+        counts = dict(self._read_group([], ['state'], ['__count']))
+        labels = dict(self._fields['state'].selection)
+        return [
+            {'state': state, 'label': label, 'count': counts.get(state, 0)}
+            for state, label in labels.items()
+        ]
+
     def _state_label(self):
         self.ensure_one()
         return dict(self._fields['state'].selection).get(self.state)

@@ -39,10 +39,146 @@
                     Traitement des dossiers d'adhésion — <t t-out="request.env.user.name"/>
                 </p>
             </div>
-            <a href="/staff/membership" class="btn btn-light">
-                <i class="fa fa-list me-1"/>Dossiers à traiter
-            </a>
+            <div class="d-flex gap-2">
+                <a href="/staff/dashboard" class="btn btn-light">
+                    <i class="fa fa-dashboard me-1"/>Tableau de bord
+                </a>
+                <a href="/staff/membership" class="btn btn-light">
+                    <i class="fa fa-list me-1"/>Dossiers à traiter
+                </a>
+            </div>
         </div>
+    </template>
+
+    <!--
+        /staff/dashboard : tableau de bord du Secrétariat (section 42).
+
+        Chaque chiffre affiché ici vient d'un comptage fait au rendu de la
+        page ; il n'existe aucun compteur stocké à resynchroniser.
+    -->
+    <template id="staff_dashboard" name="Espace validation : tableau de bord">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="oe_structure"/>
+
+                <section class="py-5">
+                    <div class="container">
+                        <t t-call="opex_membership.staff_page_header"/>
+
+                        <div class="row g-4">
+                            <!-- Demandes d'adhésion par état -->
+                            <div class="col-lg-6">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">Demandes d'adhésion</h6>
+                                        <span class="badge text-bg-secondary">
+                                            <t t-out="file_total"/> au total
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                <tr t-foreach="file_counts" t-as="entry"
+                                                    t-attf-class="#{'text-muted' if not entry['count'] else ''}">
+                                                    <td><t t-out="entry['label']"/></td>
+                                                    <td class="text-end fw-bold" style="width: 5rem;">
+                                                        <t t-out="entry['count']"/>
+                                                    </td>
+                                                    <td class="text-end" style="width: 7rem;">
+                                                        <a t-if="entry['count']"
+                                                           href="/staff/membership"
+                                                           class="small">Traiter</a>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Cotisations -->
+                            <div class="col-lg-6">
+                                <div class="card h-100">
+                                    <div class="card-header d-flex justify-content-between align-items-center">
+                                        <h6 class="mb-0">Cotisations</h6>
+                                        <span class="badge text-bg-secondary">
+                                            <t t-out="subscription_total"/> au total
+                                        </span>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                <tr t-foreach="subscription_counts" t-as="entry"
+                                                    t-attf-class="#{'text-muted' if not entry['count'] else ''}">
+                                                    <td>
+                                                        <t t-out="entry['label']"/>
+                                                        <i t-if="entry['state'] == 'late' and entry['count']"
+                                                           class="fa fa-exclamation-triangle text-danger ms-1"/>
+                                                    </td>
+                                                    <td class="text-end fw-bold" style="width: 5rem;">
+                                                        <t t-out="entry['count']"/>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Membres -->
+                            <div class="col-lg-6">
+                                <div class="card h-100">
+                                    <div class="card-header"><h6 class="mb-0">Membres</h6></div>
+                                    <div class="card-body">
+                                        <div class="row text-center">
+                                            <div class="col-6">
+                                                <div class="display-6"><t t-out="active_members"/></div>
+                                                <div class="text-muted small">membres actifs</div>
+                                            </div>
+                                            <div class="col-6">
+                                                <div class="display-6"><t t-out="new_members_this_month"/></div>
+                                                <div class="text-muted small">nouveaux ce mois</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Vie du Cluster -->
+                            <div class="col-lg-6">
+                                <div class="card h-100">
+                                    <div class="card-header"><h6 class="mb-0">Vie du Cluster</h6></div>
+                                    <div class="card-body p-0">
+                                        <table class="table table-sm mb-0">
+                                            <tbody>
+                                                <tr>
+                                                    <td>Événements à venir</td>
+                                                    <td class="text-end fw-bold"><t t-out="upcoming_events"/></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Formations à venir</td>
+                                                    <td class="text-end fw-bold"><t t-out="upcoming_trainings"/></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Assemblées générales à venir</td>
+                                                    <td class="text-end fw-bold"><t t-out="upcoming_assemblies"/></td>
+                                                </tr>
+                                                <tr>
+                                                    <td>Actualités publiées</td>
+                                                    <td class="text-end fw-bold"><t t-out="published_news"/></td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="oe_structure"/>
+            </div>
+        </t>
     </template>
 
     <!-- /staff/membership : file d'attente du rôle connecté -->

@@ -415,7 +415,15 @@ diagnostiquer jusqu'ici (cf. l'incident `res.groups.privilege` en Odoo 19).
   adhérents→PME/PMI ; Membres associés→Université, Incubateur, Centre de
   recherche ; Partenaires/Sponsors→Grande entreprise, Banque, Institution ;
   Experts/Consultants→Expert ACEO, Cabinet, Consultant indépendant
-
+- 🐛 **Bug trouvé à l'Extension 17, à corriger** : `res.partner.date_adhesion`
+  n'est en réalité jamais écrit par aucune étape du workflow — champ
+  toujours `NULL`, malgré la spec d'origine ("Système, à l'activation").
+  Corrige `_activate_membership()` pour l'écrire réellement (une ligne).
+  En attendant, le tableau de bord de l'Extension 17 utilise
+  `opex.membership.file.signature_date` comme proxy fiable — garde ce
+  contournement en place même après la correction, pas la peine de faire
+  une migration rétroactive pour les dossiers déjà actifs tant que ce
+  n'est pas gênant.
 **Champs du formulaire détaillé** (sections A à D du PDF) ajoutés sur
 `opex.membership.file` :
 | Section | Champs |

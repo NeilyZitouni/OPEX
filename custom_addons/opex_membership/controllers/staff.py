@@ -1,4 +1,4 @@
-from odoo import http
+from odoo import fields, http
 from odoo.exceptions import UserError
 from odoo.http import request
 
@@ -170,6 +170,49 @@ class OpexStaff(http.Controller):
         if not membership_file or not membership_file.has_access('read'):
             return None
         return membership_file
+
+    # ------------------------------------------------------------
+    # Tableau de bord
+    # ------------------------------------------------------------
+
+    @http.route(['/staff/dashboard'], type='http', auth='user', website=True, sitemap=False)
+    def staff_dashboard(self, **kw):
+        """Tableau de bord du Secrétariat (section 42).
+
+        Tous les chiffres sont comptés au moment du rendu, sur les modèles
+        existants : aucun compteur n'est stocké, donc aucun ne peut mentir.
+
+        Même garde-fou que les autres pages staff — `_is_staff()`, qui délègue
+        à `res.users._is_opex_staff()`. Pas de contrôle d'accès parallèle.
+        """
+        if not self._is_staff():
+            return request.redirect('/my')
+
+        MembershipFile = request.env['opex.membership.file'].sudo()
+        Subscription = request.env['opex.subscription'].sudo()
+        Partner = request.env['res.partner'].sudo()
+
+        today = fields.Date.context_today(request.env.user)
+        first_of_month = today.replace(day=1)
+        now = fields.Datetime.now()
+
+        values = {
+            'page_name': 'staff_dashboard',
+            'file_counts': MembershipFile._dashboard_counts(),
+            'file_total': MembershipFile.search_count([]),
+            'subscription_counts': Subscription._dashboard_counts(),
+            'subscription_total': Subscription.search_count([]),
+            'active_members': Partner.search_count([('is_member', '=', True)]),
+            'new_members_this_month': MembershipFile._dashboard_new_members(first_of_month),
+            'upcoming_events': request.env['opex.cluster.event'].sudo().search_count(
+                [('date_debut', '>=', now)]),
+            'upcoming_trainings': request.env['opex.cluster.training'].sudo().search_count(
+                [('date', '>=', now)]),
+            'upcoming_assemblies': request.env['opex.cluster.assembly'].sudo().search_count(
+                [('date', '>=', now)]),
+            'published_news': request.env['opex.cluster.news'].sudo().search_count([]),
+        }
+        return request.render('opex_membership.staff_dashboard', values)
 
     # ------------------------------------------------------------
     # Liste des dossiers à traiter
