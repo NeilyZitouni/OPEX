@@ -769,6 +769,37 @@ class OpexMembershipFile(models.Model):
             "signer à nouveau depuis votre espace."
         ) % motif.strip())
 
+    # Informations du dossier reprises sur le contact à l'activation, pour que
+    # l'annuaire public puisse les chercher et les afficher. Clé = champ du
+    # dossier, valeur = champ du contact ; `site_web` alimente le `website`
+    # natif de `res.partner` plutôt qu'un doublon.
+    _PUBLIC_PROFILE_FIELDS = {
+        'presentation': 'presentation',
+        'site_web': 'website',
+        'domaines_expertise': 'domaines_expertise',
+    }
+
+    def _public_profile_values(self):
+        """Instantané publiable du dossier, au format `res.partner.write()`.
+
+        Même logique que `subcategory_id` : le dossier est la candidature, le
+        contact est le membre. On recopie à l'activation plutôt que de lier des
+        champs calculés — un membre peut déposer d'autres dossiers plus tard
+        sans que son profil public change dans son dos.
+
+        Un champ vide n'est pas recopié : il effacerait ce que le contact
+        portait déjà.
+        """
+        self.ensure_one()
+        values = {
+            partner_field: self[file_field]
+            for file_field, partner_field in self._PUBLIC_PROFILE_FIELDS.items()
+            if self[file_field]
+        }
+        if self.certification_ids:
+            values['certification_ids'] = [fields.Command.set(self.certification_ids.ids)]
+        return values
+
     def _activate_membership(self):
         """Dernière étape du parcours : le candidat devient membre actif.
 
@@ -784,6 +815,7 @@ class OpexMembershipFile(models.Model):
             subcategory = rec._get_subcategory()
             if subcategory:
                 partner_values['subcategory_id'] = subcategory.id
+            partner_values.update(rec._public_profile_values())
             rec.partner_id.write(partner_values)
             rec._notify_candidate(_(
                 "Félicitations ! Votre adhésion au GIC OPEX Group est maintenant "

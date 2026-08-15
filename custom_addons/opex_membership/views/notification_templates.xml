@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Cloche + badge, greffés sur `portal.user_dropdown` — le menu qui porte le
+        nom du compte connecté dans l'en-tête.
+
+        Pourquoi ce point d'accroche : toutes les variantes d'en-tête du thème
+        appellent ce gabarit, chacune en lui passant ses propres `_item_class` /
+        `_link_class`. En les reprenant ici, la cloche hérite exactement des
+        bordures, espacements et couleurs de l'en-tête courant, quel que soit
+        l'en-tête choisi dans l'éditeur — plutôt que d'imposer un style à part.
+
+        Position : juste avant le nom de compte, donc à sa gauche. C'est la
+        convention habituelle (cloche, puis identité), et cela laisse le bouton
+        d'appel à l'action « Contact Us » à l'extrémité droite, où le thème le
+        place.
+
+        Le compteur est demandé au modèle au rendu. Pas de temps réel : il se
+        rafraîchit au chargement de la page, ce que la spécification juge
+        suffisant.
+    -->
+    <template id="header_notification_bell" name="En-tête : cloche de notification"
+              inherit_id="portal.user_dropdown" priority="30">
+        <xpath expr="//li[1]" position="before">
+            <!-- `is_connected` vient du `t-set` en tête de `portal.user_dropdown`,
+                 évalué juste au-dessus : la cloche n'existe pas pour un visiteur. -->
+            <li t-if="is_connected" t-attf-class="#{_item_class} o_no_autohide_item">
+                <t t-set="opex_notification_count"
+                   t-value="user_id.partner_id._opex_notification_count()"/>
+                <a href="/my/notifications"
+                   t-attf-class="#{_link_class} position-relative"
+                   title="Mes notifications" aria-label="Mes notifications">
+                    <i class="fa fa-bell"/>
+                    <span t-if="opex_notification_count"
+                          class="position-absolute top-0 start-100 translate-middle badge rounded-pill text-bg-danger">
+                        <t t-out="opex_notification_count"/>
+                        <span class="visually-hidden">notifications non lues</span>
+                    </span>
+                </a>
+            </li>
+        </xpath>
+    </template>
+
+    <!-- Fil d'Ariane de la page de notifications -->
+    <template id="portal_breadcrumbs_notifications" name="Portail : fil d'Ariane notifications"
+              inherit_id="portal.portal_breadcrumbs" priority="30">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name == 'notifications'" class="breadcrumb-item active">
+                Mes notifications
+            </li>
+        </xpath>
+    </template>
+
+    <!-- /my/notifications : liste complète, tous enregistrements confondus -->
+    <template id="portal_notifications" name="Portail : mes notifications">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mes notifications</t>
+            </t>
+
+            <div t-if="not notification_entries" class="alert alert-info" role="alert">
+                Vous n'avez encore reçu aucune notification.
+            </div>
+
+            <t t-else="">
+                <form action="/my/notifications/mark_seen" method="post" class="mb-3">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <button type="submit" class="btn btn-light btn-sm">
+                        <i class="fa fa-check me-1"/>Tout marquer comme lu
+                    </button>
+                </form>
+
+                <div class="list-group">
+                    <!-- Chaque ligne pointe vers l'enregistrement concerné :
+                         une notification qu'on ne peut pas ouvrir n'aide pas. -->
+                    <a t-foreach="notification_entries" t-as="entry"
+                       t-att-href="entry['url']"
+                       t-attf-class="list-group-item list-group-item-action #{'list-group-item-warning' if entry['is_new'] else ''}">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <div t-out="entry['message'].body"/>
+                                <small class="text-muted">
+                                    <t t-if="entry['message'].author_id">
+                                        par <t t-out="entry['message'].author_id.name"/> —
+                                    </t>
+                                    <span t-out="entry['message'].date"
+                                          t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                                </small>
+                            </div>
+                            <span t-if="entry['is_new']" class="badge text-bg-danger">Nouveau</span>
+                        </div>
+                    </a>
+                </div>
+            </t>
+        </t>
+    </template>
+
+</odoo>

@@ -53,11 +53,32 @@
                                     </option>
                                 </select>
                             </div>
-                            <div class="col-md-2 d-flex gap-2">
+                            <div class="col-md-3">
+                                <label class="form-label" for="expertise">Expertise</label>
+                                <!-- Texte libre : `domaines_expertise` est un
+                                     paragraphe saisi par le membre, pas une
+                                     valeur à choisir dans une liste. -->
+                                <input type="text" name="expertise" id="expertise"
+                                       class="form-control" placeholder="Lean, qualité…"
+                                       t-att-value="search['expertise']"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="certification">Certification</label>
+                                <select name="certification" id="certification" class="form-select">
+                                    <option value="">Toutes les certifications</option>
+                                    <option t-foreach="certifications" t-as="certification"
+                                            t-att-value="certification.id"
+                                            t-att-selected="'selected' if search['certification'] == str(certification.id) else None">
+                                        <t t-out="certification.name"/>
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 d-flex gap-2">
                                 <button type="submit" class="btn btn-primary flex-grow-1">
                                     <i class="fa fa-search me-1"/>Filtrer
                                 </button>
-                                <a t-if="search['q'] or search['secteur'] or search['wilaya']"
+                                <a t-if="search['q'] or search['secteur'] or search['wilaya']
+                                         or search['expertise'] or search['certification']"
                                    href="/opex/directory" class="btn btn-light" title="Réinitialiser">
                                     <i class="fa fa-times"/>
                                 </a>
@@ -94,6 +115,18 @@
                                                     <t t-out="member['wilaya']"/>
                                                 </li>
                                             </ul>
+                                            <div t-if="member['certifications']" class="mt-2">
+                                                <span t-foreach="member['certifications']" t-as="certification"
+                                                      class="badge text-bg-light me-1">
+                                                    <t t-out="certification"/>
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div class="card-footer bg-transparent border-top-0">
+                                            <a t-attf-href="/opex/directory/#{member['id']}"
+                                               class="btn btn-sm btn-outline-primary">
+                                                Voir le profil
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
@@ -108,6 +141,118 @@
                             Votre entreprise n'apparaît pas encore dans cet annuaire ?
                             <a href="/web/signup?redirect=/my/membership/new">Devenez membre du cluster</a>.
                         </div>
+                    </div>
+                </section>
+
+                <div class="oe_structure"/>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        /opex/directory/<id> : profil public d'un membre (section 28).
+
+        `member` est le dictionnaire de `get_public_profile()`, le même que
+        celui des cartes de la liste : ce gabarit ne peut donc afficher que ce
+        que l'annuaire expose déjà, jamais un champ de plus.
+    -->
+    <template id="directory_profile_page" name="Annuaire : profil public d'un membre">
+        <t t-call="website.layout">
+            <div id="wrap">
+                <div class="oe_structure"/>
+
+                <section class="pt32 pb16">
+                    <div class="container">
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb bg-transparent px-0">
+                                <li class="breadcrumb-item">
+                                    <a href="/opex/directory">Annuaire des membres</a>
+                                </li>
+                                <li class="breadcrumb-item active" aria-current="page">
+                                    <t t-out="member['name']"/>
+                                </li>
+                            </ol>
+                        </nav>
+
+                        <h1 class="mb-2"><t t-out="member['name']"/></h1>
+                        <p class="lead text-muted mb-0">
+                            <span t-if="member['subcategory_id']" class="badge text-bg-primary me-2">
+                                <t t-out="member['subcategory_id']"/>
+                            </span>
+                            <t t-if="member['wilaya']">
+                                <i class="fa fa-map-marker fa-fw me-1"/><t t-out="member['wilaya']"/>
+                            </t>
+                        </p>
+                    </div>
+                </section>
+
+                <section class="pb32">
+                    <div class="container">
+                        <div class="row g-4">
+                            <div class="col-lg-8">
+                                <t t-if="member['presentation']">
+                                    <h5>Présentation</h5>
+                                    <p class="text-muted" t-out="member['presentation']"/>
+                                </t>
+
+                                <t t-if="member['domaines_expertise']">
+                                    <h5 class="mt-4">Domaines d'expertise</h5>
+                                    <p class="text-muted" t-out="member['domaines_expertise']"/>
+                                </t>
+
+                                <t t-if="member['certifications']">
+                                    <h5 class="mt-4">Certifications</h5>
+                                    <p class="mb-0">
+                                        <span t-foreach="member['certifications']" t-as="certification"
+                                              class="badge text-bg-light me-1">
+                                            <t t-out="certification"/>
+                                        </span>
+                                    </p>
+                                </t>
+
+                                <div t-if="not member['presentation'] and not member['domaines_expertise']
+                                           and not member['certifications']"
+                                     class="alert alert-light border" role="alert">
+                                    Ce membre n'a pas encore complété son profil public.
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="card-title">Informations</h6>
+                                        <ul class="list-unstyled mb-0 text-muted">
+                                            <li t-if="member['secteur_activite']" class="mb-2">
+                                                <i class="fa fa-briefcase fa-fw me-1"/>
+                                                <t t-out="member['secteur_activite']"/>
+                                            </li>
+                                            <li t-if="member['wilaya']" class="mb-2">
+                                                <i class="fa fa-map-marker fa-fw me-1"/>
+                                                <t t-out="member['wilaya']"/>
+                                            </li>
+                                            <li t-if="member['website']" class="mb-2">
+                                                <i class="fa fa-globe fa-fw me-1"/>
+                                                <a t-att-href="member['website']" rel="noopener noreferrer"
+                                                   target="_blank">
+                                                    <t t-out="member['website']"/>
+                                                </a>
+                                            </li>
+                                        </ul>
+                                        <!-- Ni email ni téléphone : figurer à
+                                             l'annuaire n'est pas consentir à
+                                             publier ses coordonnées directes. -->
+                                        <p class="small text-muted mb-0 mt-3">
+                                            Pour entrer en contact avec ce membre, adressez-vous au
+                                            Secrétariat du GIC OPEX Group.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <a href="/opex/directory" class="btn btn-light mt-4">
+                            <i class="fa fa-arrow-left me-1"/>Retour à l'annuaire
+                        </a>
                     </div>
                 </section>
 
