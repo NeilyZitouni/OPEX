@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Référentiel de départ des certifications (`opex.certification`,
+        Extension 8).
+
+        Le modèle existait et l'écran « Activité » du parcours proposait déjà
+        des cases à cocher, mais la table n'était alimentée par personne : la
+        liste étant vide, le champ ne s'affichait pas du tout et le candidat
+        ne pouvait rien déclarer.
+
+        `noupdate="1"` : c'est un point de départ, pas une liste figée.
+        L'Administrateur ajoute, renomme ou supprime ces entrées depuis
+        Configuration → Certifications, et une mise à jour du module ne
+        rétablit pas ses choix.
+    -->
+    <data noupdate="1">
+
+        <record id="certification_iso_9001" model="opex.certification">
+            <field name="name">ISO 9001 — Management de la qualité</field>
+        </record>
+
+        <record id="certification_iso_14001" model="opex.certification">
+            <field name="name">ISO 14001 — Management environnemental</field>
+        </record>
+
+        <record id="certification_iso_45001" model="opex.certification">
+            <field name="name">ISO 45001 — Santé et sécurité au travail</field>
+        </record>
+
+        <record id="certification_iso_50001" model="opex.certification">
+            <field name="name">ISO 50001 — Management de l'énergie</field>
+        </record>
+
+        <record id="certification_iso_27001" model="opex.certification">
+            <field name="name">ISO 27001 — Sécurité de l'information</field>
+        </record>
+
+        <record id="certification_iso_22000" model="opex.certification">
+            <field name="name">ISO 22000 — Sécurité des denrées alimentaires</field>
+        </record>
+
+    </data>
+</odoo>

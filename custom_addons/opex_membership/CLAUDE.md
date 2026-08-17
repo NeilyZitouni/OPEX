@@ -80,6 +80,37 @@ tôt ou tard par en oublier une occurrence — et c'est précisément celle-là
 qui reçoit la requête forgée. S'applique à toute future extension qui
 ajoute plusieurs routes partageant une même règle de visibilité.
 
+## ⚠️ Règle transversale : "présent dans le HTML" ≠ "visible à l'écran"
+
+Rencontré deux fois sous deux formes différentes :
+
+- **Extension 10 (`certification_ids`)** : bloc caché par un `t-if`
+  conditionné à un référentiel (`opex.certification`) resté vide, jamais
+  semé.
+- **Navigation Vie du Cluster** : tuile portail rendue avec la classe CSS
+  `d-none` (le mécanisme natif `portal.portal_docs_entry` masque toute
+  carte sans `placeholder_count` ni `config_card` — les deux autres tuiles
+  du portail s'en sortaient grâce à un compteur, celle-ci n'en avait pas).
+
+Dans les deux cas, un test qui vérifie `'texte ou url' in response.body`
+passe **alors que l'utilisateur ne voit rien** — l'assertion mesure la
+présence dans le flux HTML, pas la visibilité réelle. C'est l'assertion
+elle-même qui est en cause, autant que le bug qu'elle a laissé passer.
+
+**Deux réflexes à appliquer systématiquement pour toute future extension :**
+1. Pour tout champ/bloc dépendant d'une donnée qui peut être vide ou nulle
+   (référentiel non semé, compteur à zéro, liste vide) : vérifie le rendu
+   réel avec de vraies données, pas seulement la présence du bloc dans le
+   template ou la chaîne dans la réponse HTTP.
+2. Dans les tests, ne teste jamais uniquement `'x' in body` pour confirmer
+   qu'un élément est *affiché* — vérifie l'absence de la classe qui le
+   masquerait (`d-none` ou équivalent), ou le rendu réel de l'élément
+   cliquable/visible.
+
+Quand un état vide est légitime, affiche un message explicite plutôt que
+de masquer silencieusement — un élément qui disparaît sans explication est
+pire qu'une erreur visible : ni bug signalé, ni fonctionnalité utilisable.
+
 ---
 
 ## Extension 1 — Intégration `sale.order` pour les cotisations

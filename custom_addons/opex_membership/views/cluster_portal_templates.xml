@@ -2,6 +2,65 @@
 <odoo>
 
     <!--
+        Visibilité conditionnelle de l'entrée « Vie du Cluster » du menu
+        principal.
+
+        L'entrée elle-même est un `website.menu` classique
+        (`data/website_menu.xml`), au même niveau que « Annuaire » et
+        « Devenir membre » — c'est ce qui la place dans le menu de gauche
+        plutôt que dans la zone compte à droite, et ce qui la rend éditable
+        depuis l'éditeur de site comme les autres.
+
+        Mais un `website.menu` ne sait pas se conditionner à une donnée
+        métier : son champ natif `group_ids` ne raisonne qu'en groupes, or
+        notre règle porte sur `res.partner.is_member`, qu'aucun groupe
+        n'exprime. D'où ce greffon sur `website.submenu`, le gabarit unique
+        par lequel passent toutes les variantes d'en-tête du module
+        `website` — un seul point d'insertion couvre donc tous les thèmes.
+
+        Le surcoût ne pèse que sur notre entrée : pour tous les autres
+        menus, `opex_is_cluster_menu` est faux et Python court-circuite
+        avant d'évaluer la moindre appartenance.
+
+        `o_no_autohide_item` : sans cette classe, `autoHideMenu` replie
+        l'entrée dans le « + » de débordement dès que l'en-tête est chargé.
+        Elle serait alors présente dans le HTML et invisible à l'écran —
+        le travers décrit par la règle transversale de CLAUDE.md. Vérifié
+        dans `auto_hide_menu.js` : la classe figure bien dans le sélecteur
+        `unfoldable` appliqué à `.top_menu`.
+
+        Repérage par URL plutôt que par identifiant externe : si
+        l'utilisateur change l'URL de l'entrée depuis l'éditeur, le
+        garde-fou cesse de s'appliquer et le lien redevient visible de
+        tous. Ce n'est pas une faille — `_cluster_access_denied()` refuse
+        toujours l'accès côté serveur, le visiteur est simplement redirigé
+        avec le message d'explication.
+    -->
+    <template id="website_submenu_cluster_visibility"
+              name="Menu principal : visibilité de « Vie du Cluster »"
+              inherit_id="website.submenu" priority="20">
+        <xpath expr="//t[@t-set='show_dropdown']" position="before">
+            <t t-set="opex_is_cluster_menu" t-value="submenu.url == '/my/cluster/news'"/>
+            <t t-set="opex_cluster_menu_denied"
+               t-value="opex_is_cluster_menu
+                        and not (request.env.user.partner_id.sudo().is_member
+                                 or request.env.user._is_opex_staff())"/>
+        </xpath>
+        <xpath expr="//li[@t-if]" position="attributes">
+            <attribute name="t-if" add="not opex_cluster_menu_denied" separator="and"/>
+            <attribute name="t-attf-class" separator=" "
+                       add="#{opex_is_cluster_menu and 'o_no_autohide_item' or ''}"/>
+        </xpath>
+        <!-- Même garde si l'utilisateur ajoute un sous-menu sous l'entrée
+             depuis l'éditeur : elle bascule alors sur la branche « dropdown ». -->
+        <xpath expr="//li[@t-elif]" position="attributes">
+            <attribute name="t-elif" add="not opex_cluster_menu_denied" separator="and"/>
+            <attribute name="t-attf-class" separator=" "
+                       add="#{opex_is_cluster_menu and 'o_no_autohide_item' or ''}"/>
+        </xpath>
+    </template>
+
+    <!--
         Carte « Vie du Cluster » sur l'accueil du portail.
 
         Réservée aux membres actifs, comme les pages elles-mêmes : proposer une
@@ -34,8 +93,19 @@
                      or request.env.user._is_opex_staff()">
                 <t t-call="portal.portal_docs_entry">
                     <t t-set="title">Vie du Cluster</t>
-                    <t t-set="text">Actualités, événements et formations du GIC OPEX Group</t>
+                    <t t-set="text">Actualités, événements, formations, documents et groupes</t>
                     <t t-set="url" t-value="'/my/cluster/news'"/>
+                    <!--
+                        `config_card` : sans lui, `portal.portal_docs_entry`
+                        ajoute `d-none` à la tuile et celle-ci n'apparaît jamais.
+                        Le mécanisme natif ne montre une tuile que si un
+                        `placeholder_count` non nul lui est fourni — or la Vie du
+                        Cluster n'a pas de compteur qui lui soit propre, et une
+                        tuile qui disparaîtrait faute d'actualités serait pire
+                        que pas de tuile du tout. `config_card` est la voie
+                        prévue par Odoo pour les entrées toujours visibles.
+                    -->
+                    <t t-set="config_card" t-value="True"/>
                 </t>
             </t>
         </div>

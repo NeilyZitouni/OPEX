@@ -28,5 +28,22 @@
             <field name="sequence" type="int">55</field>
         </record>
 
+        <!--
+            Vie du Cluster : entrée de menu ordinaire, mais dont l'affichage
+            est conditionné aux membres actifs (et au personnel interne, pour
+            la prévisualisation) par le greffon
+            `website_submenu_cluster_visibility` — un `website.menu` ne sait
+            pas porter cette condition lui-même.
+
+            Placée en 57, entre « Devenir membre » (55) et « Contact us »
+            (60), pour rester groupée avec les entrées OPEX.
+        -->
+        <record id="website_menu_cluster_life" model="website.menu">
+            <field name="name">Vie du Cluster</field>
+            <field name="url">/my/cluster/news</field>
+            <field name="parent_id" ref="website.main_menu"/>
+            <field name="sequence" type="int">57</field>
+        </record>
+
     </data>
 </odoo>

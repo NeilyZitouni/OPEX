@@ -245,9 +245,17 @@
                                class="form-control"
                                t-att-value="membership_file.chiffre_affaires or ''"/>
                     </div>
-                    <div class="col-12" t-if="certifications">
+                    <!--
+                        Multi-sélection par cases à cocher : `certification_ids`
+                        est un Many2many vers un référentiel, pas du texte libre.
+
+                        Le bloc n'est plus masqué quand le référentiel est vide —
+                        il l'était, et le champ disparaissait alors sans que rien
+                        ne l'explique, ce qui donnait à croire qu'il manquait.
+                    -->
+                    <div class="col-12">
                         <label class="form-label">Certifications</label>
-                        <div class="d-flex flex-wrap gap-3">
+                        <div t-if="certifications" class="d-flex flex-wrap gap-3">
                             <div t-foreach="certifications" t-as="certification"
                                  class="form-check">
                                 <input class="form-check-input" type="checkbox"
@@ -261,6 +269,11 @@
                                 </label>
                             </div>
                         </div>
+                        <p t-else="" class="text-muted small mb-0">
+                            Aucune certification n'est proposée pour le moment. Vous
+                            pourrez décrire les vôtres dans « Domaines d'expertise »
+                            à l'écran suivant.
+                        </p>
                     </div>
                 </div>
                 <t t-call="opex_membership.portal_parcours_footer"/>
