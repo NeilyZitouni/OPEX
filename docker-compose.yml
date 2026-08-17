@@ -5,9 +5,9 @@ services:
     image: postgres:17
     container_name: opex_db
     environment:
-      POSTGRES_DB: postgres
+      POSTGRES_DB: opex_db
       POSTGRES_USER: odoo
-      POSTGRES_PASSWORD: odoo
+      POSTGRES_PASSWORD: opex_docker_2026
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -22,7 +22,7 @@ services:
     environment:
       HOST: db
       USER: odoo
-      PASSWORD: odoo
+      PASSWORD: opex_docker_2026
     volumes:
       - ./custom_addons/opex_membership:/mnt/extra-addons/opex_membership
       - odoo-web-data:/var/lib/odoo
