@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ==================== Rôles ==================== -->
+
+    <record id="view_workflow_role_list" model="ir.ui.view">
+        <field name="name">opex.workflow.role.list</field>
+        <field name="model">opex.workflow.role</field>
+        <field name="arch" type="xml">
+            <list string="Rôles" editable="bottom">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="group_id" options="{'no_create': True}"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_workflow_role" model="ir.actions.act_window">
+        <field name="name">Rôles</field>
+        <field name="res_model">opex.workflow.role</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Qui intervient dans vos processus ?</p>
+            <p>
+                Un rôle adossé à un groupe Odoo vaut pour tous les dossiers.
+                Un rôle sans groupe s'attribue dossier par dossier, sur les acteurs
+                de chaque instance.
+            </p>
+        </field>
+    </record>
+
+    <!-- ==================== Règles ==================== -->
+
+    <record id="view_workflow_rule_form" model="ir.ui.view">
+        <field name="name">opex.workflow.rule.form</field>
+        <field name="model">opex.workflow.rule</field>
+        <field name="arch" type="xml">
+            <form string="Règle">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Score suffisant"/></h1>
+                    </div>
+                    <group>
+                        <field name="code" placeholder="score_min_70"/>
+                        <field name="active" widget="boolean_toggle"/>
+                    </group>
+                    <group string="Condition">
+                        <field name="expression" nolabel="1"
+                               placeholder="field('score') >= 70"/>
+                    </group>
+                    <group string="Si la condition n'est pas remplie">
+                        <field name="message" nolabel="1"
+                               placeholder="Le projet doit avoir obtenu au moins 70/100."/>
+                    </group>
+                    <field name="description" placeholder="À quoi sert cette règle ?"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_workflow_rule_list" model="ir.ui.view">
+        <field name="name">opex.workflow.rule.list</field>
+        <field name="model">opex.workflow.rule</field>
+        <field name="arch" type="xml">
+            <list string="Règles">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="expression"/>
+                <field name="message"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_workflow_rule" model="ir.actions.act_window">
+        <field name="name">Règles</field>
+        <field name="res_model">opex.workflow.rule</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucune règle pour l'instant</p>
+            <p>
+                Une règle est une condition nommée, réutilisable par plusieurs
+                transitions. Elle porte toujours un message : c'est lui que
+                l'utilisateur lira quand la condition bloquera son action.
+            </p>
+        </field>
+    </record>
+
+    <!-- ==================== Actions ==================== -->
+
+    <record id="view_workflow_action_form" model="ir.ui.view">
+        <field name="name">opex.workflow.action.form</field>
+        <field name="model">opex.workflow.action</field>
+        <field name="arch" type="xml">
+            <form string="Action">
+                <sheet>
+                    <div class="alert alert-info" role="status">
+                        Les actions sont configurables dès maintenant mais ne sont
+                        pas encore exécutées : le moteur d'exécution est livré avec
+                        l'Extension 4.
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code"/>
+                            <field name="action_type"/>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                        <group>
+                            <field name="target_role_ids" widget="many2many_tags"
+                                   options="{'no_create': True}"
+                                   invisible="action_type not in ('notify', 'create_task')"/>
+                            <field name="deadline_days"
+                                   invisible="action_type != 'create_task'"/>
+                            <field name="field_id"
+                                   invisible="action_type != 'set_field'"/>
+                            <field name="value_expression"
+                                   invisible="action_type != 'set_field'"/>
+                            <field name="template_id"
+                                   invisible="action_type != 'send_email'"/>
+                            <field name="sub_definition_id"
+                                   invisible="action_type != 'launch_subworkflow'"/>
+                        </group>
+                    </group>
+                    <field name="body" invisible="action_type != 'notify'"/>
+                    <field name="description"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_workflow_action_list" model="ir.ui.view">
+        <field name="name">opex.workflow.action.list</field>
+        <field name="model">opex.workflow.action</field>
+        <field name="arch" type="xml">
+            <list string="Actions">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="action_type"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_workflow_action" model="ir.actions.act_window">
+        <field name="name">Actions</field>
+        <field name="res_model">opex.workflow.action</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

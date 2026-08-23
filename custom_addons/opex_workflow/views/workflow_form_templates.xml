@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Rendu générique d'un formulaire dynamique.
+
+        ⚠ Le gabarit n'itère que sur `fields`, une liste **calculée côté
+        serveur** par `form.render_values()`. Un champ dont la condition
+        d'affichage est fausse n'y figure pas : il n'est donc pas rendu du
+        tout, et non rendu puis masqué. C'est la différence entre une
+        information absente et une information présente dans la source de la
+        page — la seconde se lit avec l'inspecteur du navigateur.
+
+        Aucun `t-if` de visibilité ici : s'il y en avait un, il faudrait que le
+        champ soit déjà dans la liste pour être testé, et il serait donc déjà
+        passé côté client.
+    -->
+    <template id="workflow_dynamic_form_fields" name="Champs d'un formulaire dynamique">
+        <t t-foreach="fields" t-as="f">
+            <div class="mb-3">
+                <label class="form-label" t-att-for="f['name']">
+                    <t t-esc="f['label']"/>
+                    <span t-if="f['required']" class="text-danger">*</span>
+                </label>
+
+                <t t-if="f['widget'] == 'textarea'">
+                    <textarea class="form-control" rows="4"
+                              t-att-id="f['name']" t-att-name="f['name']"
+                              t-att-required="'required' if f['required'] else None"
+                              t-att-readonly="'readonly' if f['readonly'] else None"
+                              t-att-placeholder="f['placeholder']"
+                              t-esc="f['value'] or ''"/>
+                </t>
+
+                <t t-elif="f['widget'] == 'checkbox'">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input"
+                               t-att-id="f['name']" t-att-name="f['name']"
+                               t-att-checked="'checked' if f['value'] else None"
+                               t-att-disabled="'disabled' if f['readonly'] else None"/>
+                    </div>
+                </t>
+
+                <t t-elif="f['widget'] == 'selection'">
+                    <select class="form-select"
+                            t-att-id="f['name']" t-att-name="f['name']"
+                            t-att-required="'required' if f['required'] else None"
+                            t-att-disabled="'disabled' if f['readonly'] else None">
+                        <option value=""/>
+                        <t t-foreach="f['options']" t-as="option">
+                            <option t-att-value="option[0]"
+                                    t-att-selected="'selected' if option[0] == f['value'] else None"
+                                    t-esc="option[1]"/>
+                        </t>
+                    </select>
+                </t>
+
+                <t t-else="">
+                    <input class="form-control"
+                           t-att-type="'number' if f['widget'] == 'number' else ('date' if f['widget'] == 'date' else 'text')"
+                           t-att-id="f['name']" t-att-name="f['name']"
+                           t-att-value="f['value'] if f['value'] not in (False, None) else ''"
+                           t-att-required="'required' if f['required'] else None"
+                           t-att-readonly="'readonly' if f['readonly'] else None"
+                           t-att-placeholder="f['placeholder']"/>
+                </t>
+
+                <div t-if="f['help']" class="form-text" t-esc="f['help']"/>
+            </div>
+        </t>
+    </template>
+
+    <template id="workflow_dynamic_form_page" name="Formulaire dynamique de workflow">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="form.name"/>
+                <p t-if="stage_label" class="text-muted" t-esc="stage_label"/>
+
+                <div t-if="errors" class="alert alert-danger" role="alert">
+                    <ul class="mb-0">
+                        <li t-foreach="errors" t-as="error" t-esc="error"/>
+                    </ul>
+                </div>
+
+                <div t-if="saved" class="alert alert-success" role="status">
+                    Vos réponses ont été enregistrées. Vous pouvez quitter cette
+                    page et la reprendre plus tard.
+                </div>
+
+                <div t-if="form.intro" class="mb-3" t-field="form.intro"/>
+
+                <form method="post" t-att-action="post_url">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                    <t t-call="opex_workflow.workflow_dynamic_form_fields"/>
+
+                    <!--
+                        Deux boutons pour deux intentions distinctes : le
+                        brouillon accepte l'incomplet, la validation exige les
+                        champs requis. Sans le premier, un porteur interrompu
+                        perdrait sa saisie ; sans le second, rien ne serait
+                        jamais vérifié.
+                    -->
+                    <div class="d-flex gap-2">
+                        <button type="submit" name="action" value="draft"
+                                class="btn btn-secondary">Enregistrer le brouillon</button>
+                        <button type="submit" name="action" value="validate"
+                                class="btn btn-primary">Valider cette étape</button>
+                    </div>
+                </form>
+
+                <div t-if="not fields" class="alert alert-info mt-3" role="status">
+                    Aucune information ne vous est demandée à cette étape.
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

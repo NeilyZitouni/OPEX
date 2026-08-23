@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_workflow_task_list" model="ir.ui.view">
+        <field name="name">opex.workflow.task.list</field>
+        <field name="model">opex.workflow.task</field>
+        <field name="arch" type="xml">
+            <list string="Tâches" create="false"
+                  decoration-danger="is_late"
+                  decoration-muted="state in ('done', 'cancelled')">
+                <field name="deadline"/>
+                <field name="name"/>
+                <field name="instance_id"/>
+                <field name="stage_id"/>
+                <field name="role_id"/>
+                <field name="user_id" widget="many2one_avatar_user"/>
+                <field name="is_late" column_invisible="1"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state == 'cancelled'"/>
+                <button name="action_done" type="object" icon="fa-check"
+                        title="Marquer comme faite"
+                        invisible="state != 'todo'"/>
+                <button name="action_open_instance" type="object"
+                        icon="fa-folder-open-o" title="Ouvrir le dossier"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_workflow_task_form" model="ir.ui.view">
+        <field name="name">opex.workflow.task.form</field>
+        <field name="model">opex.workflow.task</field>
+        <field name="arch" type="xml">
+            <form string="Tâche">
+                <header>
+                    <button name="action_done" type="object" string="Marquer comme faite"
+                            class="btn-primary" invisible="state != 'todo'"/>
+                    <button name="action_cancel" type="object" string="Annuler"
+                            invisible="state != 'todo'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="instance_id" readonly="1"/>
+                            <field name="definition_id" readonly="1"/>
+                            <field name="stage_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="role_id" readonly="1"/>
+                            <field name="user_id"/>
+                            <field name="deadline"/>
+                            <field name="date_done" invisible="state != 'done'"/>
+                        </group>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_workflow_task_search" model="ir.ui.view">
+        <field name="name">opex.workflow.task.search</field>
+        <field name="model">opex.workflow.task</field>
+        <field name="arch" type="xml">
+            <search string="Tâches">
+                <field name="name"/>
+                <field name="instance_id"/>
+                <field name="role_id"/>
+                <field name="user_id"/>
+                <separator/>
+                <filter name="filter_mine" string="Les miennes"
+                        domain="[('user_id', '=', uid)]"/>
+                <filter name="filter_unassigned" string="Non assignées"
+                        domain="[('user_id', '=', False)]"/>
+                <separator/>
+                <filter name="filter_todo" string="À faire"
+                        domain="[('state', '=', 'todo')]"/>
+                <filter name="filter_late" string="En retard"
+                        domain="[('is_late', '=', True)]"/>
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'stage_id'}"/>
+                    <filter name="group_role" string="Rôle"
+                            context="{'group_by': 'role_id'}"/>
+                    <filter name="group_user" string="Assignée à"
+                            context="{'group_by': 'user_id'}"/>
+                    <filter name="group_definition" string="Workflow"
+                            context="{'group_by': 'definition_id'}"/>
+                    <filter name="group_state" string="État"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!--
+        « Mes tâches » : chaque acteur voit ce qu'il a à traiter, jamais le
+        graphe complet. Le filtre est dans le contexte, donc désactivable —
+        un utilisateur qui cherche une tâche non assignée doit pouvoir la
+        trouver plutôt que de croire qu'elle n'existe pas.
+    -->
+    <record id="action_workflow_task_mine" model="ir.actions.act_window">
+        <field name="name">Mes tâches</field>
+        <field name="res_model">opex.workflow.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_mine': 1, 'search_default_filter_todo': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Rien ne vous attend</p>
+            <p>
+                Les tâches naissent des actions « Créer une tâche » posées sur les
+                transitions d'un workflow. Retirez le filtre « Les miennes » pour
+                voir celles des autres acteurs.
+            </p>
+        </field>
+    </record>
+
+    <!--
+        Vue agrégée : « combien de dossiers attendent quoi ». C'est la lecture
+        du gestionnaire, par opposition à celle de l'acteur.
+    -->
+    <record id="action_workflow_task_all" model="ir.actions.act_window">
+        <field name="name">Toutes les tâches</field>
+        <field name="res_model">opex.workflow.task</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_todo': 1, 'search_default_group_stage': 1}</field>
+    </record>
+
+</odoo>

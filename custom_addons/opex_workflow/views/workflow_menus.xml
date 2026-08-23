@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Racine non restreinte : la work queue s'adresse à tout acteur interne,
+        pas seulement aux concepteurs. Ce sont les entrées de configuration qui
+        portent les restrictions, pas le menu qui les contient — sinon un
+        contrôleur ne verrait jamais ses propres tâches.
+    -->
+    <menuitem id="menu_workflow_root"
+              name="Smart Workflow"
+              sequence="18"/>
+
+    <menuitem id="menu_workflow_definition"
+              name="Workflows"
+              parent="menu_workflow_root"
+              action="action_workflow_definition"
+              sequence="10"
+              groups="group_workflow_designer,group_workflow_manager"/>
+
+    <menuitem id="menu_workflow_instance"
+              name="Instances"
+              parent="menu_workflow_root"
+              action="action_workflow_instance"
+              sequence="20"
+              groups="group_workflow_designer,group_workflow_manager"/>
+
+    <menuitem id="menu_workflow_task_mine"
+              name="Mes tâches"
+              parent="menu_workflow_root"
+              action="action_workflow_task_mine"
+              sequence="5"/>
+
+    <menuitem id="menu_workflow_task_all"
+              name="Toutes les tâches"
+              parent="menu_workflow_root"
+              action="action_workflow_task_all"
+              sequence="30"
+              groups="group_workflow_manager,group_workflow_designer"/>
+
+    <menuitem id="menu_workflow_configuration"
+              name="Configuration"
+              parent="menu_workflow_root"
+              sequence="90"
+              groups="group_workflow_designer"/>
+
+    <menuitem id="menu_workflow_role"
+              name="Rôles"
+              parent="menu_workflow_configuration"
+              action="action_workflow_role"
+              sequence="10"/>
+
+    <menuitem id="menu_workflow_form"
+              name="Formulaires"
+              parent="menu_workflow_configuration"
+              action="action_workflow_form"
+              sequence="15"/>
+
+    <menuitem id="menu_workflow_rule"
+              name="Règles"
+              parent="menu_workflow_configuration"
+              action="action_workflow_rule"
+              sequence="20"/>
+
+    <menuitem id="menu_workflow_action"
+              name="Actions"
+              parent="menu_workflow_configuration"
+              action="action_workflow_action"
+              sequence="30"/>
+
+</odoo>

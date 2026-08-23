@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Référentiel de rôles partagé entre workflows, conformément à la
+            spécification : Porteur, Secrétariat, Comité, Expert, Investisseur
+            et CEO se réutilisent d'un processus à l'autre, et c'est ce partage
+            qui permet à une seconde définition de réutiliser les rôles de la
+            première sans les redéclarer.
+
+            `group_id` est laissé vide sur tous : le moteur ne crée aucun groupe
+            métier. C'est au module métier de rattacher un rôle à son groupe
+            (`role.group_id = ...`) quand ce rôle correspond chez lui à une
+            population permanente, ou de laisser vide pour un rôle attribué
+            dossier par dossier via les acteurs d'instance.
+
+            `noupdate="1"` : un rôle rattaché à un groupe par un module métier
+            ne doit pas voir ce rattachement effacé à la prochaine mise à jour
+            du moteur.
+        -->
+
+        <record id="role_porteur" model="opex.workflow.role">
+            <field name="name">Porteur</field>
+            <field name="code">porteur</field>
+            <field name="description">Celui qui dépose le dossier et le fait avancer de son côté.</field>
+        </record>
+
+        <record id="role_secretariat" model="opex.workflow.role">
+            <field name="name">Secrétariat</field>
+            <field name="code">secretariat</field>
+            <field name="description">Contrôle administratif : complétude, pièces, recevabilité.</field>
+        </record>
+
+        <record id="role_comite" model="opex.workflow.role">
+            <field name="name">Comité</field>
+            <field name="code">comite</field>
+            <field name="description">Instance collégiale de décision.</field>
+        </record>
+
+        <record id="role_expert" model="opex.workflow.role">
+            <field name="name">Expert</field>
+            <field name="code">expert</field>
+            <field name="description">Apporte un avis technique ou métier sur un dossier auquel il a été affecté.</field>
+        </record>
+
+        <record id="role_investisseur" model="opex.workflow.role">
+            <field name="name">Investisseur</field>
+            <field name="code">investisseur</field>
+            <field name="description">Acteur financier sollicité sur un dossier précis.</field>
+        </record>
+
+        <record id="role_ceo" model="opex.workflow.role">
+            <field name="name">CEO</field>
+            <field name="code">ceo</field>
+            <field name="description">Orchestrateur du processus, arbitre des décisions stratégiques.</field>
+        </record>
+
+    </data>
+</odoo>

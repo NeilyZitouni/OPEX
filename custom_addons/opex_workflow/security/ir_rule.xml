@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Traduction déclarative de `opex.workflow.instance._has_access()`.
+
+        Les droits de `ir.model.access.csv` sont donnés au **modèle** ; sans les
+        règles ci-dessous, un utilisateur portail lirait les dossiers de tous
+        les autres. Le controller filtre déjà côté applicatif, mais un contrôle
+        applicatif s'oublie sur une route ; une `ir.rule` porte sur toutes les
+        requêtes, y compris celles qu'on n'a pas écrites.
+
+        ⚠ Toutes les règles traversent `active_actor_ids` et non `actor_ids`.
+        La différence n'est pas cosmétique : `actor_ids` inclut les lignes
+        révoquées (`access_level = 'none'`), et un domaine à deux conditions sur
+        un One2many produit deux sous-requêtes indépendantes — les conditions
+        pourraient donc être satisfaites par deux lignes différentes, et un
+        utilisateur révoqué garderait l'accès dès qu'un autre acteur du dossier
+        l'a. Le filtre porté par le champ garantit qu'on parle d'une seule et
+        même ligne.
+
+        ⚠ Ces règles ne se voient pas en administrateur : `base.group_system`
+        contourne les `ir.rule`. Elles se testent avec un vrai compte portail —
+        c'est le piège qui a coûté du temps sur le module précédent.
+    -->
+
+    <record id="rule_instance_portal" model="ir.rule">
+        <field name="name">Dossier de workflow : le portail ne voit que les siens</field>
+        <field name="model_id" ref="model_opex_workflow_instance"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        L'historique par cascade : un acteur voit le journal des dossiers
+        auxquels il a accès, et rien d'autre. L'immuabilité est déjà garantie
+        par `write()`/`unlink()` du modèle ; cette règle borne la *lecture*.
+    -->
+    <record id="rule_history_portal" model="ir.rule">
+        <field name="name">Historique de workflow : limité aux dossiers accessibles</field>
+        <field name="model_id" ref="model_opex_workflow_history"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('instance_id.active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_task_portal" model="ir.rule">
+        <field name="name">Tâche de workflow : limitée aux dossiers accessibles</field>
+        <field name="model_id" ref="model_opex_workflow_task"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('instance_id.active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Les lignes d'acteur elles-mêmes : un porteur peut voir qui intervient
+        sur son dossier, jamais la répartition des rôles sur les dossiers des
+        autres.
+    -->
+    <record id="rule_actor_portal" model="ir.rule">
+        <field name="name">Acteur de workflow : limité aux dossiers accessibles</field>
+        <field name="model_id" ref="model_opex_workflow_instance_actor"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('instance_id.active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Utilisateurs internes non gestionnaires : même principe.
+
+        Un contrôleur ou un membre de comité est un utilisateur interne, pas un
+        portail — sans règle ici, il lirait tous les dossiers de la base. Les
+        deux groupes du moteur (concepteur, gestionnaire) sont volontairement
+        exclus : leur métier est justement de tout voir.
+
+        `global` (aucun groupe) + une seconde règle permissive pour les groupes
+        du moteur : en Odoo, les règles d'un même modèle s'additionnent en OU
+        entre groupes, et une règle globale s'impose en ET. On utilise donc une
+        règle par groupe plutôt qu'une globale, pour que les gestionnaires ne
+        soient pas bornés par elle.
+    -->
+    <record id="rule_instance_internal" model="ir.rule">
+        <field name="name">Dossier de workflow : l'utilisateur interne ne voit que ses dossiers</field>
+        <field name="model_id" ref="model_opex_workflow_instance"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_instance_workflow_staff" model="ir.rule">
+        <field name="name">Dossier de workflow : le personnel du moteur voit tout</field>
+        <field name="model_id" ref="model_opex_workflow_instance"/>
+        <field name="groups" eval="[Command.link(ref('group_workflow_manager')), Command.link(ref('group_workflow_designer'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_history_internal" model="ir.rule">
+        <field name="name">Historique de workflow : limité aux dossiers de l'utilisateur</field>
+        <field name="model_id" ref="model_opex_workflow_history"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('instance_id.active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_history_workflow_staff" model="ir.rule">
+        <field name="name">Historique de workflow : le personnel du moteur voit tout</field>
+        <field name="model_id" ref="model_opex_workflow_history"/>
+        <field name="groups" eval="[Command.link(ref('group_workflow_manager')), Command.link(ref('group_workflow_designer'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Les tâches font exception au schéma ci-dessus : un utilisateur interne
+        doit voir **les tâches qui lui sont assignées** même sans ligne
+        d'acteur sur le dossier. C'est le sens de la work queue — on lui confie
+        un travail précis, pas l'accès au dossier entier.
+    -->
+    <record id="rule_task_internal" model="ir.rule">
+        <field name="name">Tâche de workflow : les miennes ou celles de mes dossiers</field>
+        <field name="model_id" ref="model_opex_workflow_task"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">['|', ('user_id', '=', user.id), ('instance_id.active_actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_task_workflow_staff" model="ir.rule">
+        <field name="name">Tâche de workflow : le personnel du moteur voit tout</field>
+        <field name="model_id" ref="model_opex_workflow_task"/>
+        <field name="groups" eval="[Command.link(ref('group_workflow_manager')), Command.link(ref('group_workflow_designer'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+</odoo>

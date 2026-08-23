@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_workflow_instance_form" model="ir.ui.view">
+        <field name="name">opex.workflow.instance.form</field>
+        <field name="model">opex.workflow.instance</field>
+        <field name="arch" type="xml">
+            <form string="Instance de workflow">
+                <header>
+                    <!--
+                        UN bouton, pas N. Le nombre et le libellé des
+                        transitions dépendent de la donnée ; une vue XML est
+                        statique. Le wizard porte la variabilité, le header
+                        reste fixe.
+                    -->
+                    <button name="action_open_transition_wizard" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="state != 'running'"/>
+                    <button name="action_cancel" type="object" string="Annuler"
+                            invisible="state != 'running'"
+                            confirm="Le dossier sortira du processus sans atteindre une étape finale. L'annulation sera tracée dans l'historique. Continuer ?"/>
+                    <!--
+                        `definition_id` doit être dans la vue, même invisible,
+                        pour que le `domain` du statusbar puisse l'évaluer :
+                        sans lui, la barre afficherait les étapes de tous les
+                        workflows de la base.
+                    -->
+                    <field name="definition_id" invisible="1"/>
+                    <field name="current_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="current_stage_label" readonly="1"
+                                   placeholder="(aucun libellé utilisateur)"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="definition_id" readonly="1"/>
+                            <field name="resource_ref"/>
+                            <field name="res_model" invisible="1"/>
+                            <field name="res_id" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="state"/>
+                            <field name="initiator_id"/>
+                            <field name="date_start"/>
+                            <field name="date_end" invisible="state == 'running'"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Acteurs" name="actors">
+                            <div class="alert alert-info" role="status">
+                                Ce sont ces lignes qui ouvrent l'accès au dossier,
+                                pas le profil des comptes : être enregistré comme
+                                expert ne donne accès à aucun dossier, c'est la
+                                ligne ci-dessous qui donne accès à celui-ci.
+                                Passer un acteur à « Aucun » lui coupe l'accès tout
+                                en conservant la trace qu'il l'a eu.
+                            </div>
+                            <field name="actor_ids">
+                                <list editable="bottom">
+                                    <field name="role_id" options="{'no_create': True}"/>
+                                    <field name="user_id"/>
+                                    <field name="access_level"/>
+                                    <field name="date_granted" readonly="1"/>
+                                    <field name="granted_by_id" readonly="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                    <!--
+                        Historique en bas de formulaire, hors notebook : c'est
+                        la lecture qu'on veut par défaut sur un dossier, pas un
+                        onglet à aller chercher.
+
+                        `create="false"` / `delete="false"` retirent les boutons,
+                        mais ce sont `write()` et `unlink()` du modèle qui
+                        garantissent l'immuabilité. La vue n'est que de la
+                        courtoisie.
+                    -->
+                    <separator string="Historique"/>
+                    <field name="history_ids" readonly="1" nolabel="1">
+                        <list create="false" delete="false" edit="false">
+                            <field name="date"/>
+                            <field name="user_id"/>
+                            <field name="from_stage_id"/>
+                            <field name="to_stage_id"/>
+                            <field name="transition_id"/>
+                            <field name="comment"/>
+                            <field name="forced" widget="boolean_toggle" readonly="1"/>
+                            <field name="conditions_note" optional="hide"/>
+                        </list>
+                    </field>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_workflow_instance_list" model="ir.ui.view">
+        <field name="name">opex.workflow.instance.list</field>
+        <field name="model">opex.workflow.instance</field>
+        <field name="arch" type="xml">
+            <list string="Instances" create="false">
+                <field name="definition_id"/>
+                <field name="resource_ref"/>
+                <field name="current_stage_id"/>
+                <field name="initiator_id"/>
+                <field name="date_start"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'done'"
+                       decoration-muted="state == 'cancelled'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_workflow_instance_search" model="ir.ui.view">
+        <field name="name">opex.workflow.instance.search</field>
+        <field name="model">opex.workflow.instance</field>
+        <field name="arch" type="xml">
+            <search string="Instances">
+                <field name="definition_id"/>
+                <field name="current_stage_id"/>
+                <field name="initiator_id"/>
+                <filter name="filter_running" string="En cours"
+                        domain="[('state', '=', 'running')]"/>
+                <filter name="filter_done" string="Terminées"
+                        domain="[('state', '=', 'done')]"/>
+                <group name="group_by">
+                    <filter name="group_definition" string="Workflow"
+                            context="{'group_by': 'definition_id'}"/>
+                    <filter name="group_stage" string="Étape courante"
+                            context="{'group_by': 'current_stage_id'}"/>
+                    <filter name="group_state" string="État"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_workflow_instance" model="ir.actions.act_window">
+        <field name="name">Instances</field>
+        <field name="res_model">opex.workflow.instance</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun dossier en cours</p>
+            <p>
+                Une instance est créée quand un module métier appelle
+                <code>start_workflow()</code> sur un enregistrement.
+            </p>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Catégorie et privilège déclarés ici et non repris de `opex_membership` :
+        le moteur ne dépend pas du module métier (`depends` = base + mail), un
+        `ref()` vers un de ses enregistrements empêcherait son installation
+        autonome. Odoo dédoublonne les `ir.module.category` par nom.
+    -->
+    <record id="module_category_opex" model="ir.module.category">
+        <field name="name">GIC OPEX Group</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="privilege_opex_workflow" model="res.groups.privilege">
+        <field name="name">Smart Workflow</field>
+        <field name="sequence">5</field>
+        <field name="category_id" ref="module_category_opex"/>
+    </record>
+
+    <!--
+        Écrire une expression de règle, c'est écrire du code : l'expression est
+        évaluée par `safe_eval` sur l'enregistrement métier en `sudo()`. Le
+        groupe qui peut en saisir est donc technique et restreint, pas un groupe
+        d'utilisateur métier.
+    -->
+    <record id="group_workflow_designer" model="res.groups">
+        <field name="name">Concepteur de workflow</field>
+        <field name="privilege_id" ref="privilege_opex_workflow"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Configure les workflows : étapes, transitions, conditions, rôles et actions. Écrire une condition revient à écrire du code exécuté par le serveur.</field>
+    </record>
+
+    <record id="group_workflow_manager" model="res.groups">
+        <field name="name">Gestionnaire de workflow</field>
+        <field name="privilege_id" ref="privilege_opex_workflow"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Consulte les définitions et toutes les instances, et peut forcer une transition dont il ne porte pas le rôle — le forçage est tracé dans l'historique.</field>
+    </record>
+
+</odoo>

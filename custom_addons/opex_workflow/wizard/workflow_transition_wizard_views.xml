@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_workflow_transition_wizard_form" model="ir.ui.view">
+        <field name="name">opex.workflow.transition.wizard.form</field>
+        <field name="model">opex.workflow.transition.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Faire avancer le dossier">
+                <group>
+                    <field name="instance_id" invisible="1"/>
+                    <!-- Champs de pilotage des expressions ci-dessous : ils
+                         doivent être présents dans la vue pour que
+                         `invisible=` et `required=` puissent les évaluer. -->
+                    <field name="requires_comment" invisible="1"/>
+                    <field name="is_blocked" invisible="1"/>
+                    <field name="current_stage_id" readonly="1"/>
+                    <field name="transition_id"/>
+                </group>
+
+                <!--
+                    Le motif du blocage s'affiche dès la sélection, avant la
+                    confirmation : l'utilisateur doit savoir ce qui manque
+                    sans avoir à se heurter à une erreur.
+                -->
+                <div class="alert alert-warning" role="alert"
+                     invisible="not is_blocked">
+                    <strong>Cette action n'est pas possible pour le moment :</strong>
+                    <field name="blocking_reason" nolabel="1" readonly="1"/>
+                </div>
+
+                <group invisible="not transition_id">
+                    <field name="comment" nolabel="1"
+                           required="requires_comment"
+                           placeholder="Motif, précisions, consignes au porteur…"/>
+                </group>
+
+                <footer>
+                    <button name="action_confirm" type="object"
+                            string="Confirmer" class="btn-primary"
+                            data-hotkey="q"/>
+                    <button string="Annuler" class="btn-secondary"
+                            special="cancel" data-hotkey="x"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_workflow_transition_wizard" model="ir.actions.act_window">
+        <field name="name">Faire avancer le dossier</field>
+        <field name="res_model">opex.workflow.transition.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+
+</odoo>

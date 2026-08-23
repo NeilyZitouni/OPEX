@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        L'écran du test d'acceptation. Il doit être utilisable par quelqu'un qui
+        ne lit pas de Python : ajouter une étape et recâbler ses transitions se
+        fait sans quitter ce formulaire, dans deux onglets éditables en ligne.
+    -->
+    <record id="view_workflow_definition_form" model="ir.ui.view">
+        <field name="name">opex.workflow.definition.form</field>
+        <field name="model">opex.workflow.definition</field>
+        <field name="arch" type="xml">
+            <form string="Définition de workflow">
+                <header>
+                    <button name="action_check_graph" type="object"
+                            string="Valider le graphe" class="btn-primary"
+                            help="Vérifie la cohérence du graphe sans rien changer."/>
+                    <button name="action_publish" type="object"
+                            string="Publier" class="btn-primary"
+                            invisible="state == 'published'"/>
+                    <button name="action_back_to_draft" type="object"
+                            string="Repasser en brouillon"
+                            invisible="state != 'published'"/>
+                    <button name="action_new_version" type="object"
+                            string="Nouvelle version"
+                            invisible="state != 'published'"
+                            confirm="Une nouvelle version va être créée et celle-ci sera archivée. Les dossiers en cours continueront de suivre la version actuelle. Continuer ?"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="draft,published"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_instances" type="object"
+                                class="oe_stat_button" icon="fa-tasks">
+                            <field name="instance_count" widget="statinfo"
+                                   string="Instances"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Projet d'innovation"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="innovation_project"/>
+                            <field name="model_id" options="{'no_create': True}"/>
+                            <field name="model_name" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="version"/>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="stage_count"/>
+                            <field name="transition_count"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="À quoi sert ce processus ?"/>
+                    <notebook>
+                        <page string="Étapes" name="stages">
+                            <field name="stage_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="user_label"/>
+                                    <field name="is_start" widget="boolean_toggle"/>
+                                    <field name="is_end" widget="boolean_toggle"/>
+                                    <field name="actor_role_ids" widget="many2many_tags"
+                                           options="{'no_create': True}"/>
+                                    <field name="sla_days"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Transitions" name="transitions">
+                            <field name="transition_ids"
+                                   context="{'default_definition_id': id}">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="definition_id" column_invisible="1"/>
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="source_stage_id"
+                                           options="{'no_create': True}"/>
+                                    <field name="target_stage_id"
+                                           options="{'no_create': True}"/>
+                                    <field name="allowed_role_ids" widget="many2many_tags"
+                                           options="{'no_create': True}"/>
+                                    <field name="condition_ids" widget="many2many_tags"
+                                           options="{'no_create': True}"/>
+                                    <field name="requires_comment" widget="boolean_toggle"/>
+                                    <field name="active" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Instances" name="instances">
+                            <field name="instance_ids" readonly="1">
+                                <list>
+                                    <field name="resource_ref"/>
+                                    <field name="current_stage_id"/>
+                                    <field name="state"/>
+                                    <field name="initiator_id"/>
+                                    <field name="date_start"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_workflow_definition_list" model="ir.ui.view">
+        <field name="name">opex.workflow.definition.list</field>
+        <field name="model">opex.workflow.definition</field>
+        <field name="arch" type="xml">
+            <list string="Workflows">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="model_name"/>
+                <field name="version"/>
+                <field name="stage_count"/>
+                <field name="transition_count"/>
+                <field name="instance_count"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'published'"
+                       decoration-muted="state == 'archived'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_workflow_definition_search" model="ir.ui.view">
+        <field name="name">opex.workflow.definition.search</field>
+        <field name="model">opex.workflow.definition</field>
+        <field name="arch" type="xml">
+            <search string="Workflows">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="model_name"/>
+                <filter name="filter_published" string="Publiés"
+                        domain="[('state', '=', 'published')]"/>
+                <filter name="filter_draft" string="Brouillons"
+                        domain="[('state', '=', 'draft')]"/>
+                <filter name="filter_archived" string="Archivés"
+                        domain="[('active', '=', False)]"/>
+                <!-- En Odoo 19, le <group> d'une vue search n'accepte ni
+                     `expand` ni `string` : le schéma RelaxNG les rejette et la
+                     vue devient invalide au chargement. -->
+                <group name="group_by">
+                    <filter name="group_model" string="Modèle piloté"
+                            context="{'group_by': 'model_name'}"/>
+                    <filter name="group_state" string="État"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_workflow_definition" model="ir.actions.act_window">
+        <field name="name">Workflows</field>
+        <field name="res_model">opex.workflow.definition</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Décrivez votre premier processus</p>
+            <p>
+                Un workflow se compose d'étapes et de transitions. Créez-le, décrivez
+                ses étapes, reliez-les, puis cliquez sur « Valider le graphe » avant
+                de le publier.
+            </p>
+        </field>
+    </record>
+
+</odoo>

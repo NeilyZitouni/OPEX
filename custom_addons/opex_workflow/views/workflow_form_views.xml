@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_workflow_form_form" model="ir.ui.view">
+        <field name="name">opex.workflow.form.form</field>
+        <field name="model">opex.workflow.form</field>
+        <field name="arch" type="xml">
+            <form string="Formulaire dynamique">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Marché et modèle économique"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="etape_marche"/>
+                            <field name="definition_id" options="{'no_create': True}"/>
+                            <field name="stage_id" options="{'no_create': True}"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <field name="intro" placeholder="Ce que vous expliquez au porteur avant les questions…"/>
+                    <notebook>
+                        <page string="Champs" name="fields">
+                            <field name="field_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="field_id" options="{'no_create': True}"/>
+                                    <field name="label_override"/>
+                                    <field name="widget_hint"/>
+                                    <field name="visible_expression"/>
+                                    <field name="required_expression"/>
+                                    <field name="readonly" widget="boolean_toggle"/>
+                                    <field name="help_text" optional="hide"/>
+                                    <field name="placeholder" optional="hide"/>
+                                </list>
+                            </field>
+                            <div class="alert alert-info mt-2" role="status">
+                                Les conditions s'écrivent comme les règles de transition,
+                                avec le même contexte :
+                                <code>record</code>, <code>field('nom')</code>,
+                                <code>has_document('type')</code>.
+                                Laissées vides, le champ est toujours affiché et jamais obligatoire.
+                                Une condition en erreur est considérée fausse.
+                            </div>
+                        </page>
+                    </notebook>
+                    <field name="description" placeholder="À quoi sert ce formulaire ?"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_workflow_form_list" model="ir.ui.view">
+        <field name="name">opex.workflow.form.list</field>
+        <field name="model">opex.workflow.form</field>
+        <field name="arch" type="xml">
+            <list string="Formulaires">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="definition_id"/>
+                <field name="stage_id"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_workflow_form" model="ir.actions.act_window">
+        <field name="name">Formulaires</field>
+        <field name="res_model">opex.workflow.form</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun formulaire dynamique</p>
+            <p>
+                Un formulaire décrit ce qu'on demande au porteur à une étape donnée.
+                Ses champs peuvent apparaître ou devenir obligatoires selon ce qu'il
+                a déjà répondu — sans qu'un template soit écrit pour chaque cas.
+            </p>
+        </field>
+    </record>
+
+</odoo>

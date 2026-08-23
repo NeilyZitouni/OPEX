@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            Jeu d'essai des droits dynamiques.
+
+            Il existe parce qu'une `ir.rule` ne se teste pas en administrateur :
+            `base.group_system` les contourne toutes. Il faut un vrai compte
+            portail, connecté pour de bon, pour voir ce que voit un porteur.
+
+            Deux comptes portail sur le **même** dossier, plus un troisième
+            sans aucune ligne d'acteur : c'est le triplet minimal qui met en
+            évidence la règle « identité + rôle + relation au dossier ».
+
+            Mots de passe identiques aux logins — jeu de démonstration, jamais
+            chargé en production (`demo:` du manifeste, pas `data:`).
+        -->
+
+        <record id="demo_user_porteur" model="res.users">
+            <field name="name">Demo Porteur</field>
+            <field name="login">wf_demo_porteur</field>
+            <field name="password">wf_demo_porteur</field>
+            <field name="groups_id" eval="[Command.set([ref('base.group_portal')])]"/>
+        </record>
+
+        <record id="demo_user_expert" model="res.users">
+            <field name="name">Demo Expert</field>
+            <field name="login">wf_demo_expert</field>
+            <field name="password">wf_demo_expert</field>
+            <field name="groups_id" eval="[Command.set([ref('base.group_portal')])]"/>
+        </record>
+
+        <!-- Le témoin : aucun rôle, aucune ligne d'acteur, aucun accès. -->
+        <record id="demo_user_etranger" model="res.users">
+            <field name="name">Demo Sans Accès</field>
+            <field name="login">wf_demo_etranger</field>
+            <field name="password">wf_demo_etranger</field>
+            <field name="groups_id" eval="[Command.set([ref('base.group_portal')])]"/>
+        </record>
+
+        <!-- Un workflow d'essai à trois étapes, sur un modèle natif. -->
+        <record id="demo_definition" model="opex.workflow.definition">
+            <field name="name">Dossier de démonstration</field>
+            <field name="code">demo_dossier</field>
+            <field name="model_id" ref="base.model_res_partner"/>
+            <field name="description">Workflow d'essai des droits dynamiques. Piloté sur res.partner pour ne rien devoir à un module métier.</field>
+        </record>
+
+        <record id="demo_stage_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="code">draft</field>
+            <field name="name">Brouillon</field>
+            <field name="user_label">Compléter mon dossier</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="demo_stage_review" model="opex.workflow.stage">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="code">review</field>
+            <field name="name">Contrôle</field>
+            <field name="user_label">Contrôle en cours</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="demo_stage_done" model="opex.workflow.stage">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="code">done</field>
+            <field name="name">Clôturé</field>
+            <field name="user_label">Dossier clôturé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="demo_transition_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="code">submit</field>
+            <field name="name">Soumettre</field>
+            <field name="source_stage_id" ref="demo_stage_draft"/>
+            <field name="target_stage_id" ref="demo_stage_review"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_porteur')])]"/>
+        </record>
+
+        <record id="demo_transition_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="code">validate</field>
+            <field name="name">Valider</field>
+            <field name="source_stage_id" ref="demo_stage_review"/>
+            <field name="target_stage_id" ref="demo_stage_done"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_expert')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <function model="opex.workflow.definition" name="action_publish"
+                  eval="[[ref('demo_definition')]]"/>
+
+        <!-- Deux dossiers : celui du porteur de démo, et un dossier voisin
+             auquel il ne doit rien voir. -->
+        <record id="demo_partner_dossier" model="res.partner">
+            <field name="name">Dossier de démonstration — Smart Factory</field>
+        </record>
+
+        <record id="demo_partner_autre" model="res.partner">
+            <field name="name">Dossier voisin — hors périmètre</field>
+        </record>
+
+        <!--
+            Instances créées de façon déclarative plutôt que par un
+            `<function>` appelant `_start_for` : le passage d'un recordset en
+            argument XML repose sur `obj()`, dont la disponibilité dépend du
+            contexte de chargement. Un enregistrement se charge toujours.
+        -->
+        <record id="demo_instance_dossier" model="opex.workflow.instance">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="res_model">res.partner</field>
+            <field name="res_id" eval="ref('demo_partner_dossier')"/>
+            <field name="current_stage_id" ref="demo_stage_draft"/>
+            <field name="state">running</field>
+        </record>
+
+        <record id="demo_instance_autre" model="opex.workflow.instance">
+            <field name="definition_id" ref="demo_definition"/>
+            <field name="res_model">res.partner</field>
+            <field name="res_id" eval="ref('demo_partner_autre')"/>
+            <field name="current_stage_id" ref="demo_stage_draft"/>
+            <field name="state">running</field>
+        </record>
+
+        <record id="demo_history_dossier" model="opex.workflow.history">
+            <field name="instance_id" ref="demo_instance_dossier"/>
+            <field name="to_stage_id" ref="demo_stage_draft"/>
+            <field name="user_id" ref="base.user_admin"/>
+            <field name="comment">Workflow démarré.</field>
+        </record>
+
+        <!--
+            Les lignes d'acteur : c'est **elles** qui ouvrent l'accès, pas le
+            profil des comptes. Les trois comptes sont strictement identiques
+            du point de vue des groupes Odoo ; seul leur rattachement au
+            dossier les distingue.
+        -->
+        <record id="demo_actor_porteur" model="opex.workflow.instance.actor">
+            <field name="instance_id" ref="demo_instance_dossier"/>
+            <field name="role_id" ref="role_porteur"/>
+            <field name="user_id" ref="demo_user_porteur"/>
+            <field name="access_level">full</field>
+        </record>
+
+        <record id="demo_actor_expert" model="opex.workflow.instance.actor">
+            <field name="instance_id" ref="demo_instance_dossier"/>
+            <field name="role_id" ref="role_expert"/>
+            <field name="user_id" ref="demo_user_expert"/>
+            <field name="access_level">limited</field>
+        </record>
+
+        <!-- Le dossier voisin n'a qu'un acteur, et ce n'est aucun des deux
+             comptes ci-dessus : il doit rester invisible pour eux. -->
+        <record id="demo_actor_autre" model="opex.workflow.instance.actor">
+            <field name="instance_id" ref="demo_instance_autre"/>
+            <field name="role_id" ref="role_porteur"/>
+            <field name="user_id" ref="base.user_admin"/>
+            <field name="access_level">full</field>
+        </record>
+
+        <record id="demo_task_expert" model="opex.workflow.task">
+            <field name="instance_id" ref="demo_instance_dossier"/>
+            <field name="stage_id" ref="demo_stage_draft"/>
+            <field name="name">Examiner le dossier</field>
+            <field name="role_id" ref="role_expert"/>
+            <field name="user_id" ref="demo_user_expert"/>
+        </record>
+
+    </data>
+</odoo>
