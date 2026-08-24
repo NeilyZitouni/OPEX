@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_crowdfunding_root"
+              name="Smart Crowdfunding"
+              sequence="26"
+              groups="group_ceo,group_quality_control"/>
+
+    <menuitem id="menu_crowdfunding_projects"
+              name="Projets"
+              parent="menu_crowdfunding_root"
+              action="action_crowdfunding_project"
+              sequence="10"/>
+
+</odoo>

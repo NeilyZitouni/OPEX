@@ -179,9 +179,10 @@ test final s'appuie dessus : **`score`** (Integer, /100) et **`ceo_approval`**
 
 # Les extensions
 
-## Extension 1 — Socle et Dépôt Express
+## Extension 1 — Socle et Dépôt Express ✅
 
-**Section 5 du document.**
+**Section 5 du document.** — *Faite le 24/08. 14 tests dans
+`tests/test_extension1.py`, tous verts, vérifiés falsifiables.*
 
 `opex.crowdfunding.project` avec les informations minimales — et **rien de plus** :
 `partner_id`, `porteur_type` (Selection : personne physique, startup, entreprise,
@@ -487,6 +488,26 @@ immédiatement une comparaison arrangée.
 **Si le temps manque** : les extensions 1, 3, 5, 6 et 8 constituent la colonne
 vertébrale démontrable. Les extensions 9, 10 et 11 sont ce qu'on sacrifie en
 premier, en l'annonçant.
+
+## Périmètre arrêté le 24/08
+
+Le budget réel a été tranché : **1, 2, 3, 4, 5, 6, la boucle de réévaluation de
+8, et 12.** Le reste est annoncé comme non fait.
+
+| Décision | Motif |
+|---|---|
+| **7 sacrifiée en entier** | Le scoring pondéré est ce sur quoi le module générique doit briller ; le refaire ici en dur coûte cher pour une démonstration que la comparaison n'exploitera pas. L'état `matching_financier` reste, la transition y mène, le moteur de matching non. |
+| **4 gardée avec ses trois branches** | C'est précisément ce que le benchmark mesure. Ne pas la replier sur un questionnaire unique. |
+| **Le quatrième type de besoin sera ajouté et chronométré**, pas estimé en commentaire | Un coût réel face à zéro dans le module générique vaut mieux qu'une estimation. Cela remplace la consigne « note en commentaire ce que ça coûterait » de l'Extension 4. |
+| **8 réduite à sa boucle** | La boucle accompagnement → réévaluation → matching est ce qui distingue le processus d'une séquence linéaire. Le sous-processus complet (missions, jalons, livrables, évaluation) ne l'est pas. |
+| **12 non sacrifiable** | C'est elle qui fait de ce module la moitié d'une expérience plutôt qu'un second module métier. |
+| **9, 10, 11 hors périmètre** | Conformément à l'ordre de sacrifice ci-dessus. |
+
+⚠️ La zone paramétrable de l'Extension 8 — `compensation.type`, la contrepartie
+que le document interdit de coder en dur — **reste dans le périmètre et ira telle
+quelle dans le document de comparaison**. C'est le seul endroit où la
+spécification impose du paramétrable dans le module texto ; le taire rendrait la
+comparaison moins honnête.
 
 ---
 

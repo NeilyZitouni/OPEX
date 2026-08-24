@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Catégorie et privilège propres au module : `opex_crowdfunding` ne
+        dépend d'aucun autre module OPEX et doit pouvoir s'installer seul.
+    -->
+    <record id="module_category_opex_crowdfunding" model="ir.module.category">
+        <field name="name">GIC OPEX Group — Smart Crowdfunding</field>
+        <field name="sequence">25</field>
+    </record>
+
+    <record id="privilege_opex_crowdfunding" model="res.groups.privilege">
+        <field name="name">Smart Crowdfunding</field>
+        <field name="sequence">10</field>
+        <field name="category_id" ref="module_category_opex_crowdfunding"/>
+    </record>
+
+    <!--
+        Les quatre acteurs de la section 2 du document. Le porteur, lui,
+        n'a pas de groupe dédié : il est `base.group_portal` et n'accède
+        qu'à ses propres dossiers (Extension 2).
+    -->
+
+    <record id="group_ceo" model="res.groups">
+        <field name="name">Comité CEO</field>
+        <field name="privilege_id" ref="privilege_opex_crowdfunding"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Orchestrateur du processus : qualification, décision, mandat des experts, autorisation du matching financier.</field>
+    </record>
+
+    <record id="group_quality_control" model="res.groups">
+        <field name="name">Contrôle Qualité</field>
+        <field name="privilege_id" ref="privilege_opex_crowdfunding"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Quality Gate opérationnel : complétude, cohérence, conformité aux critères, anomalies. Rôle destiné à être tenu un jour par un agent IA sous supervision CEO.</field>
+    </record>
+
+    <!--
+        Expert et Acteur financier n'impliquent volontairement pas
+        `base.group_user` : ces deux rôles s'exercent depuis le portail dans
+        le document (section 16), et un groupe qui impliquerait
+        `base.group_user` transformerait chaque investisseur en utilisateur
+        interne. Le groupe se pose donc aussi bien sur un utilisateur portail
+        que sur un utilisateur interne.
+    -->
+    <record id="group_expert" model="res.groups">
+        <field name="name">Expert</field>
+        <field name="privilege_id" ref="privilege_opex_crowdfunding"/>
+        <field name="comment">Mandaté par le CEO pour diagnostic, expertise, due diligence, maturation ou coaching, dans le périmètre de sa mission.</field>
+    </record>
+
+    <record id="group_financial_actor" model="res.groups">
+        <field name="name">Acteur financier</field>
+        <field name="privilege_id" ref="privilege_opex_crowdfunding"/>
+        <field name="comment">Investisseur, fonds, organisme public, banque, sponsor ou partenaire stratégique. Son accès à un dossier dépend de l'autorisation de partage, jamais de son seul statut.</field>
+    </record>
+
+</odoo>
