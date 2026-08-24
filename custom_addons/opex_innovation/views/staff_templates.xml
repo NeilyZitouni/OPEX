@@ -1,0 +1,236 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ══════════ Section 13 — La file de contrôle ══════════ -->
+
+    <template id="staff_projects" name="Staff : projets à traiter">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Projets à traiter</h3>
+
+                <div class="alert alert-light" role="status">
+                    Cette liste ne montre que ce qui attend une action de votre
+                    part. Elle suit votre rôle, pas la totalité des dossiers.
+                </div>
+
+                <table t-if="projects" class="table">
+                    <thead>
+                        <tr>
+                            <th>Projet</th>
+                            <th>Porteur</th>
+                            <th>Secteur</th>
+                            <th>Étape</th>
+                            <th>Déposé le</th>
+                            <th/>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="projects" t-as="project">
+                            <tr>
+                                <td t-esc="project.name"/>
+                                <td t-esc="project.partner_id.display_name"/>
+                                <td t-esc="dict(project._fields['secteur'].selection).get(project.secteur, '')"/>
+                                <!-- Côté personnel, le nom système : le
+                                     back-office peut être aussi détaillé
+                                     qu'on veut (section 35). -->
+                                <td t-esc="project.workflow_stage_id.name"/>
+                                <td t-esc="project.create_date"/>
+                                <td>
+                                    <a t-att-href="'/staff/innovation/%s' % project.id"
+                                       class="btn btn-sm btn-primary">Contrôler</a>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+
+                <div t-if="not projects" class="alert alert-success" role="status">
+                    Aucun dossier n'attend votre intervention.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Section 13 — Le dossier vu par le contrôleur ══════════ -->
+
+    <template id="staff_project_detail" name="Staff : contrôle d'un projet">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h3 t-esc="project.name"/>
+                        <p class="text-muted mb-0"
+                           t-esc="project.workflow_stage_id.name"/>
+                    </div>
+                    <a class="btn btn-secondary" href="/staff/innovation">Retour</a>
+                    <a class="btn btn-primary"
+                       t-att-href="'/staff/innovation/%s/matching' % project.id">
+                        Candidats proposés
+                    </a>
+                </div>
+
+                <div t-if="error" class="alert alert-danger mt-3" role="alert"
+                     t-esc="error"/>
+
+                <!-- ═══ Section 14 — Fiche de qualification ═══
+                     Une vue, pas un modèle : la section 14 décrit un écran,
+                     pas une entité. Un modèle stocké divergerait du projet à
+                     la première modification. -->
+                <h5 class="mt-4">Fiche de qualification</h5>
+                <table class="table table-sm">
+                    <t t-foreach="summary" t-as="line">
+                        <tr>
+                            <th t-esc="line[0]" style="width: 30%"/>
+                            <td t-esc="line[1]"/>
+                        </tr>
+                    </t>
+                </table>
+
+                <!-- ═══ Le porteur ═══ -->
+                <h5 class="mt-4">Porteur</h5>
+                <table class="table table-sm">
+                    <tr><th style="width: 30%">Porteur</th>
+                        <td t-esc="project.partner_id.display_name"/></tr>
+                    <tr><th>Organisation</th>
+                        <td t-esc="project.organisation_id.display_name or '—'"/></tr>
+                    <tr><th>Email</th><td t-esc="project.email or '—'"/></tr>
+                    <tr><th>Téléphone</th><td t-esc="project.telephone or '—'"/></tr>
+                    <tr><th>Wilaya</th><td t-esc="project.wilaya or '—'"/></tr>
+                </table>
+
+                <!-- ═══ Description ═══ -->
+                <h5 class="mt-4">Description</h5>
+                <table class="table table-sm">
+                    <tr><th style="width: 30%">Résumé</th>
+                        <td t-esc="project.resume or '—'"/></tr>
+                    <tr><th>Problème</th><td t-esc="project.probleme or '—'"/></tr>
+                    <tr><th>Solution</th><td t-esc="project.solution or '—'"/></tr>
+                    <tr><th>Marché cible</th><td t-esc="project.marche_cible or '—'"/></tr>
+                    <tr><th>Proposition de valeur</th>
+                        <td t-esc="project.proposition_valeur or '—'"/></tr>
+                </table>
+
+                <!-- ═══ Équipe ═══ -->
+                <h5 class="mt-4">Équipe</h5>
+                <table t-if="project.team_member_ids" class="table table-sm">
+                    <thead><tr><th>Nom</th><th>Fonction</th><th>Compétence</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="project.team_member_ids" t-as="member">
+                            <tr>
+                                <td t-esc="member.name"/>
+                                <td t-esc="member.fonction or ''"/>
+                                <td t-esc="member.competence or ''"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+                <p t-if="not project.team_member_ids" class="text-muted">
+                    Aucun membre d'équipe déclaré.
+                </p>
+
+                <!-- ═══ Documents ═══ -->
+                <h5 class="mt-4">Pièces jointes</h5>
+                <table t-if="project.document_ids" class="table table-sm">
+                    <thead><tr><th>Type</th><th>Libellé</th><th>Fichier</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="project.document_ids" t-as="document">
+                            <tr>
+                                <td t-esc="dict(document._fields['document_type'].selection).get(document.document_type, '')"/>
+                                <td t-esc="document.name"/>
+                                <td t-esc="document.filename or document.url or '—'"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+                <p t-if="not project.document_ids" class="text-danger">
+                    Aucune pièce jointe — le dossier est probablement incomplet.
+                </p>
+
+                <!-- ═══ Besoins et financement ═══ -->
+                <h5 class="mt-4">Besoins et financement</h5>
+                <table class="table table-sm">
+                    <tr><th style="width: 30%">Compétences recherchées</th>
+                        <td t-esc="', '.join(project.besoin_competence_ids.mapped('name')) or '—'"/></tr>
+                    <tr><th>Accompagnement souhaité</th>
+                        <td t-esc="', '.join(project.besoin_accompagnement_ids.mapped('name')) or '—'"/></tr>
+                    <tr><th>Besoin de financement</th>
+                        <td><t t-esc="'Oui' if project.besoin_financement else 'Non'"/></td></tr>
+                    <tr t-if="project.besoin_financement">
+                        <th>Montant recherché</th>
+                        <td t-esc="project.montant_recherche"/></tr>
+                    <tr t-if="project.besoin_financement">
+                        <th>Utilisation prévue</th>
+                        <td t-esc="project.utilisation_prevue or '—'"/></tr>
+                </table>
+
+                <!-- ═══ Les deux issues du contrôle ═══
+                     Les actions proposées viennent du moteur. Cet écran ne
+                     connaît ni « conforme » ni « incomplet » : il affiche ce
+                     que la configuration autorise à cette étape, pour ce
+                     rôle. -->
+                <h5 class="mt-4">Décision</h5>
+                <div t-if="not options" class="alert alert-light" role="status">
+                    Aucune action ne vous est ouverte à cette étape.
+                </div>
+                <t t-foreach="options" t-as="option">
+                    <form method="post"
+                          t-att-action="'/staff/innovation/%s/transition' % project.id"
+                          class="border rounded p-3 mb-2">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="transition_id"
+                               t-att-value="option['transition'].id"/>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong t-esc="option['transition'].name"/>
+                            <button type="submit" class="btn btn-sm btn-primary"
+                                    t-att-disabled="'disabled' if not option['available'] else None">
+                                Confirmer
+                            </button>
+                        </div>
+
+                        <!--
+                            Une transition bloquée reste **visible**, avec son
+                            motif : la faire disparaître laisserait le
+                            contrôleur sans savoir ce qui manque.
+                        -->
+                        <div t-if="not option['available']"
+                             class="alert alert-warning mt-2 mb-0" role="alert"
+                             t-esc="option['reason']"/>
+
+                        <!--
+                            Motif obligatoire quand la configuration l'exige.
+                            Le `required` est un confort d'écran ; c'est
+                            `do_transition()` qui refuse réellement.
+                        -->
+                        <div t-if="option['transition'].requires_comment" class="mt-2">
+                            <label class="form-label">
+                                Motif <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" rows="2" name="comment"
+                                      required="required"
+                                      placeholder="Ex. : merci d'ajouter le business plan détaillé."/>
+                        </div>
+                    </form>
+                </t>
+
+                <!-- ═══ Historique ═══ -->
+                <h5 class="mt-4">Historique</h5>
+                <table class="table table-sm">
+                    <thead><tr><th>Date</th><th>Auteur</th><th>Étape</th><th>Commentaire</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="instance.history_ids.sorted('date')" t-as="entry">
+                            <tr>
+                                <td t-esc="entry.date"/>
+                                <td t-esc="entry.user_id.name"/>
+                                <td t-esc="entry.to_stage_id.name"/>
+                                <td t-esc="entry.comment or ''"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+    </template>
+
+</odoo>

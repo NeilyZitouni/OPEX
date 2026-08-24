@@ -1,4 +1,5 @@
 import logging
+from datetime import timedelta
 
 from odoo import _, api, fields, models
 from odoo.exceptions import UserError
@@ -71,6 +72,55 @@ class WorkflowInstance(models.Model):
         string="Démarrée le", default=fields.Datetime.now, readonly=True)
     date_end = fields.Datetime(string="Terminée le", readonly=True)
 
+    # ------------------------------------------------------------
+    # Sous-workflows (Extension 8)
+    # ------------------------------------------------------------
+    parent_instance_id = fields.Many2one(
+        'opex.workflow.instance',
+        string="Dossier parent",
+        ondelete='set null',
+        index=True,
+        readonly=True,
+        help="Renseigné quand cette instance a été démarrée comme "
+             "sous-workflow. Sans ce lien, un enregistrement portant plusieurs "
+             "sous-processus ne dirait pas lequel a déclenché lequel.",
+    )
+    child_instance_ids = fields.One2many(
+        'opex.workflow.instance', 'parent_instance_id',
+        string="Sous-workflows")
+
+    # ------------------------------------------------------------
+    # SLA (Extension 8)
+    # ------------------------------------------------------------
+    date_stage_start = fields.Datetime(
+        string="Sur cette étape depuis",
+        default=fields.Datetime.now,
+        readonly=True,
+        help="Horodatage de l'entrée dans l'étape courante. Stocké plutôt que "
+             "déduit de l'historique : le calcul des retards s'exécute sur "
+             "toute la base, il doit tenir dans une requête.",
+    )
+    sla_deadline = fields.Datetime(
+        string="Échéance",
+        compute='_compute_sla_deadline',
+        store=True,
+        help="Date au-delà de laquelle le dossier est en retard sur son étape.",
+    )
+    # Écrit par le cron, pas calculé : « en retard » dépend de l'heure qu'il
+    # est. Un champ calculé stocké se figerait au dernier recalcul et un champ
+    # calculé non stocké ne serait pas filtrable. C'est le cron qui fait foi,
+    # comme le demande la spécification.
+    is_late = fields.Boolean(string="En retard", readonly=True, index=True)
+    sla_notified_stage_id = fields.Many2one(
+        'opex.workflow.stage',
+        string="Retard déjà signalé pour",
+        readonly=True,
+        ondelete='set null',
+        help="Étape pour laquelle l'alerte a déjà été envoyée. Évite de "
+             "renotifier à chaque passage du cron : une alerte répétée toutes "
+             "les heures cesse d'être lue.",
+    )
+
     actor_ids = fields.One2many(
         'opex.workflow.instance.actor', 'instance_id', string="Acteurs")
     # ⚠ One2many **filtré**, et c'est indispensable, pas cosmétique.
@@ -91,6 +141,15 @@ class WorkflowInstance(models.Model):
     )
     history_ids = fields.One2many(
         'opex.workflow.history', 'instance_id', string="Historique")
+
+    @api.depends('date_stage_start', 'current_stage_id.sla_days', 'state')
+    def _compute_sla_deadline(self):
+        for instance in self:
+            days = instance.current_stage_id.sla_days
+            if instance.state == 'running' and days and instance.date_stage_start:
+                instance.sla_deadline = instance.date_stage_start + timedelta(days=days)
+            else:
+                instance.sla_deadline = False
 
     @api.model
     def _selection_resource_model(self):
@@ -225,7 +284,30 @@ class WorkflowInstance(models.Model):
             'stage': self.current_stage_id,
             'has_document': self._has_document,
             'field': self._field,
+            'subworkflow_done': self._subworkflow_done,
         }
+
+    def _subworkflow_done(self, definition_code):
+        """`subworkflow_done('accompagnement')` — ce sous-processus est-il fini ?
+
+        Cherche sur le **même enregistrement métier**, pas seulement parmi les
+        enfants directs : un sous-workflow lancé par une autre branche du
+        processus compte tout autant. C'est ce qui rend un même sous-processus
+        réutilisable d'un workflow à l'autre — l'accompagnement se déroule une
+        fois, et les deux processus qui l'attendent le voient terminé.
+
+        Tolérant : un code inconnu renvoie False plutôt que de lever, comme
+        tous les helpers de condition.
+        """
+        self.ensure_one()
+        if not self.res_model or not self.res_id:
+            return False
+        return bool(self.sudo().search_count([
+            ('res_model', '=', self.res_model),
+            ('res_id', '=', self.res_id),
+            ('definition_id.code', '=', definition_code),
+            ('state', '=', 'done'),
+        ]))
 
     def _evaluate_expression(self, expression):
         """Évalue une expression et renvoie sa **valeur brute**.
@@ -512,6 +594,11 @@ class WorkflowInstance(models.Model):
         pourquoi — et sans savoir ce qu'il doit faire pour la débloquer.
         """
         self.ensure_one()
+        # Résolu ici plutôt que laissé à None : voir la note de
+        # `next_action_label()` sur la détection de langue par `_()`. Toute
+        # méthode portant un local nommé `user` doit lui donner une vraie
+        # valeur avant d'appeler quoi que ce soit de traduit.
+        user = user or self.env.user
         if self.state != 'running' or not self.current_stage_id:
             return self.env['opex.workflow.transition'].browse()
         # `sudo()` sur la **configuration** : étapes, transitions et règles sont
@@ -533,6 +620,7 @@ class WorkflowInstance(models.Model):
         garde le type qu'annonce son nom — un recordset de transitions.
         """
         self.ensure_one()
+        user = user or self.env.user
         options = []
         for transition in self.available_transitions(user=user):
             ok, blocking, _notes = self._evaluate_conditions(transition)
@@ -593,7 +681,16 @@ class WorkflowInstance(models.Model):
             and not (transition.allowed_role_ids & self._user_roles(self.env.user))
         )
 
-        self.sudo().current_stage_id = target.id
+        # `date_stage_start` repart à chaque étape : le SLA se compte depuis
+        # l'entrée dans l'étape courante, pas depuis l'ouverture du dossier.
+        # `sla_notified_stage_id` est effacé pour que la nouvelle étape puisse
+        # alerter à son tour.
+        self.sudo().write({
+            'current_stage_id': target.id,
+            'date_stage_start': fields.Datetime.now(),
+            'is_late': False,
+            'sla_notified_stage_id': False,
+        })
 
         self.env['opex.workflow.history'].sudo().create({
             'instance_id': self.id,
@@ -659,10 +756,19 @@ class WorkflowInstance(models.Model):
                 notes.append("✗ %s — %s" % (action.name, error))
 
         if failures:
+            # `sudo()` sur la **lecture** aussi, pas seulement sur l'écriture.
+            #
+            # Un utilisateur peut légitimement franchir une transition sans
+            # avoir le droit de *lire* l'instance : il tient son rôle d'un
+            # groupe, alors que les `ir.rule` accordent la lecture par ligne
+            # d'acteur. Lire `current_stage_id` sous son identité pour
+            # journaliser un échec d'action lève alors une AccessError — et
+            # fait échouer une transition qui, elle, avait parfaitement abouti.
+            instance = self.sudo()
             self.env['opex.workflow.history'].sudo().create({
-                'instance_id': self.id,
-                'from_stage_id': self.current_stage_id.id or False,
-                'to_stage_id': self.current_stage_id.id or False,
+                'instance_id': instance.id,
+                'from_stage_id': instance.current_stage_id.id or False,
+                'to_stage_id': instance.current_stage_id.id or False,
                 'transition_id': transition.id,
                 'user_id': self.env.user.id,
                 'comment': _(
@@ -672,6 +778,340 @@ class WorkflowInstance(models.Model):
                 'conditions_note': "\n".join(notes),
             })
         return failures, "\n".join(notes)
+
+    # ------------------------------------------------------------
+    # Sous-workflows
+    # ------------------------------------------------------------
+
+    def start_subworkflow(self, definition_code):
+        """Démarre un second processus sur le **même** enregistrement métier.
+
+        C'est ce qui rend un sous-processus réutilisable : l'accompagnement se
+        décrit une fois et se déclenche depuis n'importe quel workflow, sans
+        être recopié dans chacun.
+
+        Le sous-workflow est une instance à part entière — son propre
+        historique, ses propres acteurs, sa propre étape courante. Il ne touche
+        pas à l'instance parente : celle-ci n'avance que par ses propres
+        transitions, et attend le cas échéant via `subworkflow_done()`.
+        """
+        self.ensure_one()
+        record = self._get_record()
+        if not record:
+            raise UserError(_(
+                "L'enregistrement piloté n'existe plus : impossible d'y "
+                "démarrer un sous-workflow."))
+
+        existing = self.sudo().search([
+            ('res_model', '=', self.res_model),
+            ('res_id', '=', self.res_id),
+            ('definition_id.code', '=', definition_code),
+            ('state', '=', 'running'),
+        ], limit=1)
+        if existing:
+            raise UserError(_(
+                "Un sous-workflow « %s » est déjà en cours sur ce dossier."
+            ) % definition_code)
+
+        child = self._start_for(record, definition_code)
+        child.sudo().parent_instance_id = self.id
+        return child
+
+    # ------------------------------------------------------------
+    # SLA et relances
+    # ------------------------------------------------------------
+
+    def _partners_for_roles(self, roles):
+        """Destinataires portant l'un de ces rôles sur ce dossier.
+
+        Un seul endroit pour cette résolution : les actions de notification et
+        les relances de SLA s'en servent toutes les deux, et deux versions
+        divergeraient au premier ajustement.
+        """
+        self.ensure_one()
+        if not roles:
+            return self.env['res.partner'].browse()
+        partners = self.sudo().actor_ids.filtered(
+            lambda a: a.role_id in roles and a.access_level != 'none'
+        ).user_id.partner_id
+        groups = roles.sudo().group_id
+        if groups:
+            partners |= groups.sudo().all_user_ids.partner_id
+        return partners
+
+    def _notify_sla_breach(self):
+        """Prévient le rôle attendu qu'un dossier traîne sur son étape.
+
+        `mail.mt_note` : c'est une relance interne, destinée à celui qui doit
+        agir. Le porteur n'a pas à recevoir un email parce que le secrétariat
+        est en retard.
+        """
+        self.ensure_one()
+        record = self._get_record()
+        if not record or not hasattr(record, 'message_post'):
+            return False
+        partners = self._partners_for_roles(self.current_stage_id.actor_role_ids)
+        record.sudo().message_post(
+            body=_(
+                "Ce dossier est à l'étape « %(stage)s » depuis plus de "
+                "%(days)s jour(s) et dépasse le délai attendu."
+            ) % {
+                'stage': self.current_stage_id.name,
+                'days': self.current_stage_id.sla_days,
+            },
+            partner_ids=partners.ids,
+            subtype_xmlid='mail.mt_note',
+        )
+        return True
+
+    @api.model
+    def _cron_check_sla(self):
+        """Marque les dossiers en retard et relance le rôle attendu.
+
+        Deux écritures distinctes, et c'est délibéré : `is_late` marque **tous**
+        les dossiers dépassés à chaque passage, alors que la notification ne
+        part qu'une fois par étape. Un compteur « 3 accompagnements en retard »
+        doit rester exact en permanence ; une alerte répétée toutes les heures,
+        elle, cesse d'être lue.
+        """
+        now = fields.Datetime.now()
+        late = self.sudo().search([
+            ('state', '=', 'running'),
+            ('sla_deadline', '!=', False),
+            ('sla_deadline', '<', now),
+        ])
+        on_time = self.sudo().search([
+            ('state', '=', 'running'),
+            ('is_late', '=', True),
+            '|', ('sla_deadline', '=', False), ('sla_deadline', '>=', now),
+        ])
+
+        on_time.write({'is_late': False})
+        if late:
+            late.write({'is_late': True})
+
+        notified = 0
+        for instance in late:
+            if instance.sla_notified_stage_id == instance.current_stage_id:
+                continue
+            try:
+                with self.env.cr.savepoint():
+                    instance._notify_sla_breach()
+                instance.sla_notified_stage_id = instance.current_stage_id.id
+                notified += 1
+            except Exception:  # noqa: BLE001 — une relance ratée n'arrête pas le cron
+                self.env.invalidate_all()
+                _logger.exception(
+                    "opex_workflow: relance SLA impossible sur l'instance %s",
+                    instance.id)
+
+        _logger.info(
+            "opex_workflow: SLA — %s dossier(s) en retard, %s relance(s) envoyée(s)",
+            len(late), notified)
+        return True
+
+    # ------------------------------------------------------------
+    # Progression, pour le portail générique
+    # ------------------------------------------------------------
+
+    def progress_steps(self):
+        """La progression telle que l'utilisateur final doit la lire.
+
+        Renvoie une entrée par étape, avec son **libellé utilisateur** et son
+        état : franchie, en cours, à venir. Jamais de code technique — le
+        workflow système peut être complexe, ce que l'utilisateur lit ne doit
+        pas l'être.
+
+        « Franchie » se lit dans l'historique et non dans la séquence : le
+        processus est un graphe, pas une file. Un dossier passé par la boucle
+        de remédiation a franchi des étapes qu'un autre n'aura jamais vues, et
+        déduire l'avancement d'un numéro d'ordre mentirait sur les deux.
+        """
+        self.ensure_one()
+        visited = set(self.sudo().history_ids.mapped('to_stage_id').ids)
+        steps = []
+        for stage in self.definition_id.sudo().stage_ids.sorted('sequence'):
+            if stage == self.current_stage_id:
+                state = 'current'
+            elif stage.id in visited:
+                state = 'done'
+            else:
+                state = 'upcoming'
+            steps.append({
+                'stage': stage,
+                'label': stage.user_label or stage.name,
+                'state': state,
+            })
+        return steps
+
+    def next_action_label(self, user=None):
+        """Ce que l'utilisateur doit faire ensuite, en une phrase.
+
+        Le principe des documents sources : « ne pas demander à l'utilisateur
+        de piloter le workflow, le workflow doit guider l'utilisateur ». On lui
+        dit donc ce qu'on attend de lui, pas dans quel état est la machine.
+        """
+        self.ensure_one()
+        # ⚠ Résolu immédiatement, et ce n'est pas de la coquetterie.
+        #
+        # `_()` devine la langue en inspectant les **variables locales de
+        # l'appelant** : `odoo/tools/translate.py` y cherche un nom `user` et
+        # fait `int()` dessus. Un paramètre `user=None` laissé tel quel fait
+        # donc planter la traduction — `TypeError: int() argument must be ...
+        # not 'NoneType'` — dans une méthode qui n'a rien à voir avec les
+        # langues. Le piège vaut pour toute méthode ayant un local `user` et
+        # appelant `_()`.
+        user = user or self.env.user
+
+        if self.state == 'done':
+            return _("Ce dossier est clôturé.")
+        if self.state == 'cancelled':
+            return _("Ce dossier a été annulé.")
+
+        options = self.transition_options(user=user)
+        available = [option for option in options if option['available']]
+        if available:
+            return _("Votre prochaine action : %s") % ", ".join(
+                option['transition'].name for option in available)
+        if options:
+            return _("En attente : %s") % options[0]['reason']
+        return _(
+            "Votre dossier est en cours de traitement. Aucune action ne vous "
+            "est demandée pour le moment.")
+
+    # ------------------------------------------------------------
+    # Smart Matching — scoring pondéré explicable
+    # ------------------------------------------------------------
+
+    def _score_candidate(self, partner, criteria):
+        """Score d'un candidat sur ce dossier. Renvoie (score, explication).
+
+        Somme des poids satisfaits rapportée à la somme des poids
+        **applicables**, en pourcentage. Un critère qu'on n'a pas pu évaluer —
+        expression fautive, champ absent — est retiré des deux sommes plutôt
+        que compté comme un échec : le pénaliser ferait chuter tous les
+        candidats de la même façon et rendrait le classement dépendant d'une
+        faute de configuration.
+
+        L'explication est construite ligne à ligne en même temps que le calcul.
+        Elle n'est pas un commentaire ajouté après coup : c'est la trace de ce
+        qui a effectivement été comparé.
+        """
+        self.ensure_one()
+        lines = []
+        earned = 0.0
+        applicable = 0.0
+
+        for criterion in criteria:
+            try:
+                source_value = self._evaluate_expression(criterion.source_expression)
+            except Exception as error:  # noqa: BLE001 — critère neutralisé
+                _logger.warning(
+                    "opex_workflow: critère « %s » illisible sur l'instance %s : %s",
+                    criterion.name, self.id, error)
+                lines.append("· %s — non évalué (%s)" % (criterion.name, error))
+                continue
+
+            target_value = False
+            if criterion.target_field in partner._fields:
+                target_value = partner.sudo()[criterion.target_field]
+            elif criterion.target_field:
+                lines.append("· %s — le champ « %s » n'existe pas sur le candidat"
+                             % (criterion.name, criterion.target_field))
+                continue
+
+            ok, detail = criterion._compare(source_value, target_value)
+            applicable += criterion.weight
+            if ok:
+                earned += criterion.weight
+                lines.append("✓ %s (poids %g) — %s" % (
+                    criterion.name, criterion.weight, detail))
+            else:
+                lines.append("✗ %s (poids %g) — %s" % (
+                    criterion.name, criterion.weight, detail))
+
+        score = (earned / applicable * 100.0) if applicable else 0.0
+        header = _("Score %(score).0f %% — %(earned)g point(s) sur %(total)g") % {
+            'score': score, 'earned': earned, 'total': applicable,
+        }
+        return score, "\n".join([header, ""] + lines)
+
+    def run_matching(self, candidate_type='expert', partners=None, limit=10,
+                     min_score=0.0):
+        """Propose des candidats scorés sur ce dossier.
+
+        ⚠ **Ne déclenche aucune transition et n'écrit rien sur l'objet
+        métier.** Elle produit une liste de propositions, rien de plus. C'est
+        écrit dans les deux documents sources : l'IA recommande, elle ne décide
+        pas. Le responsable Valide / Modifie / Exclut / Ajoute ensuite, et
+        déclenche lui-même la suite du processus s'il y a lieu.
+
+        Les candidats déjà décidés (retenus, écartés, exclus) ne sont pas
+        recalculés : relancer le matching ne doit pas effacer un arbitrage
+        humain.
+        """
+        self.ensure_one()
+        Candidate = self.env['opex.matching.candidate'].sudo()
+        criteria = self.env['opex.matching.criteria'].sudo().search([
+            ('definition_id', '=', self.definition_id.id),
+            ('active', '=', True),
+        ])
+        if not criteria:
+            raise UserError(_(
+                "Aucun critère de matching n'est configuré sur le workflow "
+                "« %s »."
+            ) % self.definition_id.name)
+
+        if partners is None:
+            partners = self.env['res.partner'].sudo().search(
+                [('is_company', '=', False)])
+
+        decided = Candidate.search([
+            ('instance_id', '=', self.id),
+            ('candidate_type', '=', candidate_type),
+            ('state', '!=', 'proposed'),
+        ])
+        untouchable = set(decided.mapped('partner_id').ids)
+
+        # Les propositions non arbitrées sont remplacées : le dossier a pu
+        # évoluer depuis, et laisser d'anciens scores à côté des nouveaux
+        # rendrait la liste illisible.
+        Candidate.search([
+            ('instance_id', '=', self.id),
+            ('candidate_type', '=', candidate_type),
+            ('state', '=', 'proposed'),
+        ]).unlink()
+
+        scored = []
+        for partner in partners:
+            if partner.id in untouchable:
+                continue
+            score, detail = self._score_candidate(partner, criteria)
+            if score >= min_score:
+                scored.append((score, detail, partner))
+
+        scored.sort(key=lambda item: item[0], reverse=True)
+        created = Candidate.browse()
+        for score, detail, partner in scored[:limit]:
+            created |= Candidate.create({
+                'instance_id': self.id,
+                'partner_id': partner.id,
+                'candidate_type': candidate_type,
+                'score': score,
+                'detail': detail,
+            })
+        return created
+
+    def action_view_candidates(self):
+        self.ensure_one()
+        return {
+            'type': 'ir.actions.act_window',
+            'name': _("Candidats proposés"),
+            'res_model': 'opex.matching.candidate',
+            'view_mode': 'list,form',
+            'domain': [('instance_id', '=', self.id)],
+            'context': {'default_instance_id': self.id},
+        }
 
     def action_open_transition_wizard(self):
         """Ouvre le wizard des transitions possibles sur ce dossier.

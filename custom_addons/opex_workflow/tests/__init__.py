@@ -5,3 +5,5 @@ from . import test_wizard
 from . import test_actions
 from . import test_access
 from . import test_forms
+from . import test_matching
+from . import test_transverse

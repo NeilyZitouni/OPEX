@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_expert_profile_form" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.form</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <field name="arch" type="xml">
+            <form string="Profil Expert">
+                <header>
+                    <!--
+                        Le bloc générique du moteur : un bouton « Action » qui
+                        ouvre le wizard, et un statusbar sur l'étape courante.
+                        Aucun bouton métier ici — les actions possibles
+                        dépendent de la configuration, pas de cette vue.
+                    -->
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="partner_id" readonly="1"/></h1>
+                        <h3><field name="workflow_stage_label" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Expertise">
+                            <field name="domaine_expertise"/>
+                            <field name="fonction"/>
+                            <field name="annees_experience"/>
+                            <field name="competence_ids" widget="many2many_tags"/>
+                        </group>
+                        <group string="Suivi">
+                            <field name="profile_activated" readonly="1"/>
+                            <field name="motif_complement" readonly="1"
+                                   invisible="not motif_complement"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Parcours" name="parcours">
+                            <group>
+                                <field name="specialites"/>
+                                <field name="experiences_pro"/>
+                                <field name="projets_realises"/>
+                                <field name="experiences_conseil"/>
+                                <field name="experience_mentoring"/>
+                                <field name="description_expertise"/>
+                            </group>
+                        </page>
+                        <page string="Justificatifs" name="documents">
+                            <field name="document_ids">
+                                <list editable="bottom">
+                                    <field name="document_type"/>
+                                    <field name="name"/>
+                                    <field name="file" filename="filename"/>
+                                    <field name="filename" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_expert_profile_list" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.list</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <field name="arch" type="xml">
+            <list string="Profils Expert">
+                <field name="partner_id"/>
+                <field name="domaine_expertise"/>
+                <field name="annees_experience"/>
+                <field name="workflow_stage_id"/>
+                <field name="profile_activated" widget="boolean_toggle"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_expert_profile_search" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.search</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <field name="arch" type="xml">
+            <search string="Profils Expert">
+                <field name="partner_id"/>
+                <field name="domaine_expertise"/>
+                <separator/>
+                <filter name="filter_active" string="Profils actifs"
+                        domain="[('profile_activated', '=', True)]"/>
+                <filter name="filter_pending" string="Demandes en cours"
+                        domain="[('workflow_state', '=', 'running')]"/>
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_expert_profile" model="ir.actions.act_window">
+        <field name="name">Profils Expert</field>
+        <field name="res_model">opex.innovation.expert.profile</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_pending': 1}</field>
+    </record>
+
+    <record id="action_innovation_competence" model="ir.actions.act_window">
+        <field name="name">Compétences</field>
+        <field name="res_model">opex.innovation.competence</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

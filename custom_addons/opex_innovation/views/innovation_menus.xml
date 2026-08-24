@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <menuitem id="menu_innovation_root"
+              name="OPEX Innovation"
+              sequence="19"
+              groups="group_innovation_manager,opex_membership.group_secretariat"/>
+
+    <menuitem id="menu_innovation_project"
+              name="Projets"
+              parent="menu_innovation_root"
+              action="action_innovation_project"
+              sequence="5"/>
+
+    <menuitem id="menu_innovation_profiles"
+              name="Profils"
+              parent="menu_innovation_root"
+              sequence="10"/>
+
+    <menuitem id="menu_expert_profile"
+              name="Profils Expert"
+              parent="menu_innovation_profiles"
+              action="action_expert_profile"
+              sequence="10"/>
+
+    <menuitem id="menu_investor_profile"
+              name="Profils Investisseur"
+              parent="menu_innovation_profiles"
+              action="action_investor_profile"
+              sequence="20"/>
+
+    <menuitem id="menu_evaluation"
+              name="Évaluations"
+              parent="menu_innovation_root"
+              action="action_evaluation"
+              sequence="7"/>
+
+    <menuitem id="menu_innovation_configuration"
+              name="Configuration"
+              parent="menu_innovation_root"
+              sequence="90"
+              groups="group_innovation_manager"/>
+
+    <menuitem id="menu_remediation"
+              name="Remédiations"
+              parent="menu_innovation_root"
+              action="action_remediation"
+              sequence="8"/>
+
+    <menuitem id="menu_remediation_point"
+              name="Points de remédiation"
+              parent="menu_innovation_configuration"
+              action="action_remediation_point"
+              sequence="20"/>
+
+    <menuitem id="menu_innovation_competence"
+              name="Compétences"
+              parent="menu_innovation_configuration"
+              action="action_innovation_competence"
+              sequence="10"/>
+
+</odoo>

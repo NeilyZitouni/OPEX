@@ -1,0 +1,774 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Section 31 — Historique / traçabilité
+        ═══════════════════════════════════════════════════════════════
+
+        Motif repris du Module 1 (`opex_membership.membership_history`) :
+        `opex.innovation.project` n'hérite pas de `portal.mixin`, donc le
+        chatter natif ne s'affiche pas au portail. Un bloc QWeb en lecture
+        seule le remplace.
+
+        ⚠ Le gabarit itère sur des **dictionnaires** produits par
+        `project.history_entries()`. C'est le modèle qui décide ce que chaque
+        public a le droit de lire, pas la page. Passer `instance.history_ids`
+        donnerait accès à l'instance, à ses acteurs, et de fil en aiguille au
+        dossier entier.
+
+        Rien n'est recodé ici : le journal est celui du moteur, immuable depuis
+        l'Extension 2.
+    -->
+    <template id="project_history" name="Historique du projet">
+        <div class="mt-4">
+            <h5>Historique</h5>
+            <t t-set="entries" t-value="project.history_entries()"/>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead>
+                        <tr><th style="width: 12rem;">Date / heure</th><th>Événement</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr t-foreach="entries" t-as="entry">
+                            <td class="text-nowrap text-muted">
+                                <span t-out="entry['date']"
+                                      t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                            </td>
+                            <td>
+                                <div t-out="entry['body']"/>
+                                <div t-if="entry['comment']" class="small"
+                                     t-out="entry['comment']"/>
+                                <div t-if="entry['author']" class="small text-muted">
+                                    par <t t-out="entry['author']"/>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <p t-if="not entries" class="text-muted mb-0">
+                Aucun événement enregistré pour le moment.
+            </p>
+        </div>
+    </template>
+
+    <template id="portal_my_home_project" name="Portail : mes projets"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="50">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes projets d'innovation</t>
+                <t t-set="url" t-value="'/my/innovation'"/>
+                <t t-set="text">Déposer et suivre un projet</t>
+                <t t-set="placeholder_count" t-value="'innovation_project_count'"/>
+                <!--
+                    ⚠ `config_card` : sans lui, `portal.portal_docs_entry`
+                    ajoute `d-none` à la tuile et celle-ci n'apparaît **jamais**
+                    tant que le compteur est nul.
+
+                    Or un porteur qui n'a encore déposé aucun projet a
+                    précisément zéro projet — la tuile disparaîtrait exactement
+                    pour celui qui en a le plus besoin, et il n'aurait aucun
+                    chemin vers « Déposer un nouveau projet ». Le compteur reste
+                    déclaré pour afficher le nombre quand il y en a un ;
+                    `config_card` garantit que l'entrée existe toujours.
+
+                    Piège déjà payé sur le Module 1, et retrouvé intact ici.
+                -->
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- ══════════ Fil des étapes, partagé par les six écrans ══════════ -->
+
+    <template id="portal_project_steps" name="Étapes du dépôt">
+        <ul class="nav nav-pills mb-4 flex-wrap">
+            <t t-foreach="steps" t-as="s">
+                <li class="nav-item">
+                    <span t-att-class="
+                        'nav-link active' if s_index == step_index
+                        else ('nav-link text-success' if s_index &lt; step_index
+                              else 'nav-link text-muted')">
+                        <t t-esc="s[1]"/>
+                    </span>
+                </li>
+            </t>
+        </ul>
+    </template>
+
+    <!-- ══════════ Section 4 — Mes projets ══════════ -->
+
+    <template id="portal_my_projects" name="Mes projets">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="mb-0">Mes projets</h3>
+                    <a class="btn btn-primary" href="/my/innovation/new">
+                        + Déposer un nouveau projet
+                    </a>
+                </div>
+
+                <!--
+                    Message de reprise. Sans lui, un porteur revenu deux jours
+                    plus tard recommencerait une saisie qu'il a déjà faite.
+                -->
+                <div t-if="draft" class="alert alert-info" role="status">
+                    Vous avez un projet en cours de saisie :
+                    <strong t-esc="draft.name or 'sans titre'"/>.
+                    <a t-att-href="'/my/innovation/%s/marche' % draft.id">
+                        Reprendre là où vous en étiez
+                    </a>
+                </div>
+
+                <!--
+                    ═══════════ Section 35 — le tableau de bord du porteur ═══════════
+
+                    Le tableau d'origine listait « État : Évaluation en cours »
+                    dans une colonne. C'était déjà le libellé utilisateur et
+                    non le code — mais un tableau à cinq colonnes n'est pas ce
+                    que la section 35 décrit. Elle décrit une **carte**, et une
+                    carte qui répond à la seule question que le porteur se pose :
+                    où en est mon projet, et qu'attend-on de moi ?
+                -->
+                <div t-if="dashboard and dashboard['total']" class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body py-3">
+                                <div class="fs-3" t-esc="dashboard['total']"/>
+                                <div class="text-muted small">Projet(s) déposé(s)</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card text-center">
+                            <div class="card-body py-3">
+                                <div class="fs-3" t-esc="dashboard['en_cours']"/>
+                                <div class="text-muted small">En cours de traitement</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div t-attf-class="card text-center #{
+                                 'border-warning' if dashboard['action_requise'] else ''}">
+                            <div class="card-body py-3">
+                                <div class="fs-3" t-esc="dashboard['action_requise']"/>
+                                <div class="text-muted small">En attente de votre action</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <t t-foreach="cards or []" t-as="card">
+                    <t t-call="opex_innovation.portal_project_card"/>
+                </t>
+
+                <div t-if="not projects" class="alert alert-light" role="status">
+                    Vous n'avez déposé aucun projet pour le moment.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_project_not_member" name="Adhésion requise">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="alert alert-info" role="status">
+                    Votre adhésion au GIC OPEX Group doit être validée avant de
+                    pouvoir déposer un projet d'innovation.
+                </div>
+                <a class="btn btn-secondary" href="/my">Retour à mon espace</a>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Écran 1 — Informations générales ══════════ -->
+
+    <template id="portal_project_step_general" name="Dépôt : informations générales">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Déposer un projet</h3>
+                <t t-call="opex_innovation.portal_project_steps"/>
+
+                <div t-if="error" class="alert alert-danger" role="alert" t-esc="error"/>
+
+                <div class="alert alert-light" role="status">
+                    Vos informations de contact sont reprises de votre profil :
+                    vous n'avez pas à les ressaisir.
+                </div>
+
+                <form method="post" action="/my/innovation/new">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="name">Nom du projet</label>
+                        <input class="form-control" type="text" id="name" name="name"
+                               required="required" placeholder="Nom de votre projet"
+                               t-att-value="project.name if project else ''"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="resume">Résumé du projet</label>
+                        <textarea class="form-control" rows="3" id="resume" name="resume"
+                                  placeholder="Décrivez votre projet en quelques lignes…"
+                                  t-esc="project.resume if project else ''"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="probleme">Problème identifié</label>
+                        <textarea class="form-control" rows="3" id="probleme" name="probleme"
+                                  placeholder="Quel problème votre projet cherche-t-il à résoudre ?"
+                                  t-esc="project.probleme if project else ''"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="solution">Solution proposée</label>
+                        <textarea class="form-control" rows="3" id="solution" name="solution"
+                                  placeholder="Comment votre solution répond-elle à ce problème ?"
+                                  t-esc="project.solution if project else ''"/>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="secteur">Secteur</label>
+                            <select class="form-select" id="secteur" name="secteur">
+                                <option value=""/>
+                                <option value="industrie">Industrie</option>
+                                <option value="energie">Énergie</option>
+                                <option value="numerique">Numérique</option>
+                                <option value="agriculture">Agriculture</option>
+                                <option value="sante">Santé</option>
+                                <option value="environnement">Environnement</option>
+                                <option value="transport">Transport</option>
+                                <option value="autre">Autre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="maturite">Niveau de maturité</label>
+                            <select class="form-select" id="maturite" name="maturite">
+                                <option value=""/>
+                                <option value="idee">Idée</option>
+                                <option value="prototype">Prototype</option>
+                                <option value="mvp">MVP</option>
+                                <option value="produit">Produit développé</option>
+                                <option value="premiers_clients">Premiers clients</option>
+                                <option value="commercialisation">Commercialisation</option>
+                                <option value="industrialisation">Industrialisation</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Enregistrer et continuer</button>
+                    <a class="btn btn-secondary" href="/my/innovation">Annuler</a>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Écran 2 — Marché ══════════ -->
+
+    <template id="portal_project_step_marche" name="Dépôt : marché">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+                <t t-call="opex_innovation.portal_project_steps"/>
+
+                <form method="post" t-att-action="'/my/innovation/%s/marche' % project.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="marche_cible">Marché cible</label>
+                        <textarea class="form-control" rows="2" id="marche_cible"
+                                  name="marche_cible" placeholder="Qui sont vos clients ?"
+                                  t-esc="project.marche_cible or ''"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="besoin_marche">Besoin du marché</label>
+                        <textarea class="form-control" rows="2" id="besoin_marche"
+                                  name="besoin_marche" placeholder="Quel besoin avez-vous identifié ?"
+                                  t-esc="project.besoin_marche or ''"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="concurrence">Concurrence</label>
+                        <textarea class="form-control" rows="2" id="concurrence"
+                                  name="concurrence" placeholder="Qui sont vos principaux concurrents ?"
+                                  t-esc="project.concurrence or ''"/>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="proposition_valeur">Proposition de valeur</label>
+                        <textarea class="form-control" rows="2" id="proposition_valeur"
+                                  name="proposition_valeur"
+                                  placeholder="Pourquoi votre solution est-elle différente ?"
+                                  t-esc="project.proposition_valeur or ''"/>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="modele_economique">Modèle économique</label>
+                            <select class="form-select" id="modele_economique" name="modele_economique">
+                                <option value=""/>
+                                <option value="vente">Vente</option>
+                                <option value="abonnement">Abonnement</option>
+                                <option value="licence">Licence</option>
+                                <option value="commission">Commission</option>
+                                <option value="marketplace">Marketplace</option>
+                                <option value="autre">Autre</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="potentiel_commercial">Potentiel commercial</label>
+                            <select class="form-select" id="potentiel_commercial" name="potentiel_commercial">
+                                <option value=""/>
+                                <option value="local">Marché local</option>
+                                <option value="national">Marché national</option>
+                                <option value="international">Marché international</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <a class="btn btn-secondary" href="/my/innovation">Enregistrer et quitter</a>
+                    <button type="submit" class="btn btn-primary">Continuer</button>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Écran 3 — Équipe ══════════ -->
+
+    <template id="portal_project_step_equipe" name="Dépôt : équipe">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+                <t t-call="opex_innovation.portal_project_steps"/>
+
+                <div class="alert alert-light" role="status">
+                    Décrire votre équipe permettra au système de mieux
+                    comprendre les besoins de votre projet.
+                </div>
+
+                <table t-if="project.team_member_ids" class="table">
+                    <thead>
+                        <tr><th>Nom</th><th>Fonction</th><th>Compétence</th><th>Expérience</th><th/></tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="project.team_member_ids" t-as="member">
+                            <tr>
+                                <td t-esc="member.name"/>
+                                <td t-esc="member.fonction or ''"/>
+                                <td t-esc="member.competence or ''"/>
+                                <td t-esc="member.experience or ''"/>
+                                <td>
+                                    <form method="post"
+                                          t-att-action="'/my/innovation/%s/equipe' % project.id">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <input type="hidden" name="action" value="remove"/>
+                                        <input type="hidden" name="member_id" t-att-value="member.id"/>
+                                        <button type="submit" class="btn btn-sm btn-link text-danger">
+                                            Retirer
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+
+                <form method="post" t-att-action="'/my/innovation/%s/equipe' % project.id"
+                      class="border rounded p-3 mb-3">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <input type="hidden" name="action" value="add"/>
+                    <div class="row">
+                        <div class="col-md-3 mb-2">
+                            <input class="form-control" name="member_name" placeholder="Nom"/>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <input class="form-control" name="member_fonction" placeholder="Fonction"/>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <input class="form-control" name="member_competence" placeholder="Compétence"/>
+                        </div>
+                        <div class="col-md-3 mb-2">
+                            <input class="form-control" name="member_experience" placeholder="Expérience"/>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-secondary">+ Ajouter un membre</button>
+                </form>
+
+                <form method="post" t-att-action="'/my/innovation/%s/equipe' % project.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <a class="btn btn-secondary" href="/my/innovation">Enregistrer et quitter</a>
+                    <button type="submit" class="btn btn-primary">Continuer</button>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Écran 4 — Besoins ══════════ -->
+
+    <template id="portal_project_step_besoins" name="Dépôt : besoins">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+                <t t-call="opex_innovation.portal_project_steps"/>
+
+                <div class="alert alert-info" role="status">
+                    Cette étape est la plus importante : c'est sur elle que le
+                    cluster vous proposera des experts, des mentors et des
+                    investisseurs.
+                </div>
+
+                <form method="post" t-att-action="'/my/innovation/%s/besoins' % project.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Besoins en compétences</label>
+                        <div class="row">
+                            <t t-foreach="competences" t-as="competence">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="competence_ids"
+                                               t-att-id="'comp_%s' % competence.id"
+                                               t-att-value="competence.id"
+                                               t-att-checked="'checked' if competence in project.besoin_competence_ids else None"/>
+                                        <label class="form-check-label"
+                                               t-att-for="'comp_%s' % competence.id"
+                                               t-esc="competence.name"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                        <div t-if="not competences" class="form-text">
+                            Aucune compétence n'est encore référencée par le cluster.
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Besoin d'accompagnement</label>
+                        <div class="row">
+                            <t t-foreach="competences" t-as="competence">
+                                <div class="col-md-4">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               name="accompagnement_ids"
+                                               t-att-id="'acc_%s' % competence.id"
+                                               t-att-value="competence.id"
+                                               t-att-checked="'checked' if competence in project.besoin_accompagnement_ids else None"/>
+                                        <label class="form-check-label"
+                                               t-att-for="'acc_%s' % competence.id"
+                                               t-esc="competence.name"/>
+                                    </div>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               id="besoin_financement" name="besoin_financement"
+                               t-att-checked="'checked' if project.besoin_financement else None"/>
+                        <label class="form-check-label" for="besoin_financement">
+                            J'ai besoin d'un financement
+                        </label>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="montant_recherche">Montant recherché</label>
+                            <input class="form-control" type="number" step="0.01"
+                                   id="montant_recherche" name="montant_recherche"
+                                   t-att-value="project.montant_recherche or ''"/>
+                        </div>
+                        <div class="col-md-8 mb-3">
+                            <label class="form-label" for="type_financement">Type de financement</label>
+                            <input class="form-control" type="text"
+                                   id="type_financement" name="type_financement"
+                                   t-att-value="project.type_financement or ''"/>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="utilisation_prevue">Utilisation prévue</label>
+                        <textarea class="form-control" rows="2" id="utilisation_prevue"
+                                  name="utilisation_prevue"
+                                  t-esc="project.utilisation_prevue or ''"/>
+                    </div>
+
+                    <a class="btn btn-secondary" href="/my/innovation">Enregistrer et quitter</a>
+                    <button type="submit" class="btn btn-primary">Continuer</button>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Écran 5 — Pièces jointes ══════════ -->
+
+    <template id="portal_project_step_documents" name="Dépôt : pièces jointes">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+                <t t-call="opex_innovation.portal_project_steps"/>
+
+                <div t-if="error" class="alert alert-danger" role="alert" t-esc="error"/>
+
+                <table t-if="project.document_ids" class="table">
+                    <thead><tr><th>Type</th><th>Libellé</th><th>Fichier</th><th/></tr></thead>
+                    <tbody>
+                        <t t-foreach="project.document_ids" t-as="document">
+                            <tr>
+                                <td t-esc="dict(document._fields['document_type'].selection).get(document.document_type, '')"/>
+                                <td t-esc="document.name"/>
+                                <td t-esc="document.filename or document.url or ''"/>
+                                <td>
+                                    <form method="post"
+                                          t-att-action="'/my/innovation/%s/documents' % project.id">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <input type="hidden" name="action" value="remove"/>
+                                        <input type="hidden" name="document_id"
+                                               t-att-value="document.id"/>
+                                        <button type="submit" class="btn btn-sm btn-link text-danger">
+                                            Retirer
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+
+                <form method="post" enctype="multipart/form-data"
+                      t-att-action="'/my/innovation/%s/documents' % project.id"
+                      class="border rounded p-3 mb-3">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <input type="hidden" name="action" value="add"/>
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <select class="form-select" name="document_type">
+                                <t t-foreach="document_types" t-as="dtype">
+                                    <option t-att-value="dtype[0]" t-esc="dtype[1]"/>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <input class="form-control" name="name" placeholder="Libellé"/>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <input class="form-control" type="file" name="file"/>
+                        </div>
+                    </div>
+                    <div class="mb-2">
+                        <input class="form-control" name="url"
+                               placeholder="…ou un lien (vidéo de démonstration)"/>
+                    </div>
+                    <button type="submit" class="btn btn-sm btn-secondary">+ Ajouter la pièce</button>
+                </form>
+
+                <form method="post" t-att-action="'/my/innovation/%s/documents' % project.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <a class="btn btn-secondary" href="/my/innovation">Enregistrer et quitter</a>
+                    <button type="submit" class="btn btn-primary">Continuer</button>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Écran 6 — Récapitulatif et soumission ══════════ -->
+
+    <template id="portal_project_step_recap" name="Dépôt : récapitulatif">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+                <t t-call="opex_innovation.portal_project_steps"/>
+
+                <div t-if="error" class="alert alert-danger" role="alert" t-esc="error"/>
+
+                <table class="table">
+                    <t t-foreach="summary" t-as="line">
+                        <tr>
+                            <th t-esc="line[0]" style="width: 30%"/>
+                            <td t-esc="line[1]"/>
+                        </tr>
+                    </t>
+                    <tr>
+                        <th>Équipe</th>
+                        <td><t t-esc="len(project.team_member_ids)"/> membre(s)</td>
+                    </tr>
+                    <tr>
+                        <th>Pièces jointes</th>
+                        <td><t t-esc="len(project.document_ids)"/> pièce(s)</td>
+                    </tr>
+                </table>
+
+                <!--
+                    Section 11 : « une fois soumis, certaines informations
+                    pourront ne plus être modifiables pendant l'évaluation ».
+                    L'avertissement est explicite et la confirmation obligatoire
+                    — le porteur ne doit pas découvrir la contrainte après coup.
+                -->
+                <div class="alert alert-warning" role="alert">
+                    <strong>Avant de soumettre :</strong> une fois votre projet
+                    transmis au cluster, certaines informations ne seront plus
+                    modifiables pendant l'évaluation. Vous pourrez les corriger
+                    uniquement si le secrétariat vous demande un complément.
+                </div>
+
+                <form method="post" t-att-action="'/my/innovation/%s/recap' % project.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               id="confirm" name="confirm" value="1"/>
+                        <label class="form-check-label" for="confirm">
+                            J'ai vérifié les informations et je confirme la soumission.
+                        </label>
+                    </div>
+                    <a class="btn btn-secondary"
+                       t-att-href="'/my/innovation/%s/documents' % project.id">Retour</a>
+                    <button type="submit" class="btn btn-primary">Soumettre le projet</button>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Suivi ══════════ -->
+
+    <template id="portal_project_detail" name="Mon projet">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+
+                <!-- Progression rendue par le gabarit générique du moteur. -->
+                <t t-call="opex_workflow.workflow_portal_progress"/>
+
+                <!--
+                    Section 13 : « Le porteur reçoit *Action requise sur votre
+                    projet* ». Le motif est affiché en évidence, pas enfoui
+                    dans l'historique — le porteur doit savoir **quoi**
+                    corriger, pas seulement que quelque chose ne va pas.
+                -->
+                <div t-if="project.workflow_stage_id.code in ('complement_requested', 'remediation')"
+                     class="alert alert-warning mt-3" role="alert">
+                    <h5 class="alert-heading">Action requise sur votre projet</h5>
+                    <p t-if="project.motif_complement" class="mb-2">
+                        <strong>Ce qui vous est demandé :</strong>
+                        <span t-esc="project.motif_complement"/>
+                    </p>
+                    <a class="btn btn-sm btn-primary"
+                       t-att-href="'/my/innovation/%s/marche' % project.id">
+                        Corriger mon projet
+                    </a>
+                    <!--
+                        La resoumission passe par le moteur : le bouton
+                        n'apparaît que si la transition est réellement ouverte
+                        au porteur à cette étape.
+                    -->
+                    <t t-set="resubmit" t-value="[
+                        o for o in instance.transition_options()
+                        if o['transition'].code in ('resubmit_after_complement',
+                                                    'resubmit_after_remediation')]"/>
+                    <t t-foreach="resubmit" t-as="option">
+                        <form method="post" class="d-inline"
+                              t-att-action="'/my/innovation/%s/resubmit' % project.id">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="transition_id"
+                                   t-att-value="option['transition'].id"/>
+                            <button type="submit" class="btn btn-sm btn-success"
+                                    t-att-disabled="'disabled' if not option['available'] else None"
+                                    t-esc="option['transition'].name"/>
+                        </form>
+                        <div t-if="not option['available']" class="form-text"
+                             t-esc="option['reason']"/>
+                    </t>
+                </div>
+
+                <!--
+                    ═══════════ Section 25 — le suivi du financement ═══════════
+
+                    « Le porteur peut voir : Financement recherché 500 000 DA,
+                    Montant obtenu 300 000 DA, Progression 60 %. »
+
+                    Affiché seulement si le projet cherche un financement — un
+                    bloc à 0 % sur un projet qui n'en demande pas serait faux
+                    et inquiétant.
+                -->
+                <div t-if="project.besoin_financement or project.montant_recherche"
+                     class="card mt-4">
+                    <div class="card-header">Mon financement</div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table table-sm">
+                                    <tr><th style="width: 55%">Financement recherché</th>
+                                        <td>
+                                            <span t-field="project.montant_recherche"
+                                                  t-options="{'widget': 'monetary', 'display_currency': project.currency_id}"/>
+                                        </td>
+                                    </tr>
+                                    <tr><th>Montant obtenu</th>
+                                        <td>
+                                            <span t-field="project.financement_obtenu"
+                                                  t-options="{'widget': 'monetary', 'display_currency': project.currency_id}"/>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <!-- ⚠ `t-attf-` : voir la note du gabarit
+                                     `portal_opportunity_detail`. Un
+                                     `t-att-style="'width: %s%%' % ..."` renvoie
+                                     une 500 au rendu. -->
+                                <div class="progress" style="height: 22px;">
+                                    <div class="progress-bar" role="progressbar"
+                                         t-attf-style="width: #{project.progression_financement}%"
+                                         t-att-aria-valuenow="project.progression_financement"
+                                         aria-valuemin="0" aria-valuemax="100">
+                                        <span t-esc="project.progression_financement"/> %
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6">
+                                <!-- Le parcours du § 25, déduit à l'affichage.
+                                     Aucun champ d'étape n'est stocké : voir
+                                     `financement_steps()`. -->
+                                <ul class="list-group list-group-flush">
+                                    <li t-foreach="project.financement_steps()" t-as="step"
+                                        class="list-group-item d-flex justify-content-between px-0">
+                                        <span t-esc="step['label']"/>
+                                        <span t-if="step['state'] == 'done'" class="text-success">✓</span>
+                                        <span t-elif="step['state'] == 'current'"
+                                              class="badge text-bg-primary">en cours</span>
+                                        <span t-else="" class="text-muted">○</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!--
+                    ═══════════ Section 29 — l'évaluation finale ═══════════
+
+                    Le bouton n'apparaît que si `can_evaluate_finally()` répond
+                    oui. **La même fonction** garde la route : un `t-if` qui
+                    dirait autre chose que le contrôle serveur produirait un
+                    bouton menant à une erreur.
+                -->
+                <div t-if="project.can_evaluate_finally()" class="alert alert-info mt-4"
+                     role="status">
+                    <h5 class="alert-heading">Votre accompagnement est terminé</h5>
+                    <p class="mb-2">
+                        Votre avis nous aide à améliorer l'accompagnement proposé
+                        aux prochains porteurs.
+                    </p>
+                    <a class="btn btn-sm btn-primary"
+                       t-att-href="'/my/innovation/%s/evaluation-finale' % project.id">
+                        Évaluer l'accompagnement
+                    </a>
+                </div>
+
+                <t t-call="opex_innovation.project_history"/>
+
+                <a class="btn btn-secondary" href="/my/innovation">Retour à mes projets</a>
+            </div>
+        </t>
+    </template>
+
+</odoo>

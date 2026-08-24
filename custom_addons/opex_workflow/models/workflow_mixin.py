@@ -75,7 +75,17 @@ class WorkflowMixin(models.AbstractModel):
             })
         instance = self.env['opex.workflow.instance']._start_for(
             self, definition_code, actor_values=actor_values)
-        self.workflow_instance_id = instance.id
+        # `sudo()` : le rattachement à l'instance est de la comptabilité du
+        # moteur, pas une donnée de l'utilisateur.
+        #
+        # Sans lui, un module métier qui restreint l'écriture de ses
+        # enregistrements selon l'étape courante — un cas parfaitement normal,
+        # « le porteur ne modifie plus sa demande une fois soumise » — rend le
+        # démarrage impossible : au moment où l'on écrit `workflow_instance_id`,
+        # il n'y a pas encore d'étape, donc aucune règle ne peut l'autoriser.
+        # L'utilisateur se voit refuser la création de son propre dossier.
+        self.sudo().workflow_instance_id = instance.id
+        self.invalidate_recordset(['workflow_instance_id'])
         return instance
 
     def workflow_available_transitions(self, user=None):

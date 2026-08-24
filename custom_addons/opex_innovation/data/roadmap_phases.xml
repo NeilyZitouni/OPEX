@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LES PHASES DE ROADMAP — section 22
+            ═══════════════════════════════════════════════════════════════
+
+                Phase 1 — Validation      : ✓ Étude du besoin
+                Phase 2 — Produit         : ✓ Prototype, → MVP
+                Phase 3 — Marché          : ○ Premiers clients
+                Phase 4 — Industrialisation : ○ Industrialisation
+
+            ⚠ **Un référentiel, pas une liste en dur.** Le périmètre le demande
+            explicitement, et pour une raison qui se vérifie : un cluster qui
+            travaille avec des projets deeptech voudra une phase
+            « Certification » ou « Propriété intellectuelle ». Il l'ajoute ici,
+            sans développement.
+
+            Ces quatre phases sont donc un **contenu par défaut**, pas une
+            structure. Elles sont recopiées dans chaque accompagnement à son
+            ouverture — une copie, pas une référence : modifier ce référentiel
+            ne doit pas réécrire la roadmap d'un accompagnement déjà en cours.
+        -->
+
+        <record id="roadmap_validation" model="opex.innovation.roadmap.template">
+            <field name="name">Validation</field>
+            <field name="code">validation</field>
+            <field name="sequence">10</field>
+            <field name="description">Étude du besoin : confirmer que le problème existe et qu'il vaut la peine d'être résolu.</field>
+        </record>
+
+        <record id="roadmap_produit" model="opex.innovation.roadmap.template">
+            <field name="name">Produit</field>
+            <field name="code">produit</field>
+            <field name="sequence">20</field>
+            <field name="description">Du prototype au MVP : une version utilisable par de vrais utilisateurs.</field>
+        </record>
+
+        <record id="roadmap_marche" model="opex.innovation.roadmap.template">
+            <field name="name">Marché</field>
+            <field name="code">marche</field>
+            <field name="sequence">30</field>
+            <field name="description">Premiers clients : la preuve que quelqu'un paie pour la solution.</field>
+        </record>
+
+        <record id="roadmap_industrialisation" model="opex.innovation.roadmap.template">
+            <field name="name">Industrialisation</field>
+            <field name="code">industrialisation</field>
+            <field name="sequence">40</field>
+            <field name="description">Passage à l'échelle : production, partenaires, déploiement.</field>
+        </record>
+
+    </data>
+</odoo>

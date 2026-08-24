@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_innovation_project_form" model="ir.ui.view">
+        <field name="name">opex.innovation.project.form</field>
+        <field name="model">opex.innovation.project</field>
+        <field name="arch" type="xml">
+            <form string="Projet d'innovation">
+                <header>
+                    <!--
+                        Un bouton unique. Les quinze étapes et leurs sorties
+                        vivent dans la configuration : cette vue ne les connaît
+                        pas et n'a pas à les connaître.
+                    -->
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_documents" type="object"
+                                class="oe_stat_button" icon="fa-paperclip">
+                            <field name="document_count" widget="statinfo"
+                                   string="Pièces"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Smart Factory"/></h1>
+                        <h3><field name="workflow_stage_label" readonly="1"/></h3>
+                    </div>
+
+                    <group>
+                        <group string="Porteur">
+                            <field name="partner_id"/>
+                            <!-- Repris du profil, jamais ressaisis. -->
+                            <field name="organisation_id"/>
+                            <field name="email"/>
+                            <field name="telephone"/>
+                            <field name="wilaya"/>
+                            <field name="secteur_porteur"/>
+                        </group>
+                        <group string="Qualification">
+                            <field name="secteur"/>
+                            <field name="maturite"/>
+                            <field name="score"/>
+                            <field name="ceo_approval" widget="boolean_toggle"/>
+                            <field name="project_id"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Projet" name="projet">
+                            <group>
+                                <field name="resume" placeholder="Décrivez votre projet en quelques lignes…"/>
+                                <field name="probleme"/>
+                                <field name="solution"/>
+                            </group>
+                        </page>
+                        <page string="Marché" name="marche">
+                            <group>
+                                <group>
+                                    <field name="modele_economique"/>
+                                    <field name="potentiel_commercial"/>
+                                </group>
+                            </group>
+                            <group>
+                                <field name="marche_cible"/>
+                                <field name="besoin_marche"/>
+                                <field name="concurrence"/>
+                                <field name="proposition_valeur"/>
+                            </group>
+                        </page>
+                        <page string="Équipe" name="equipe">
+                            <field name="team_member_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="fonction"/>
+                                    <field name="competence"/>
+                                    <field name="experience"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Besoins" name="besoins">
+                            <div class="alert alert-info" role="status">
+                                Cette section est la plus importante pour le
+                                Matching : c'est sur elle que le moteur compare
+                                le projet aux experts et aux investisseurs.
+                            </div>
+                            <group>
+                                <group>
+                                    <field name="besoin_competence_ids" widget="many2many_tags"/>
+                                    <field name="besoin_accompagnement_ids" widget="many2many_tags"/>
+                                </group>
+                                <group>
+                                    <field name="besoin_financement" widget="boolean_toggle"/>
+                                    <field name="currency_id" invisible="1"/>
+                                    <field name="montant_recherche"
+                                           invisible="not besoin_financement"/>
+                                    <field name="type_financement"
+                                           invisible="not besoin_financement"/>
+                                </group>
+                            </group>
+                            <field name="utilisation_prevue"
+                                   invisible="not besoin_financement"/>
+                        </page>
+                        <page string="Pièces jointes" name="documents">
+                            <field name="document_ids">
+                                <list editable="bottom">
+                                    <field name="document_type"/>
+                                    <field name="name"/>
+                                    <field name="file" filename="filename"/>
+                                    <field name="filename" column_invisible="1"/>
+                                    <field name="url"/>
+                                    <field name="version"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Évaluations" name="evaluations">
+                            <field name="evaluation_ids">
+                                <list editable="bottom">
+                                    <field name="evaluator_id"/>
+                                    <field name="score_total"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_innovation_project_list" model="ir.ui.view">
+        <field name="name">opex.innovation.project.list</field>
+        <field name="model">opex.innovation.project</field>
+        <field name="arch" type="xml">
+            <list string="Projets d'innovation">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="secteur"/>
+                <field name="maturite"/>
+                <field name="workflow_stage_id"/>
+                <field name="score"/>
+                <field name="ceo_approval" widget="boolean_toggle"/>
+                <field name="create_date"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_innovation_project_search" model="ir.ui.view">
+        <field name="name">opex.innovation.project.search</field>
+        <field name="model">opex.innovation.project</field>
+        <field name="arch" type="xml">
+            <search string="Projets">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="workflow_stage_id"/>
+                <separator/>
+                <filter name="filter_running" string="En cours"
+                        domain="[('workflow_state', '=', 'running')]"/>
+                <filter name="filter_financement" string="Cherchent un financement"
+                        domain="[('besoin_financement', '=', True)]"/>
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                    <filter name="group_secteur" string="Secteur"
+                            context="{'group_by': 'secteur'}"/>
+                    <filter name="group_maturite" string="Maturité"
+                            context="{'group_by': 'maturite'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_innovation_project" model="ir.actions.act_window">
+        <field name="name">Projets d'innovation</field>
+        <field name="res_model">opex.innovation.project</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun projet déposé</p>
+            <p>
+                Un projet suit les quinze étapes du parcours d'innovation. Ces
+                étapes ne sont écrites nulle part en Python : elles sont
+                configurées dans Smart Workflow, et peuvent être modifiées
+                depuis l'interface.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_innovation_document_list" model="ir.ui.view">
+        <field name="name">opex.innovation.document.list</field>
+        <field name="model">opex.innovation.document</field>
+        <field name="arch" type="xml">
+            <list string="Pièces jointes" editable="bottom">
+                <field name="project_id"/>
+                <field name="document_type"/>
+                <field name="name"/>
+                <field name="file" filename="filename"/>
+                <field name="filename" column_invisible="1"/>
+                <field name="url"/>
+                <field name="version"/>
+            </list>
+        </field>
+    </record>
+
+</odoo>

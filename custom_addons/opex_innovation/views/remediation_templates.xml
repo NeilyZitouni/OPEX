@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Section 18 côté porteur. Il ne lit pas « améliorez votre projet » : il
+        lit une liste de points cochés, chacun avec ce qui est attendu, plus le
+        commentaire du comité.
+    -->
+    <template id="portal_remediation" name="Améliorations demandées">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+
+                <t t-call="opex_workflow.workflow_portal_progress"/>
+
+                <div t-if="error" class="alert alert-danger mt-3" role="alert"
+                     t-esc="error"/>
+
+                <div class="alert alert-warning mt-3" role="alert">
+                    <h5 class="alert-heading">Votre projet nécessite des
+                        améliorations avant une nouvelle évaluation.</h5>
+                    <p class="mb-0">
+                        Le comité a précisé les points à reprendre. Corrigez
+                        votre dossier, ajoutez les pièces manquantes, répondez
+                        aux remarques, puis resoumettez.
+                    </p>
+                </div>
+
+                <h5 class="mt-4">Ce qui doit être corrigé</h5>
+                <ul class="list-group mb-3">
+                    <t t-foreach="remediation.point_ids" t-as="point">
+                        <li class="list-group-item">
+                            <strong t-esc="point.name"/>
+                            <div t-if="point.description" class="text-muted small"
+                                 t-esc="point.description"/>
+                        </li>
+                    </t>
+                </ul>
+
+                <div t-if="remediation.commentaire_comite" class="mb-3">
+                    <h5>Commentaire du comité</h5>
+                    <p t-esc="remediation.commentaire_comite"/>
+                </div>
+
+                <div class="mb-3">
+                    <a class="btn btn-secondary"
+                       t-att-href="'/my/innovation/%s/marche' % project.id">
+                        Modifier mon dossier
+                    </a>
+                    <a class="btn btn-secondary"
+                       t-att-href="'/my/innovation/%s/documents' % project.id">
+                        Ajouter des pièces
+                    </a>
+                </div>
+
+                <form method="post"
+                      t-att-action="'/my/innovation/%s/remediation' % project.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="reponse">
+                            Votre réponse aux remarques
+                        </label>
+                        <textarea class="form-control" rows="4" id="reponse"
+                                  name="reponse"
+                                  placeholder="Expliquez ce que vous avez corrigé, point par point."/>
+                    </div>
+
+                    <!--
+                        L'avertissement de versionnage : le porteur doit savoir
+                        que son dossier actuel sera archivé, et que le comité
+                        pourra comparer.
+                    -->
+                    <div class="alert alert-light" role="status">
+                        En resoumettant, la version actuelle de votre dossier
+                        sera archivée. Le comité pourra comparer ce que vous
+                        avez modifié.
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        Soumettre mes améliorations
+                    </button>
+                </form>
+
+                <div t-if="project.version_ids" class="mt-4">
+                    <h5>Versions précédentes de mon dossier</h5>
+                    <table class="table table-sm">
+                        <thead><tr><th>Version</th><th>Archivée le</th><th>Score</th></tr></thead>
+                        <tbody>
+                            <t t-foreach="project.version_ids" t-as="snapshot">
+                                <tr>
+                                    <td t-esc="snapshot.version"/>
+                                    <td t-esc="snapshot.date_snapshot"/>
+                                    <td t-esc="snapshot.score"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

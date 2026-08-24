@@ -1,0 +1,557 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LE WORKFLOW PROJET — 15 étapes, décrites en données
+            ═══════════════════════════════════════════════════════════════
+
+            Schéma 10 du PDF Module 2 (machine à états), plus les précisions des
+            sections 13 à 18. Pas une ligne de Python ne décrit ce processus.
+
+            Les `user_label` viennent de la section 35 : « le back-office Odoo
+            peut être beaucoup plus détaillé », mais le porteur ne lit jamais un
+            code d'étape.
+
+            Trois points volontairement non simplifiés :
+
+            1. Le contrôle administratif a **deux** sorties — conforme et
+               incomplet — et le dossier **revient** au contrôle après
+               resoumission. Un `if` unique aurait suffi à faire tourner la
+               démonstration ; il aurait aussi effacé la moitié du processus.
+
+            2. La décision du comité a **trois** sorties : accepté, ajourné,
+               refusé. « Le rejet ne doit pas être confondu avec la
+               maturation. »
+
+            3. La boucle remédiation → resoumission → évaluation existe. C'est
+               elle qui prouve qu'on gère un graphe et non une file.
+        -->
+
+        <!-- ══════════ Règles ══════════ -->
+
+        <record id="rule_project_ready_to_submit" model="opex.workflow.rule">
+            <field name="name">Dossier complet</field>
+            <field name="code">project_ready_to_submit</field>
+            <field name="expression">bool(field('resume') and field('probleme') and field('solution') and field('secteur'))</field>
+            <field name="message">Complétez le résumé, le problème, la solution et le secteur avant de soumettre.</field>
+        </record>
+
+        <record id="rule_project_has_business_plan" model="opex.workflow.rule">
+            <field name="name">Business plan déposé</field>
+            <field name="code">project_has_business_plan</field>
+            <field name="expression">has_document('business_plan')</field>
+            <field name="message">Le business plan doit être joint au dossier.</field>
+        </record>
+
+        <!--
+            Les deux règles du test d'acceptation, écrites avec les noms de
+            champs convenus. Elles existent dès maintenant pour que l'ajout de
+            l'étape Demo Day n'ait plus qu'à les cocher.
+        -->
+        <record id="rule_project_score_70" model="opex.workflow.rule">
+            <field name="name">Note suffisante</field>
+            <field name="code">project_score_70</field>
+            <field name="expression">field('score') &gt;= 70</field>
+            <field name="message">Le projet doit avoir obtenu au moins 70/100.</field>
+        </record>
+
+        <record id="rule_project_ceo_approval" model="opex.workflow.rule">
+            <field name="name">Accord du CEO</field>
+            <field name="code">project_ceo_approval</field>
+            <field name="expression">record.ceo_approval == True</field>
+            <field name="message">L'accord du CEO n'a pas encore été donné.</field>
+        </record>
+
+        <record id="rule_project_has_pitch_deck" model="opex.workflow.rule">
+            <field name="name">Pitch deck déposé</field>
+            <field name="code">project_has_pitch_deck</field>
+            <field name="expression">has_document('pitch_deck')</field>
+            <field name="message">Le pitch deck n'a pas encore été déposé.</field>
+        </record>
+
+        <!-- ══════════ Actions ══════════ -->
+
+        <record id="action_project_notify_secretariat" model="opex.workflow.action">
+            <field name="name">Prévenir le secrétariat</field>
+            <field name="code">project_notify_secretariat</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Nouveau projet à contrôler.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="action_project_notify_comite" model="opex.workflow.action">
+            <field name="name">Prévenir le comité</field>
+            <field name="code">project_notify_comite</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Un projet attend l'évaluation du comité.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <record id="action_project_notify_porteur" model="opex.workflow.action">
+            <field name="name">Informer le porteur</field>
+            <field name="code">project_notify_porteur</field>
+            <field name="action_type">notify</field>
+            <!-- Le seul message que le porteur doit réellement recevoir. -->
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Votre projet a évolué. Consultez votre espace personnel.</p></field>
+        </record>
+
+        <record id="action_project_run_matching" model="opex.workflow.action">
+            <field name="name">Rechercher des experts</field>
+            <field name="code">project_run_matching</field>
+            <field name="action_type">run_matching</field>
+            <field name="matching_candidate_type">expert</field>
+            <field name="matching_limit">5</field>
+        </record>
+
+        <!-- ══════════ Définition ══════════ -->
+
+        <record id="wf_innovation_project" model="opex.workflow.definition">
+            <field name="name">Projet d'innovation</field>
+            <field name="code">innovation_project</field>
+            <field name="model_id" ref="model_opex_innovation_project"/>
+            <field name="description">Parcours complet du projet d'innovation : dépôt, contrôle administratif, qualification, évaluation, décision du comité, matching, accompagnement, financement, industrialisation, clôture. Schéma 10 du PDF Module 2.</field>
+        </record>
+
+        <!-- ══════════ Les 15 étapes ══════════ -->
+
+        <record id="pstage_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">draft</field>
+            <field name="name">Brouillon</field>
+            <field name="user_label">Compléter mon projet</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="pstage_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">submitted</field>
+            <field name="name">Soumis</field>
+            <field name="user_label">Projet déposé</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">3</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="pstage_under_review" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">under_review</field>
+            <field name="name">Contrôle administratif</field>
+            <field name="user_label">Contrôle en cours</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="pstage_complement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">complement_requested</field>
+            <field name="name">Complément demandé</field>
+            <field name="user_label">Action requise sur votre projet</field>
+            <field name="sequence">40</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="pstage_qualified" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">qualified</field>
+            <field name="name">Qualifié</field>
+            <field name="user_label">Contrôle terminé</field>
+            <field name="sequence">50</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <record id="pstage_evaluation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">evaluation</field>
+            <field name="name">En évaluation</field>
+            <field name="user_label">Évaluation en cours</field>
+            <field name="sequence">60</field>
+            <field name="sla_days">15</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <record id="pstage_remediation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">remediation</field>
+            <field name="name">Remédiation</field>
+            <field name="user_label">Améliorations demandées</field>
+            <field name="sequence">70</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="pstage_resubmitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">resubmitted</field>
+            <field name="name">Resoumis</field>
+            <field name="user_label">Nouvelle évaluation en cours</field>
+            <field name="sequence">80</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <record id="pstage_accepted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">accepted</field>
+            <field name="name">Accepté</field>
+            <field name="user_label">Projet accepté</field>
+            <field name="sequence">90</field>
+        </record>
+
+        <record id="pstage_matching" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">matching</field>
+            <field name="name">Matching</field>
+            <field name="user_label">Recherche de partenaires</field>
+            <field name="sequence">100</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="pstage_accompagnement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">accompagnement</field>
+            <field name="name">Accompagnement</field>
+            <field name="user_label">Accompagnement en cours</field>
+            <field name="sequence">110</field>
+            <field name="sla_days">90</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+        </record>
+
+        <record id="pstage_financement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">financement</field>
+            <field name="name">Financement</field>
+            <field name="user_label">Financement en cours</field>
+            <field name="sequence">120</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_investisseur')])]"/>
+        </record>
+
+        <record id="pstage_industrialisation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">industrialisation</field>
+            <field name="name">Industrialisation</field>
+            <field name="user_label">Industrialisation</field>
+            <field name="sequence">130</field>
+        </record>
+
+        <record id="pstage_closed" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">closed</field>
+            <field name="name">Clôturé</field>
+            <field name="user_label">Projet clôturé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">140</field>
+        </record>
+
+        <record id="pstage_rejected" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">rejected</field>
+            <field name="name">Refusé</field>
+            <field name="user_label">Projet refusé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">150</field>
+        </record>
+
+        <!-- ══════════ Transitions ══════════ -->
+
+        <record id="ptr_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">submit</field>
+            <field name="name">Soumettre le projet</field>
+            <field name="source_stage_id" ref="pstage_draft"/>
+            <field name="target_stage_id" ref="pstage_submitted"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_project_ready_to_submit')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_secretariat')])]"/>
+        </record>
+
+        <record id="ptr_take_in_charge" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">take_in_charge</field>
+            <field name="name">Prendre en charge</field>
+            <field name="source_stage_id" ref="pstage_submitted"/>
+            <field name="target_stage_id" ref="pstage_under_review"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <!-- ① Le contrôle administratif a DEUX sorties. -->
+        <record id="ptr_qualify" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">qualify</field>
+            <field name="name">Dossier conforme</field>
+            <field name="source_stage_id" ref="pstage_under_review"/>
+            <field name="target_stage_id" ref="pstage_qualified"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+        <record id="ptr_request_complement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">request_complement</field>
+            <field name="name">Demander un complément</field>
+            <field name="source_stage_id" ref="pstage_under_review"/>
+            <field name="target_stage_id" ref="pstage_complement"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+        <!-- …avec RETOUR vers le contrôle après resoumission. -->
+        <record id="ptr_resubmit_after_complement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">resubmit_after_complement</field>
+            <field name="name">Renvoyer mon dossier</field>
+            <field name="source_stage_id" ref="pstage_complement"/>
+            <field name="target_stage_id" ref="pstage_under_review"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_secretariat')])]"/>
+        </record>
+
+        <!--
+            Deux entrées en évaluation, pas une avec un `if` dedans : les deux
+            scénarios du schéma 6 — avec évaluateurs sollicités, ou évaluation
+            directe par le comité. « Tous les projets ne nécessitent pas
+            nécessairement une expertise externe. »
+        -->
+        <record id="ptr_evaluate_with_experts" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">evaluate_with_experts</field>
+            <field name="name">Solliciter des évaluateurs</field>
+            <field name="source_stage_id" ref="pstage_qualified"/>
+            <field name="target_stage_id" ref="pstage_evaluation"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_comite')])]"/>
+        </record>
+
+        <record id="ptr_evaluate_directly" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">evaluate_directly</field>
+            <field name="name">Évaluer directement</field>
+            <field name="source_stage_id" ref="pstage_qualified"/>
+            <field name="target_stage_id" ref="pstage_evaluation"/>
+            <field name="sequence">70</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <!-- ② La décision du comité a TROIS sorties. -->
+        <record id="ptr_accept" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">accept</field>
+            <field name="name">Accepter</field>
+            <field name="source_stage_id" ref="pstage_evaluation"/>
+            <field name="target_stage_id" ref="pstage_accepted"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+        <record id="ptr_adjourn" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">adjourn</field>
+            <field name="name">Ajourner</field>
+            <field name="source_stage_id" ref="pstage_evaluation"/>
+            <field name="target_stage_id" ref="pstage_remediation"/>
+            <field name="sequence">90</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+        <record id="ptr_reject" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">reject</field>
+            <field name="name">Refuser</field>
+            <field name="source_stage_id" ref="pstage_evaluation"/>
+            <field name="target_stage_id" ref="pstage_rejected"/>
+            <field name="sequence">100</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+
+        <!--
+            Les deux pouvoirs supplémentaires du comité (section 17) :
+            « demander des informations complémentaires » et « demander une
+            nouvelle évaluation ». Ce sont des **transitions**, pas des cas
+            particuliers codés dans une méthode.
+
+            La première renvoie le dossier au porteur par le même chemin que le
+            contrôle administratif — l'étape « Complément demandé » existe déjà,
+            on la réutilise plutôt que d'en créer une seconde qui dirait la
+            même chose.
+        -->
+        <record id="ptr_committee_ask_info" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">committee_ask_info</field>
+            <field name="name">Demander des informations complémentaires</field>
+            <field name="source_stage_id" ref="pstage_evaluation"/>
+            <field name="target_stage_id" ref="pstage_complement"/>
+            <field name="sequence">95</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+        <record id="ptr_committee_new_evaluation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">committee_new_evaluation</field>
+            <field name="name">Demander une nouvelle évaluation</field>
+            <field name="source_stage_id" ref="pstage_evaluation"/>
+            <field name="target_stage_id" ref="pstage_qualified"/>
+            <field name="sequence">96</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_comite')])]"/>
+        </record>
+
+        <!-- Le retour du complément demandé par le comité rejoint le contrôle
+             existant : `ptr_resubmit_after_complement` le porte déjà. -->
+
+        <!-- ③ La boucle remédiation → resoumission → évaluation. -->
+        <record id="ptr_resubmit_after_remediation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">resubmit_after_remediation</field>
+            <field name="name">Soumettre mes améliorations</field>
+            <field name="source_stage_id" ref="pstage_remediation"/>
+            <field name="target_stage_id" ref="pstage_resubmitted"/>
+            <field name="sequence">110</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_comite')])]"/>
+        </record>
+
+        <record id="ptr_reevaluate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">reevaluate</field>
+            <field name="name">Relancer l'évaluation</field>
+            <field name="source_stage_id" ref="pstage_resubmitted"/>
+            <field name="target_stage_id" ref="pstage_evaluation"/>
+            <field name="sequence">120</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <!-- ══════════ La suite du parcours ══════════ -->
+
+        <record id="ptr_start_matching" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">start_matching</field>
+            <field name="name">Lancer le matching</field>
+            <field name="source_stage_id" ref="pstage_accepted"/>
+            <field name="target_stage_id" ref="pstage_matching"/>
+            <field name="sequence">130</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_run_matching')])]"/>
+        </record>
+
+        <record id="ptr_start_accompagnement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">start_accompagnement</field>
+            <field name="name">Démarrer l'accompagnement</field>
+            <field name="source_stage_id" ref="pstage_matching"/>
+            <field name="target_stage_id" ref="pstage_accompagnement"/>
+            <field name="sequence">140</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+        <record id="ptr_start_financement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">start_financement</field>
+            <field name="name">Passer au financement</field>
+            <field name="source_stage_id" ref="pstage_accompagnement"/>
+            <field name="target_stage_id" ref="pstage_financement"/>
+            <field name="sequence">150</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="ptr_start_industrialisation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">start_industrialisation</field>
+            <field name="name">Passer à l'industrialisation</field>
+            <field name="source_stage_id" ref="pstage_financement"/>
+            <field name="target_stage_id" ref="pstage_industrialisation"/>
+            <field name="sequence">160</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="ptr_close" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">close</field>
+            <field name="name">Clôturer le projet</field>
+            <field name="source_stage_id" ref="pstage_industrialisation"/>
+            <field name="target_stage_id" ref="pstage_closed"/>
+            <field name="sequence">170</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_project_notify_porteur')])]"/>
+        </record>
+
+
+    </data>
+
+    <!--
+        ⚠ Rattachements de rôles **hors du bloc `noupdate`**, et pour la même
+        raison que la publication : `noupdate="1"` empêche non seulement la
+        recréation, mais aussi la **mise à jour** d'un enregistrement existant.
+
+        `opex_workflow.role_comite` est semé par le moteur ; le lier ici à un
+        groupe est une modification d'un enregistrement déjà présent. Placée
+        dans le bloc `noupdate`, elle est purement et simplement ignorée lors
+        d'un `-u` — le rôle reste sans groupe, plus personne ne le porte, et
+        toutes les transitions qu'il garde deviennent infranchissables sans
+        qu'aucune erreur ne le signale.
+    -->
+    <!--
+        ⚠ Rattachements par `<function>` et non par `<record>`, et c'est la
+        troisième facette du même piège.
+
+        `noupdate` n'est pas une propriété du bloc XML : c'est une colonne de
+        `ir_model_data`, écrite à la **création** de l'enregistrement. Les rôles
+        sont semés par `opex_workflow` dans un bloc `noupdate="1"` ; leur ligne
+        `ir_model_data` porte donc ce drapeau définitivement, et un `<record>`
+        de ce module — même hors bloc `noupdate` — est ignoré lors d'une mise à
+        jour. Aucune restructuration de notre XML n'y change quoi que ce soit.
+
+        Un `<function>` hors bloc `noupdate`, lui, s'exécute toujours. On écrit
+        donc le rattachement explicitement.
+
+        Symptôme si on l'oublie : le rôle reste sans groupe, plus personne ne le
+        porte, et toutes les transitions qu'il garde deviennent infranchissables
+        — sans qu'aucune erreur ne le signale au chargement.
+    -->
+    <function model="opex.workflow.role" name="write"
+              eval="[[ref('opex_workflow.role_comite')], {'group_id': ref('group_comite_evaluation')}]"/>
+
+    <function model="opex.workflow.role" name="write"
+              eval="[[ref('opex_workflow.role_ceo')], {'group_id': ref('group_innovation_manager')}]"/>
+
+    <!--
+        ⚠ Publication hors du bloc `noupdate="1"`, et c'est indispensable.
+
+        Odoo **n'exécute pas** les `<function>` d'un bloc `noupdate` lors d'une
+        mise à jour de module : seulement à la première installation. Placée
+        au-dessus, la publication ne serait jamais rejouée, et une définition
+        ajoutée par `-u` resterait en brouillon — donc introuvable par
+        `start_workflow()`, sans qu'aucune erreur ne le signale au chargement.
+
+        Ici, elle est rejouée à chaque mise à jour. C'est sans risque —
+        `action_publish()` est idempotent — et c'est même utile : le graphe est
+        revalidé à chaque déploiement, et une configuration devenue incohérente
+        fait échouer la mise à jour au lieu de se découvrir en démonstration.
+    -->
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_innovation_project')]]"/>
+
+</odoo>

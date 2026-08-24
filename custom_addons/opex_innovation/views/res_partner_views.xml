@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Extension de la fiche contact. On hérite de la vue native de `contacts`
+        et non d'une vue d'`opex_membership` : le Module 1 est gelé, et une vue
+        héritée pointant sur l'une des siennes rendrait les deux modules
+        solidaires pour rien.
+    -->
+    <record id="view_partner_form_innovation" model="ir.ui.view">
+        <field name="name">res.partner.form.innovation</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet/notebook" position="inside">
+                <page string="Innovation" name="innovation">
+                    <div class="alert alert-info" role="status">
+                        Les profils sont <strong>cumulables</strong> : un même
+                        compte peut être Membre, Expert et Investisseur à la fois.
+                        Ce sont trois indicateurs indépendants, jamais un choix
+                        exclusif.
+                    </div>
+                    <group>
+                        <group string="Profils actifs">
+                            <field name="is_expert" widget="boolean_toggle"/>
+                            <field name="is_investor" widget="boolean_toggle"/>
+                        </group>
+                        <group string="Demandes">
+                            <field name="expert_profile_id" readonly="1"/>
+                            <field name="investor_profile_id" readonly="1"/>
+                        </group>
+                    </group>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_partner_search_innovation" model="ir.ui.view">
+        <field name="name">res.partner.search.innovation</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_res_partner_filter"/>
+        <field name="arch" type="xml">
+            <xpath expr="//search" position="inside">
+                <separator/>
+                <filter name="filter_is_expert" string="Experts"
+                        domain="[('is_expert', '=', True)]"/>
+                <filter name="filter_is_investor" string="Investisseurs"
+                        domain="[('is_investor', '=', True)]"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="privilege_opex_innovation" model="res.groups.privilege">
+        <field name="name">Innovation</field>
+        <field name="sequence">15</field>
+        <field name="category_id" ref="opex_membership.module_category_opex"/>
+    </record>
+
+    <record id="group_innovation_manager" model="res.groups">
+        <field name="name">Gestionnaire Innovation</field>
+        <field name="privilege_id" ref="privilege_opex_innovation"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Suit les profils Expert et Investisseur, les projets d'innovation et leur accompagnement.</field>
+    </record>
+
+    <record id="group_comite_evaluation" model="res.groups">
+        <field name="name">Comité d'évaluation</field>
+        <field name="privilege_id" ref="privilege_opex_innovation"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Évalue les projets d'innovation et rend la décision : accepté, ajourné ou refusé. Instance décisionnelle finale.</field>
+    </record>
+
+</odoo>

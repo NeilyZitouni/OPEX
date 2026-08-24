@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            SMART MATCHING — configuration, pas de code
+            ═══════════════════════════════════════════════════════════════
+
+            Les sept critères de la section 19 : secteur, compétences
+            recherchées, localisation, niveau de maturité, besoins
+            d'accompagnement, besoin de financement, technologies.
+
+            ⚠ Pas une ligne de scoring n'est écrite ici ni ailleurs dans ce
+            module. Le moteur de l'Extension 7 fait le calcul ; ces
+            enregistrements lui disent quoi comparer et avec quel poids.
+
+            « L'IA recommande. Elle ne doit pas automatiquement décider seule. »
+            Aucun de ces critères ne déclenche quoi que ce soit : ils produisent
+            une liste ordonnée, que le responsable arbitre.
+        -->
+
+        <!-- ══════════ Critères ══════════ -->
+
+        <record id="matching_secteur" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Secteur</field>
+            <field name="code">secteur</field>
+            <field name="criteria_type">secteur</field>
+            <field name="sequence">10</field>
+            <field name="weight">3.0</field>
+            <field name="source_expression">field('secteur')</field>
+            <field name="target_field">expert_domaine</field>
+            <field name="match_mode">contains</field>
+        </record>
+
+        <record id="matching_competences" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Compétences recherchées</field>
+            <field name="code">competences</field>
+            <field name="criteria_type">competence</field>
+            <field name="sequence">20</field>
+            <field name="weight">4.0</field>
+            <field name="source_expression">field('besoin_competence_ids')</field>
+            <field name="target_field">expert_competence_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <record id="matching_accompagnement" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Besoins d'accompagnement</field>
+            <field name="code">accompagnement</field>
+            <field name="criteria_type">competence</field>
+            <field name="sequence">30</field>
+            <field name="weight">2.0</field>
+            <field name="source_expression">field('besoin_accompagnement_ids')</field>
+            <field name="target_field">expert_competence_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <record id="matching_localisation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Localisation</field>
+            <field name="code">localisation</field>
+            <field name="criteria_type">localisation</field>
+            <field name="sequence">40</field>
+            <field name="weight">1.0</field>
+            <field name="source_expression">field('wilaya')</field>
+            <field name="target_field">wilaya</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <record id="matching_maturite" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Niveau de maturité</field>
+            <field name="code">maturite</field>
+            <field name="criteria_type">maturite</field>
+            <field name="sequence">50</field>
+            <field name="weight">2.0</field>
+            <field name="source_expression">field('maturite')</field>
+            <field name="target_field">investor_maturite</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <!--
+            Le besoin de financement : on ne cherche pas l'égalité mais la
+            capacité — l'investisseur doit pouvoir couvrir le montant demandé.
+            D'où `gte` : candidat ≥ dossier.
+        -->
+        <record id="matching_financement" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Capacité de financement</field>
+            <field name="code">financement</field>
+            <field name="criteria_type">montant</field>
+            <field name="sequence">60</field>
+            <field name="weight">3.0</field>
+            <field name="source_expression">field('montant_recherche')</field>
+            <field name="target_field">investor_montant_max</field>
+            <field name="match_mode">gte</field>
+        </record>
+
+        <record id="matching_technologies" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="name">Technologies</field>
+            <field name="code">technologies</field>
+            <field name="criteria_type">technologie</field>
+            <field name="sequence">70</field>
+            <field name="weight">2.0</field>
+            <field name="source_expression">field('besoin_competence_ids')</field>
+            <field name="target_field">investor_secteur_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <!-- ══════════ Trois actions, trois catégories ══════════
+
+            Le moteur cherche **un** type de candidat par exécution. Les trois
+            catégories de la section 19 s'obtiennent donc par trois actions
+            portées par la même transition — pas par une extension du moteur.
+
+            `matching_domain` restreint le vivier : sans lui, les trois
+            recherches parcourraient les mêmes contacts et proposeraient les
+            mêmes personnes dans les trois listes.
+        -->
+
+        <record id="action_matching_experts" model="opex.workflow.action">
+            <field name="name">Rechercher des experts</field>
+            <field name="code">innovation_match_experts</field>
+            <field name="action_type">run_matching</field>
+            <field name="sequence">10</field>
+            <field name="matching_candidate_type">expert</field>
+            <field name="matching_domain">[('is_expert', '=', True)]</field>
+            <field name="matching_limit">5</field>
+        </record>
+
+        <record id="action_matching_mentors" model="opex.workflow.action">
+            <field name="name">Rechercher des mentors</field>
+            <field name="code">innovation_match_mentors</field>
+            <field name="action_type">run_matching</field>
+            <field name="sequence">20</field>
+            <field name="matching_candidate_type">mentor</field>
+            <!-- Le vivier des mentors est celui des experts expérimentés : le
+                 portail ne distingue pas les deux profils, c'est le rôle
+                 proposé sur le projet qui les sépare. -->
+            <field name="matching_domain">[('is_expert', '=', True)]</field>
+            <field name="matching_limit">3</field>
+        </record>
+
+        <record id="action_matching_investisseurs" model="opex.workflow.action">
+            <field name="name">Rechercher des investisseurs</field>
+            <field name="code">innovation_match_investisseurs</field>
+            <field name="action_type">run_matching</field>
+            <field name="sequence">30</field>
+            <field name="matching_candidate_type">investisseur</field>
+            <field name="matching_domain">[('is_investor', '=', True)]</field>
+            <field name="matching_limit">5</field>
+        </record>
+
+    </data>
+
+    <!--
+        Branchement sur la transition « Lancer le matching ».
+
+        Hors du bloc `noupdate` : la transition existe déjà et porte le drapeau
+        `noupdate` de sa création, donc un `<record>` serait ignoré lors d'une
+        mise à jour. Même piège qu'aux Extensions 10 et 12.
+    -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('ptr_start_matching')], {'action_ids': [(6, 0, [
+                  ref('action_matching_experts'),
+                  ref('action_matching_mentors'),
+                  ref('action_matching_investisseurs'),
+              ])]}]"/>
+
+</odoo>

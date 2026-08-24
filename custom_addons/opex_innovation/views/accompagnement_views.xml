@@ -1,0 +1,283 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Accompagnement — section 21
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <record id="view_accompagnement_form" model="ir.ui.view">
+        <field name="name">opex.innovation.accompagnement.form</field>
+        <field name="model">opex.innovation.accompagnement</field>
+        <field name="arch" type="xml">
+            <form string="Accompagnement">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_open_workspace" type="object"
+                                class="oe_stat_button" icon="fa-tasks"
+                                invisible="not task_project_id">
+                            <div class="o_stat_info">
+                                <span class="o_stat_text">Espace</span>
+                                <span class="o_stat_text">de travail</span>
+                            </div>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="project_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="expert_id"/>
+                            <field name="mentor_id"/>
+                        </group>
+                        <group>
+                            <field name="date_debut"/>
+                            <field name="date_fin"/>
+                            <field name="progression" widget="progressbar"/>
+                            <field name="task_project_id" readonly="1"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <group string="Objectifs">
+                        <field name="objectifs" nolabel="1"
+                               placeholder="Ce que l'accompagnement doit avoir produit à son terme."/>
+                    </group>
+                    <notebook>
+                        <page string="Roadmap" name="roadmap">
+                            <!-- Section 22. Les phases sont recopiées du
+                                 référentiel à l'ouverture ; elles s'éditent
+                                 ensuite librement pour cet accompagnement-ci. -->
+                            <field name="phase_ids">
+                                <list editable="bottom" decoration-success="state == 'done'"
+                                      decoration-info="state == 'in_progress'">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="name"/>
+                                    <field name="description"/>
+                                    <field name="state"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Livrables" name="livrables">
+                            <!-- Sections 23 et 24. L'étape est celle du moteur :
+                                 pas de champ `state` sur le livrable. -->
+                            <field name="deliverable_ids">
+                                <list decoration-danger="en_retard == True"
+                                      decoration-success="workflow_stage_id.code == 'validated'">
+                                    <field name="name"/>
+                                    <field name="deadline"/>
+                                    <field name="workflow_stage_id"/>
+                                    <field name="version"/>
+                                    <field name="en_retard" column_invisible="1"/>
+                                    <field name="workflow_state" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_accompagnement_list" model="ir.ui.view">
+        <field name="name">opex.innovation.accompagnement.list</field>
+        <field name="model">opex.innovation.accompagnement</field>
+        <field name="arch" type="xml">
+            <list string="Accompagnements">
+                <field name="project_id"/>
+                <field name="partner_id"/>
+                <field name="expert_id"/>
+                <field name="mentor_id"/>
+                <field name="date_debut"/>
+                <field name="date_fin"/>
+                <field name="progression" widget="progressbar"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_accompagnement" model="ir.actions.act_window">
+        <field name="name">Accompagnements</field>
+        <field name="res_model">opex.innovation.accompagnement</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Livrable — sections 23 et 24
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <record id="view_deliverable_form" model="ir.ui.view">
+        <field name="name">opex.innovation.deliverable.form</field>
+        <field name="model">opex.innovation.deliverable</field>
+        <field name="arch" type="xml">
+            <form string="Livrable">
+                <header>
+                    <!-- Un bouton unique. Les quatre étapes et leurs sorties
+                         vivent dans la configuration : cette vue ne les connaît
+                         pas et n'a pas à les connaître. -->
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" placeholder="Business model"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="accompagnement_id"/>
+                            <field name="project_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="deadline"/>
+                            <field name="en_retard" widget="boolean_toggle" readonly="1"/>
+                            <field name="version" readonly="1"/>
+                            <field name="file" filename="filename"/>
+                            <field name="filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Ce qui est attendu">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                    <notebook>
+                        <page string="Versions précédentes" name="versions">
+                            <div class="alert alert-info" role="status">
+                                Section 24 : l'historique est conservé. Chaque
+                                version refusée est figée avec le motif qui l'a
+                                visée, et ne peut plus être modifiée.
+                            </div>
+                            <field name="history_ids" readonly="1">
+                                <list>
+                                    <field name="version"/>
+                                    <field name="date"/>
+                                    <field name="author_id"/>
+                                    <field name="file" filename="filename"/>
+                                    <field name="filename" column_invisible="1"/>
+                                    <field name="motif_correction"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_deliverable_list" model="ir.ui.view">
+        <field name="name">opex.innovation.deliverable.list</field>
+        <field name="model">opex.innovation.deliverable</field>
+        <field name="arch" type="xml">
+            <list string="Livrables" decoration-danger="en_retard == True"
+                  decoration-success="workflow_stage_id.code == 'validated'">
+                <field name="project_id"/>
+                <field name="name"/>
+                <field name="deadline"/>
+                <field name="workflow_stage_id"/>
+                <field name="version"/>
+                <field name="en_retard" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_deliverable_search" model="ir.ui.view">
+        <field name="name">opex.innovation.deliverable.search</field>
+        <field name="model">opex.innovation.deliverable</field>
+        <field name="arch" type="xml">
+            <search string="Livrables">
+                <field name="name"/>
+                <field name="project_id"/>
+                <!--
+                    ⚠ Le filtre porte sur les champs bruts, pas sur `en_retard`.
+
+                    `en_retard` est calculé et **non stocké** : il n'est donc pas
+                    cherchable, et Odoo refuse la vue (« Unsearchable field
+                    en_retard »). Le stocker serait pire : sa valeur dépend de la
+                    date du jour, donc un livrable stocké « à l'heure » hier le
+                    resterait aujourd'hui jusqu'à ce qu'un autre champ le fasse
+                    recalculer. Un champ figé qui prétend parler du présent est
+                    plus dangereux qu'un filtre un peu plus long à lire.
+                -->
+                <filter name="filter_late" string="En retard"
+                        domain="[('deadline', '&lt;', context_today().strftime('%Y-%m-%d')),
+                                 ('workflow_stage_id.code', '!=', 'validated')]"/>
+                <filter name="filter_to_review" string="À vérifier"
+                        domain="[('workflow_stage_id.code', '=', 'submitted')]"/>
+                <separator/>
+                <filter name="filter_validated" string="Validés"
+                        domain="[('workflow_stage_id.code', '=', 'validated')]"/>
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                    <filter name="group_project" string="Projet"
+                            context="{'group_by': 'project_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_deliverable" model="ir.actions.act_window">
+        <field name="name">Livrables</field>
+        <field name="res_model">opex.innovation.deliverable</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ══════════ Référentiel des phases ══════════ -->
+
+    <record id="view_roadmap_template_list" model="ir.ui.view">
+        <field name="name">opex.innovation.roadmap.template.list</field>
+        <field name="model">opex.innovation.roadmap.template</field>
+        <field name="arch" type="xml">
+            <list string="Phases types" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_roadmap_template" model="ir.actions.act_window">
+        <field name="name">Phases de roadmap</field>
+        <field name="res_model">opex.innovation.roadmap.template</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiley_face">Ajoutez une phase type</p>
+            <p>
+                Ces phases sont recopiées dans chaque nouvel accompagnement.
+                En ajouter une ne demande aucun développement — et ne modifie
+                pas les accompagnements déjà ouverts.
+            </p>
+        </field>
+    </record>
+
+    <!-- ══════════ Menus ══════════ -->
+
+    <menuitem id="menu_accompagnement"
+              name="Accompagnements"
+              parent="opex_innovation.menu_innovation_root"
+              action="action_accompagnement"
+              sequence="40"/>
+
+    <menuitem id="menu_deliverable"
+              name="Livrables"
+              parent="opex_innovation.menu_innovation_root"
+              action="action_deliverable"
+              sequence="42"/>
+
+    <menuitem id="menu_roadmap_template"
+              name="Phases de roadmap"
+              parent="opex_innovation.menu_innovation_configuration"
+              action="action_roadmap_template"
+              sequence="30"/>
+
+</odoo>

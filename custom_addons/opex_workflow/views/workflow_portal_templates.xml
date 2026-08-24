@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Progression générique, réutilisable par n'importe quel module métier :
+
+            <t t-call="opex_workflow.workflow_portal_progress">
+                <t t-set="instance" t-value="projet.workflow_instance_id"/>
+            </t>
+
+        ⚠ Aucun code technique n'est rendu ici. Les libellés viennent de
+        `stage.user_label`, et l'étape suivante est formulée comme une action
+        attendue, pas comme un état de machine. Le workflow système peut être
+        complexe ; ce que l'utilisateur lit ne doit pas l'être.
+    -->
+    <template id="workflow_portal_progress" name="Progression d'un dossier">
+        <t t-if="instance">
+            <div class="o_workflow_progress">
+                <ul class="list-unstyled mb-3">
+                    <t t-foreach="instance.progress_steps()" t-as="step">
+                        <li t-att-class="'mb-1 fw-bold' if step['state'] == 'current' else ('mb-1' if step['state'] == 'done' else 'mb-1 text-muted')">
+                            <span t-if="step['state'] == 'done'" class="text-success me-2">✓</span>
+                            <span t-elif="step['state'] == 'current'" class="text-primary me-2">●</span>
+                            <span t-else="" class="me-2">○</span>
+                            <span t-esc="step['label']"/>
+                        </li>
+                    </t>
+                </ul>
+
+                <p class="mb-0" t-esc="instance.next_action_label()"/>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        Page portail complète du dossier. Un module métier qui a sa propre page
+        appelle plutôt le gabarit de progression ci-dessus ; celle-ci existe
+        pour que le moteur soit démontrable seul, sans module métier installé.
+    -->
+    <template id="workflow_portal_instance_page" name="Mon dossier">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="record_name"/>
+
+                <t t-call="opex_workflow.workflow_portal_progress"/>
+
+                <div t-if="form" class="mt-3">
+                    <a class="btn btn-primary"
+                       t-att-href="'/my/workflow/%s/form/%s' % (instance.id, form.id)">
+                        Compléter mon dossier
+                    </a>
+                </div>
+
+                <div class="mt-4">
+                    <h5>Historique</h5>
+                    <table class="table table-sm">
+                        <thead>
+                            <tr><th>Date</th><th>Étape</th><th>Commentaire</th></tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="history" t-as="entry">
+                                <tr>
+                                    <td t-esc="entry.date"/>
+                                    <td t-esc="entry.to_stage_id.user_label or entry.to_stage_id.name"/>
+                                    <td t-esc="entry.comment or ''"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

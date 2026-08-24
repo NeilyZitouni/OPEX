@@ -38,6 +38,20 @@
               sequence="30"
               groups="group_workflow_manager,group_workflow_designer"/>
 
+    <menuitem id="menu_matching_candidate"
+              name="Candidats proposés"
+              parent="menu_workflow_root"
+              action="action_matching_candidate"
+              sequence="40"
+              groups="group_workflow_manager,group_workflow_designer"/>
+
+    <menuitem id="menu_matching_relation"
+              name="Mises en relation"
+              parent="menu_workflow_root"
+              action="action_matching_relation"
+              sequence="50"
+              groups="group_workflow_manager,group_workflow_designer"/>
+
     <menuitem id="menu_workflow_configuration"
               name="Configuration"
               parent="menu_workflow_root"
@@ -67,5 +81,11 @@
               parent="menu_workflow_configuration"
               action="action_workflow_action"
               sequence="30"/>
+
+    <menuitem id="menu_matching_criteria"
+              name="Critères de matching"
+              parent="menu_workflow_configuration"
+              action="action_matching_criteria"
+              sequence="40"/>
 
 </odoo>

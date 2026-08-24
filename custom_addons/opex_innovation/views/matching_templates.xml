@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ══════════ Section 19 — L'écran du responsable OPEX ══════════ -->
+
+    <template id="staff_matching" name="Staff : matching">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h3 t-esc="project.name"/>
+                    <a class="btn btn-secondary"
+                       t-att-href="'/staff/innovation/%s' % project.id">Retour au dossier</a>
+                </div>
+
+                <div class="alert alert-warning mt-3" role="alert">
+                    <strong>Le moteur recommande, il ne décide pas.</strong>
+                    Retenir un candidat lui ouvre l'accès aux informations qui le
+                    concernent et le prévient. Cela ne fait pas avancer le
+                    dossier : la suite du processus se déclenche séparément.
+                </div>
+
+                <t t-foreach="['expert', 'mentor', 'investisseur']" t-as="kind">
+                    <h5 class="mt-4">
+                        <t t-esc="labels.get(kind, kind)"/>s recommandés
+                    </h5>
+
+                    <table t-if="by_type[kind]" class="table">
+                        <thead>
+                            <tr>
+                                <th>Candidat</th><th>Score</th><th>État</th>
+                                <th>Réponse</th><th>Décision</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="by_type[kind]" t-as="candidate">
+                                <tr>
+                                    <td>
+                                        <span t-esc="candidate.partner_id.display_name"/>
+                                        <!-- L'explication du score, dépliable.
+                                             Un pourcentage sans justification
+                                             n'est pas défendable. -->
+                                        <details class="small text-muted">
+                                            <summary>Comment ce score a été obtenu</summary>
+                                            <pre class="mb-0" t-esc="candidate.detail"/>
+                                        </details>
+                                    </td>
+                                    <td><t t-esc="'%.0f' % candidate.score"/> %</td>
+                                    <td t-esc="dict(candidate._fields['state'].selection).get(candidate.state, '')"/>
+                                    <td t-esc="dict(candidate._fields['candidate_response'].selection).get(candidate.candidate_response, '')"/>
+                                    <td>
+                                        <form method="post"
+                                              t-att-action="'/staff/innovation/%s/matching/decide' % project.id"
+                                              class="d-flex gap-1">
+                                            <input type="hidden" name="csrf_token"
+                                                   t-att-value="request.csrf_token()"/>
+                                            <input type="hidden" name="candidate_id"
+                                                   t-att-value="candidate.id"/>
+                                            <button type="submit" name="decision" value="accept"
+                                                    class="btn btn-sm btn-primary"
+                                                    t-att-disabled="'disabled' if candidate.state == 'accepted' else None">
+                                                Accepter
+                                            </button>
+                                            <button type="submit" name="decision" value="reject"
+                                                    class="btn btn-sm btn-secondary">Ignorer</button>
+                                            <button type="submit" name="decision" value="exclude"
+                                                    class="btn btn-sm btn-outline-danger">Exclure</button>
+                                            <button type="submit" name="decision" value="reset"
+                                                    class="btn btn-sm btn-link">Modifier</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+
+                    <p t-if="not by_type[kind]" class="text-muted">
+                        Aucun candidat proposé dans cette catégorie.
+                    </p>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Section 20 — Ce que le candidat voit ══════════ -->
+
+    <template id="portal_my_home_opportunities" name="Portail : mes opportunités"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="70">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes opportunités</t>
+                <t t-set="url" t-value="'/my/innovation/opportunities'"/>
+                <t t-set="text">Projets qui vous sont proposés</t>
+                <!--
+                    ⚠ Sans `placeholder_count`, `portal.portal_docs_entry`
+                    rendait cette tuile avec `d-none` : présente dans le HTML,
+                    invisible à l'écran, et aucun test ne s'en apercevait.
+
+                    Ici, contrairement aux tuiles « Mes projets » et
+                    « Mes profils », le masquage à zéro est le bon comportement :
+                    un membre à qui aucun projet n'est proposé n'a rien à
+                    consulter, et la tuile réapparaît d'elle-même à la première
+                    proposition.
+                -->
+                <t t-set="placeholder_count"
+                   t-value="'innovation_opportunity_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_opportunities" name="Mes opportunités">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Mes opportunités</h3>
+
+                <!--
+                    ⚠ Le gabarit itère sur des **dictionnaires** construits par
+                    `_matching_teaser()`, jamais sur les projets.
+
+                    Passer le recordset du projet donnerait accès à tous ses
+                    champs — budget, évaluations, historique, coordonnées du
+                    porteur. La liste ci-dessous est exactement celle de la
+                    section 20, et rien d'autre ne peut être rendu par
+                    inadvertance.
+                -->
+                <t t-foreach="proposals" t-as="proposal">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                Une opportunité d'accompagnement vous a été proposée
+                            </h5>
+
+                            <table class="table table-sm">
+                                <tr><th style="width: 30%">Projet</th>
+                                    <td t-esc="proposal.get('projet', '')"/></tr>
+                                <tr><th>Secteur</th>
+                                    <td t-esc="proposal.get('secteur', '')"/></tr>
+                                <tr><th>Résumé</th>
+                                    <td t-esc="proposal.get('resume', '')"/></tr>
+                                <tr><th>Besoin</th>
+                                    <td t-esc="proposal.get('besoin', '')"/></tr>
+                                <tr><th>Rôle proposé</th>
+                                    <td t-esc="proposal.get('role', '')"/></tr>
+                                <tr><th>Durée estimée</th>
+                                    <td t-esc="proposal.get('duree', '')"/></tr>
+
+                                <!--
+                                    Section 26 — les quatre informations de
+                                    l'acteur financier. Section 32 : « informations
+                                    financières autorisées ».
+
+                                    ⚠ Le `t-if` ne masque rien : ces clés
+                                    n'existent tout simplement pas dans le
+                                    dictionnaire d'un expert. `_matching_teaser()`
+                                    ne les y met que pour un investisseur ou un
+                                    sponsor. Le montant recherché par le porteur
+                                    n'est donc pas dans le HTML envoyé à un
+                                    expert — pas caché en CSS : absent.
+                                -->
+                                <t t-if="proposal.get('financier')">
+                                    <tr><th>Maturité</th>
+                                        <td t-esc="proposal.get('maturite', '')"/></tr>
+                                    <tr><th>Potentiel</th>
+                                        <td t-esc="proposal.get('potentiel', '')"/></tr>
+                                    <tr><th>Financement recherché</th>
+                                        <td>
+                                            <span t-esc="proposal.get('financement_recherche', 0)"
+                                                  t-options="{'widget': 'monetary', 'display_currency': proposal.get('currency')}"/>
+                                        </td>
+                                    </tr>
+                                    <tr><th>Progression du financement</th>
+                                        <td>
+                                            <span t-esc="proposal.get('progression_financement', 0)"/> %
+                                        </td>
+                                    </tr>
+                                </t>
+                            </table>
+
+                            <t t-set="candidate" t-value="proposal['candidate']"/>
+
+                            <a class="btn btn-outline-primary me-2"
+                               t-att-href="'/my/innovation/opportunity/%s' % candidate.id">
+                                Voir le projet
+                            </a>
+
+                            <div t-if="candidate.candidate_response == 'pending'" class="d-inline">
+                                <form method="post" class="d-inline"
+                                      t-att-action="'/my/innovation/opportunities/%s/respond' % candidate.id">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <!-- Le libellé du § 26 pour l'acteur financier,
+                                         celui du § 20 pour l'expert. -->
+                                    <button type="submit" name="response" value="interested"
+                                            class="btn btn-primary">
+                                        <t t-if="proposal.get('financier')">Manifester mon intérêt</t>
+                                        <t t-else="">Je suis intéressé</t>
+                                    </button>
+                                    <button type="submit" name="response" value="declined"
+                                            class="btn btn-secondary">Je ne suis pas disponible</button>
+                                </form>
+                            </div>
+                            <div t-else="" class="alert alert-light mb-0" role="status">
+                                Vous avez répondu :
+                                <strong t-esc="dict(candidate._fields['candidate_response'].selection).get(candidate.candidate_response, '')"/>
+                            </div>
+                        </div>
+                    </div>
+                </t>
+
+                <div t-if="not proposals" class="alert alert-light" role="status">
+                    Aucune opportunité ne vous est proposée pour le moment.
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

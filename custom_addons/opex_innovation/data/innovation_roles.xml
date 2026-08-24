@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+            Le moteur livre le référentiel de rôles sans aucun rattachement à un
+            groupe : il ne connaît aucun groupe métier et ne doit pas en
+            connaître. C'est ici, dans le métier, qu'on relie les deux.
+
+            L'identifiant est **préfixé du module d'origine** : on complète
+            l'enregistrement semé par `opex_workflow`, on n'en crée pas un
+            second. Un `<record id="role_secretariat">` sans préfixe créerait un
+            doublon, et les transitions pointeraient vers le mauvais.
+
+            Le Secrétariat du Module 1 devient le contrôleur des demandes de
+            profil : c'est déjà lui qui instruit les dossiers d'adhésion, et le
+            PDF place ce contrôle au même endroit.
+
+            ⚠ Ce bloc n'est **pas** en `noupdate` : il modifie un enregistrement
+            semé par le moteur, et `noupdate="1"` ferait ignorer la
+            modification lors de toute mise à jour du module.
+
+            `role_porteur` reste volontairement sans groupe : il est attribué
+            dossier par dossier, sur l'instance, au membre qui a déposé la
+            demande. C'est le principe même des droits dynamiques.
+        -->
+        <!-- `<function>` et non `<record>` : voir la note de
+             `project_workflow.xml`. Le drapeau `noupdate` de ces rôles vit
+             dans `ir_model_data`, il vient du moteur, et il rendrait tout
+             `<record>` inopérant lors d'une mise à jour. -->
+        <function model="opex.workflow.role" name="write"
+                  eval="[[ref('opex_workflow.role_secretariat')], {'group_id': ref('opex_membership.group_secretariat')}]"/>
+
+
+        <!--
+            ⚠ Rôle créé par le métier, absent du référentiel du moteur.
+
+            Expert ≠ évaluateur. « Expert » est un profil du vivier, semé par
+            `opex_workflow` ; « évaluateur » est une fonction qu'on exerce sur
+            **un projet donné**, et qui n'existe que le temps d'une
+            désignation. Sans `group_id` : personne ne le porte en permanence,
+            c'est la ligne d'acteur qui l'attribue.
+        -->
+        <record id="role_evaluateur" model="opex.workflow.role">
+            <field name="name">Évaluateur</field>
+            <field name="code">evaluateur</field>
+            <field name="description">Sollicité pour rendre un avis consultatif sur un projet précis. L'intervention est optionnelle et la décision finale appartient au Comité d'évaluation.</field>
+        </record>
+
+    </data>
+</odoo>

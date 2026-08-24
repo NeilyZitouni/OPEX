@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Section 35 — la carte « MON PROJET »
+        ═══════════════════════════════════════════════════════════════
+
+            Smart Factory
+            ✓ Déposé
+            ✓ Contrôle terminé
+            ● Évaluation en cours
+            ○ Décision
+            ○ Accompagnement
+            ○ Financement
+            ○ Industrialisation
+
+            Dernière action : « Votre projet est actuellement évalué. »
+            [ Consulter mon projet ]
+
+        ⚠ Sept lignes, jamais quinze. Les jalons viennent de
+        `project.milestones()`, qui lit la correspondance configurée dans
+        `data/milestones.xml`. Aucun code d'étape n'entre dans ce gabarit — ni
+        pour afficher, ni pour décider quoi afficher.
+    -->
+    <template id="portal_project_card" name="Carte MON PROJET">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title mb-3" t-esc="card['project'].name"/>
+
+                <ul class="list-unstyled mb-3">
+                    <li t-foreach="card['milestones']" t-as="step"
+                        t-attf-class="mb-1 #{
+                            'text-success' if step['state'] == 'done'
+                            else 'fw-bold' if step['state'] == 'current'
+                            else 'text-muted'}">
+                        <span t-if="step['state'] == 'done'">✓</span>
+                        <span t-elif="step['state'] == 'current'">●</span>
+                        <span t-else="">○</span>
+                        <t t-esc="step['label']"/>
+                        <t t-if="step['state'] == 'current'"> en cours</t>
+                    </li>
+                </ul>
+
+                <p t-if="card['message']" class="mb-3">
+                    <span class="text-muted">Dernière action :</span>
+                    <em t-esc="card['message']"/>
+                </p>
+
+                <a t-att-href="'/my/innovation/%s' % card['project'].id"
+                   class="btn btn-primary">Consulter mon projet</a>
+
+                <!--
+                    Section 16 : « ne pas demander à l'utilisateur de piloter le
+                    workflow, le workflow doit guider l'utilisateur. » Le bouton
+                    n'apparaît que si la transition est réellement ouverte au
+                    porteur à cette étape — c'est le moteur qui le dit, pas une
+                    condition recopiée ici.
+                -->
+                <t t-foreach="card['actions']" t-as="option">
+                    <a t-if="option['transition'].code == 'submit'"
+                       t-att-href="'/my/innovation/%s/recap' % card['project'].id"
+                       class="btn btn-success"
+                       t-esc="option['transition'].name"/>
+                </t>
+                <a t-if="card['project'].workflow_stage_id.code == 'draft'"
+                   t-att-href="'/my/innovation/%s/marche' % card['project'].id"
+                   class="btn btn-outline-primary">Compléter mon dossier</a>
+            </div>
+        </div>
+    </template>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Dashboard expert — « mes missions, mes livrables »
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <template id="portal_missions" name="Mes missions">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Mes missions</h3>
+
+                <!--
+                    ⚠ Comme l'espace investisseur : le gabarit itère sur les
+                    dictionnaires de `_matching_teaser()`, jamais sur les
+                    projets. L'expert voit ce à quoi il a droit, et rien
+                    d'autre ne peut être rendu par inadvertance.
+                -->
+                <div t-if="missions" class="row">
+                    <div t-foreach="missions" t-as="mission" class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title" t-esc="mission.get('projet', '')"/>
+                                <table class="table table-sm">
+                                    <tr><th style="width: 40%">Secteur</th>
+                                        <td t-esc="mission.get('secteur', '')"/></tr>
+                                    <tr><th>Besoin</th>
+                                        <td t-esc="mission.get('besoin', '')"/></tr>
+                                    <tr><th>Rôle proposé</th>
+                                        <td t-esc="mission.get('role', '')"/></tr>
+                                    <tr><th>Durée estimée</th>
+                                        <td t-esc="mission.get('duree', '')"/></tr>
+                                </table>
+                                <a t-att-href="'/my/innovation/opportunity/%s' % mission['candidate'].id"
+                                   class="btn btn-sm btn-outline-primary">Voir le projet</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div t-else="" class="alert alert-light" role="status">
+                    Aucune mission ne vous est confiée pour le moment.
+                </div>
+
+                <h4 class="mt-4">Mes évaluations</h4>
+                <div t-if="a_rendre" class="alert alert-warning" role="status">
+                    <strong t-esc="len(a_rendre)"/> évaluation(s) attendent votre avis.
+                    <a href="/my/innovation/evaluations">Les ouvrir</a>
+                </div>
+                <div t-if="not a_rendre and rendues" class="alert alert-success"
+                     role="status">
+                    Vous avez rendu <strong t-esc="len(rendues)"/> évaluation(s).
+                    Rien ne vous est demandé pour le moment.
+                </div>
+                <div t-if="not a_rendre and not rendues" class="alert alert-light"
+                     role="status">
+                    Aucune évaluation ne vous a été confiée.
+                </div>
+
+                <!--
+                    ✅ « Mes livrables » — section 24. Cet encart annonçait
+                    jusqu'ici que la fonctionnalité relevait de l'Extension 16,
+                    non réalisée. Elle l'est.
+
+                    Les livrables affichés sont ceux dont cet expert est acteur,
+                    filtrés côté serveur par `instance._has_access()`.
+                -->
+                <h4 class="mt-4">Mes livrables à vérifier</h4>
+
+                <div t-if="a_verifier" class="list-group mb-3">
+                    <a t-foreach="a_verifier" t-as="livrable"
+                       t-att-href="'/my/innovation/deliverable/%s' % livrable.id"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong t-esc="livrable.name"/>
+                            <span class="text-muted"> — </span>
+                            <span t-esc="livrable.project_id.name"/>
+                            <div class="small text-muted">
+                                Nouveau livrable à vérifier
+                                <t t-if="livrable.version &gt; 1">
+                                    — version <t t-esc="livrable.version"/>
+                                </t>
+                            </div>
+                        </div>
+                        <span t-if="livrable.en_retard" class="badge text-bg-danger">
+                            En retard
+                        </span>
+                    </a>
+                </div>
+                <div t-else="" class="alert alert-light" role="status">
+                    Aucun livrable n'attend votre vérification.
+                </div>
+
+                <div t-if="en_correction" class="alert alert-info" role="status">
+                    <strong t-esc="len(en_correction)"/> livrable(s) sont en
+                    cours de correction chez leur porteur.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Dashboard gestionnaire — projets par étape, délais, alertes
+        ═══════════════════════════════════════════════════════════════
+
+        Le back-office peut être aussi détaillé qu'on veut : c'est ici que la
+        complexité a le droit d'être visible. Les codes techniques d'étape y
+        figurent, contrairement à la carte du porteur.
+    -->
+    <template id="staff_dashboard" name="Staff : tableau de bord">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3 class="mb-0">Tableau de bord</h3>
+                    <a class="btn btn-outline-secondary" href="/staff/innovation">
+                        File de travail
+                    </a>
+                </div>
+
+                <!-- ══════════ Alertes, en tête : c'est ce qui demande une
+                     action, pas ce qui décrit l'existant. ══════════ -->
+                <h5>Alertes</h5>
+                <div t-if="alertes">
+                    <div t-foreach="alertes" t-as="alerte"
+                         t-attf-class="alert alert-#{alerte['niveau']} d-flex justify-content-between align-items-center"
+                         role="alert">
+                        <div>
+                            <strong t-esc="alerte['titre']"/> —
+                            <span t-esc="alerte['detail']"/>
+                        </div>
+                        <a t-att-href="alerte['url']" class="btn btn-sm btn-light">
+                            Ouvrir
+                        </a>
+                    </div>
+                </div>
+                <div t-else="" class="alert alert-success" role="status">
+                    Aucune alerte. Aucun dossier en retard, aucune évaluation
+                    sans avis, aucun financement sans candidat.
+                </div>
+
+                <div class="row mt-4">
+                    <!-- ══════════ Projets par étape ══════════ -->
+                    <div class="col-lg-6">
+                        <h5>Projets par étape</h5>
+                        <table t-if="par_etape" class="table table-sm">
+                            <thead>
+                                <tr><th>Étape</th><th>Code</th>
+                                    <th class="text-end">Projets</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="par_etape" t-as="ligne">
+                                    <td t-esc="ligne['label']"/>
+                                    <td><code t-esc="ligne['code']"/></td>
+                                    <td class="text-end">
+                                        <span class="badge text-bg-secondary"
+                                              t-esc="ligne['count']"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div t-else="" class="alert alert-light" role="status">
+                            Aucun projet dans votre périmètre.
+                        </div>
+                    </div>
+
+                    <!-- ══════════ Délais ══════════ -->
+                    <div class="col-lg-6">
+                        <h5>Délais</h5>
+                        <table t-if="delais" class="table table-sm">
+                            <thead>
+                                <tr><th>Dossier</th><th>Étape</th>
+                                    <th class="text-end">Jours</th>
+                                    <th>Échéance</th></tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="delais" t-as="ligne"
+                                    t-attf-class="#{'table-danger' if ligne['en_retard'] else ''}">
+                                    <td t-esc="ligne['instance'].display_name"/>
+                                    <td t-esc="ligne['instance'].current_stage_id.name"/>
+                                    <td class="text-end" t-esc="ligne['jours']"/>
+                                    <td>
+                                        <span t-if="ligne['echeance']"
+                                              t-esc="ligne['echeance']"
+                                              t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy'}"/>
+                                        <span t-else="" class="text-muted">—</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <div t-else="" class="alert alert-light" role="status">
+                            Aucun dossier en cours.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_my_home_missions" name="Portail : mes missions"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="65">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes missions</t>
+                <t t-set="url" t-value="'/my/innovation/missions'"/>
+                <t t-set="text">Projets que vous accompagnez</t>
+                <!-- Même compteur que « Mes opportunités » : les deux écrans
+                     lisent les mêmes propositions retenues, sous deux angles.
+                     Un second compteur donnerait deux nombres à tenir d'accord. -->
+                <t t-set="placeholder_count"
+                   t-value="'innovation_opportunity_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!-- Lien vers le tableau de bord depuis la file de travail. -->
+    <template id="staff_projects_dashboard_link" name="Staff : lien tableau de bord"
+              inherit_id="opex_innovation.staff_projects">
+        <xpath expr="//h3" position="after">
+            <a class="btn btn-outline-primary btn-sm ms-2"
+               href="/staff/innovation/dashboard">Tableau de bord</a>
+        </xpath>
+    </template>
+
+</odoo>

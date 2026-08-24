@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LE PREMIER WORKFLOW CONFIGURÉ DU PROJET
+            ═══════════════════════════════════════════════════════════════
+
+            Schéma 2 du PDF Module 2, traduit en données. Pas une ligne de
+            Python ne décrit ce processus : ni les étapes, ni les transitions,
+            ni les conditions, ni les droits. Le module métier connaît un seul
+            mot du workflow — son code, `profile_request`.
+
+            ⚠ Une seule définition pour **deux modèles**.
+
+            Le moteur pilote par `res_model` / `res_id` ; il n'exige pas que les
+            objets se ressemblent. `model_id` désigne le profil Expert, et la
+            définition est réutilisée telle quelle par le profil Investisseur
+            via une seconde définition qui ne diffère que par son modèle —
+            mêmes étapes, mêmes libellés, mêmes règles, réécrites nulle part
+            ailleurs qu'ici.
+
+            ⚠ Écart de comptage signalé.
+
+            La consigne annonce « cinq étapes, quatre transitions ». Le schéma 2
+            en demande davantage : la boucle Complément → Resoumission → En
+            contrôle en fait partie, et c'est elle qui prouve qu'on gère un
+            graphe et pas une séquence. On configure donc **six étapes et six
+            transitions**, fidèles au schéma. « Profil activé » n'est pas une
+            étape mais une action `set_field` : c'est un effet, pas un état
+            d'attente.
+        -->
+
+        <!-- ══════════ Règles ══════════ -->
+
+        <record id="rule_profile_has_cv" model="opex.workflow.rule">
+            <field name="name">CV fourni</field>
+            <field name="code">profile_has_cv</field>
+            <field name="expression">has_document('cv')</field>
+            <field name="message">Un CV doit être joint à la demande.</field>
+        </record>
+
+        <record id="rule_profile_domain_filled" model="opex.workflow.rule">
+            <field name="name">Domaine d'expertise renseigné</field>
+            <field name="code">profile_domain_filled</field>
+            <field name="expression">bool(field('domaine_expertise') or field('type_investisseur'))</field>
+            <field name="message">Précisez votre domaine d'expertise ou votre type d'investisseur avant de soumettre.</field>
+        </record>
+
+        <!-- ══════════ Actions ══════════ -->
+
+        <record id="action_profile_notify_control" model="opex.workflow.action">
+            <field name="name">Prévenir le Secrétariat</field>
+            <field name="code">profile_notify_control</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Une demande de profil attend votre contrôle.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="action_profile_notify_member" model="opex.workflow.action">
+            <field name="name">Informer le membre</field>
+            <field name="code">profile_notify_member</field>
+            <field name="action_type">notify</field>
+            <!-- `comment` et non `note` : c'est le seul message que
+                 l'intéressé doit réellement recevoir par email. -->
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Votre demande de profil a été examinée. Consultez votre espace personnel.</p></field>
+        </record>
+
+        <record id="action_profile_activate" model="opex.workflow.action">
+            <field name="name">Activer le profil</field>
+            <field name="code">profile_activate</field>
+            <field name="action_type">set_field</field>
+            <field name="field_id" ref="field_opex_innovation_expert_profile__profile_activated"/>
+            <field name="value_expression">True</field>
+        </record>
+
+        <record id="action_profile_activate_investor" model="opex.workflow.action">
+            <field name="name">Activer le profil investisseur</field>
+            <field name="code">profile_activate_investor</field>
+            <field name="action_type">set_field</field>
+            <field name="field_id" ref="field_opex_innovation_investor_profile__profile_activated"/>
+            <field name="value_expression">True</field>
+        </record>
+
+        <!-- ══════════ Définition — profil Expert ══════════ -->
+
+        <record id="wf_expert_profile" model="opex.workflow.definition">
+            <field name="name">Demande de profil Expert</field>
+            <field name="code">profile_request</field>
+            <field name="model_id" ref="model_opex_innovation_expert_profile"/>
+            <field name="description">Schéma 2 du PDF Module 2. Brouillon, soumission, contrôle du Secrétariat, puis validation, refus, ou demande de complément avec retour au contrôle.</field>
+        </record>
+
+        <record id="stage_expert_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">draft</field>
+            <field name="name">Brouillon</field>
+            <field name="user_label">Compléter ma demande</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="stage_expert_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">submitted</field>
+            <field name="name">Soumise</field>
+            <field name="user_label">Demande déposée</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">2</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="stage_expert_review" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">review</field>
+            <field name="name">En contrôle</field>
+            <field name="user_label">Contrôle en cours</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="stage_expert_complement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">complement_requested</field>
+            <field name="name">Complément demandé</field>
+            <field name="user_label">Action requise sur votre demande</field>
+            <field name="sequence">40</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="stage_expert_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">validated</field>
+            <field name="name">Validée</field>
+            <field name="user_label">Profil activé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="stage_expert_refused" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">refused</field>
+            <field name="name">Refusée</field>
+            <field name="user_label">Demande non retenue</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="tr_expert_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">submit</field>
+            <field name="name">Soumettre ma demande</field>
+            <field name="source_stage_id" ref="stage_expert_draft"/>
+            <field name="target_stage_id" ref="stage_expert_submitted"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_profile_domain_filled'), ref('rule_profile_has_cv')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_control')])]"/>
+        </record>
+
+        <record id="tr_expert_take" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">take_in_charge</field>
+            <field name="name">Prendre en charge</field>
+            <field name="source_stage_id" ref="stage_expert_submitted"/>
+            <field name="target_stage_id" ref="stage_expert_review"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="tr_expert_complement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">request_complement</field>
+            <field name="name">Demander un complément</field>
+            <field name="source_stage_id" ref="stage_expert_review"/>
+            <field name="target_stage_id" ref="stage_expert_complement"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_member')])]"/>
+        </record>
+
+        <!-- La boucle. C'est elle qui distingue un graphe d'une séquence. -->
+        <record id="tr_expert_resubmit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">resubmit</field>
+            <field name="name">Renvoyer ma demande</field>
+            <field name="source_stage_id" ref="stage_expert_complement"/>
+            <field name="target_stage_id" ref="stage_expert_review"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_control')])]"/>
+        </record>
+
+        <record id="tr_expert_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">validate</field>
+            <field name="name">Valider</field>
+            <field name="source_stage_id" ref="stage_expert_review"/>
+            <field name="target_stage_id" ref="stage_expert_validated"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_activate'), ref('action_profile_notify_member')])]"/>
+        </record>
+
+        <record id="tr_expert_refuse" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_profile"/>
+            <field name="code">refuse</field>
+            <field name="name">Refuser</field>
+            <field name="source_stage_id" ref="stage_expert_review"/>
+            <field name="target_stage_id" ref="stage_expert_refused"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_member')])]"/>
+        </record>
+
+
+        <!-- ══════════ Définition — profil Investisseur ══════════ -->
+
+        <record id="wf_investor_profile" model="opex.workflow.definition">
+            <field name="name">Demande de profil Investisseur</field>
+            <field name="code">profile_request_investor</field>
+            <field name="model_id" ref="model_opex_innovation_investor_profile"/>
+            <field name="description">Même processus que la demande de profil Expert (schéma 2 du PDF), sur le modèle Investisseur.</field>
+        </record>
+
+        <record id="stage_investor_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">draft</field>
+            <field name="name">Brouillon</field>
+            <field name="user_label">Compléter ma demande</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="stage_investor_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">submitted</field>
+            <field name="name">Soumise</field>
+            <field name="user_label">Demande déposée</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">2</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="stage_investor_review" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">review</field>
+            <field name="name">En contrôle</field>
+            <field name="user_label">Contrôle en cours</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="stage_investor_complement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">complement_requested</field>
+            <field name="name">Complément demandé</field>
+            <field name="user_label">Action requise sur votre demande</field>
+            <field name="sequence">40</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="stage_investor_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">validated</field>
+            <field name="name">Validée</field>
+            <field name="user_label">Profil activé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="stage_investor_refused" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">refused</field>
+            <field name="name">Refusée</field>
+            <field name="user_label">Demande non retenue</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="tr_investor_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">submit</field>
+            <field name="name">Soumettre ma demande</field>
+            <field name="source_stage_id" ref="stage_investor_draft"/>
+            <field name="target_stage_id" ref="stage_investor_submitted"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_profile_domain_filled')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_control')])]"/>
+        </record>
+
+        <record id="tr_investor_take" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">take_in_charge</field>
+            <field name="name">Prendre en charge</field>
+            <field name="source_stage_id" ref="stage_investor_submitted"/>
+            <field name="target_stage_id" ref="stage_investor_review"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="tr_investor_complement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">request_complement</field>
+            <field name="name">Demander un complément</field>
+            <field name="source_stage_id" ref="stage_investor_review"/>
+            <field name="target_stage_id" ref="stage_investor_complement"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_member')])]"/>
+        </record>
+
+        <record id="tr_investor_resubmit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">resubmit</field>
+            <field name="name">Renvoyer ma demande</field>
+            <field name="source_stage_id" ref="stage_investor_complement"/>
+            <field name="target_stage_id" ref="stage_investor_review"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_control')])]"/>
+        </record>
+
+        <record id="tr_investor_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">validate</field>
+            <field name="name">Valider</field>
+            <field name="source_stage_id" ref="stage_investor_review"/>
+            <field name="target_stage_id" ref="stage_investor_validated"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_activate_investor'), ref('action_profile_notify_member')])]"/>
+        </record>
+
+        <record id="tr_investor_refuse" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_investor_profile"/>
+            <field name="code">refuse</field>
+            <field name="name">Refuser</field>
+            <field name="source_stage_id" ref="stage_investor_review"/>
+            <field name="target_stage_id" ref="stage_investor_refused"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_profile_notify_member')])]"/>
+        </record>
+
+
+    </data>
+
+    <!--
+        ⚠ Publication hors du bloc `noupdate="1"`, et c'est indispensable.
+
+        Odoo **n'exécute pas** les `<function>` d'un bloc `noupdate` lors d'une
+        mise à jour de module : seulement à la première installation. Placée
+        au-dessus, la publication ne serait jamais rejouée, et une définition
+        ajoutée par `-u` resterait en brouillon — donc introuvable par
+        `start_workflow()`, sans qu'aucune erreur ne le signale au chargement.
+
+        Ici, elle est rejouée à chaque mise à jour. C'est sans risque —
+        `action_publish()` est idempotent — et c'est même utile : le graphe est
+        revalidé à chaque déploiement, et une configuration devenue incohérente
+        fait échouer la mise à jour au lieu de se découvrir en démonstration.
+    -->
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_expert_profile')]]"/>
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_investor_profile')]]"/>
+
+</odoo>

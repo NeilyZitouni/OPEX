@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LES SEPT JALONS DE LA SECTION 35
+            ═══════════════════════════════════════════════════════════════
+
+                Smart Factory
+                ✓ Déposé
+                ✓ Contrôle terminé
+                ● Évaluation en cours
+                ○ Décision
+                ○ Accompagnement
+                ○ Financement
+                ○ Industrialisation
+
+            Quinze étapes techniques, sept lignes lues par le porteur. La
+            correspondance est ici, en données : ajouter une étape au workflow
+            ne demande que de la cocher dans le jalon voulu.
+
+            ⚠ **Trois étapes ne sont rattachées à aucun jalon**, et c'est
+            voulu : `complement_requested`, `remediation` et `resubmitted` sont
+            des allers-retours internes au contrôle et à l'évaluation. Les
+            afficher ferait apparaître et disparaître des lignes sur la carte
+            au gré des va-et-vient — exactement la complexité interne que la
+            section 35 demande de masquer. Le porteur voit l'alerte « Action
+            requise » et l'historique complet ; sa carte, elle, reste stable.
+        -->
+
+        <record id="milestone_depose" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">depose</field>
+            <field name="name">Déposé</field>
+            <field name="sequence">10</field>
+            <!--
+                ⚠ **Volontairement sans phrase d'état.**
+
+                Ce jalon couvre deux situations opposées : le brouillon en cours
+                de saisie et le dossier soumis. Une phrase unique mentirait sur
+                l'une des deux — « votre projet a bien été enregistré » est faux
+                pour un brouillon incomplet, et le porteur perdrait l'indication
+                de ce qui lui manque.
+
+                Sans phrase, `milestone_message()` retombe sur
+                `next_action_label()` du moteur, qui sait dire les deux : la
+                prochaine action quand elle est possible, le motif du blocage
+                quand elle ne l'est pas.
+            -->
+            <field name="message"></field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_draft'), ref('pstage_submitted')])]"/>
+        </record>
+
+        <record id="milestone_controle" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">controle</field>
+            <field name="name">Contrôle terminé</field>
+            <field name="sequence">20</field>
+            <field name="message">Votre projet est en cours de contrôle administratif.</field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_under_review'), ref('pstage_qualified')])]"/>
+        </record>
+
+        <record id="milestone_evaluation" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">evaluation</field>
+            <field name="name">Évaluation</field>
+            <field name="sequence">30</field>
+            <!-- La phrase exacte de la section 35. -->
+            <field name="message">Votre projet est actuellement évalué.</field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_evaluation')])]"/>
+        </record>
+
+        <record id="milestone_decision" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">decision</field>
+            <field name="name">Décision</field>
+            <field name="sequence">40</field>
+            <field name="message">Le comité examine votre dossier.</field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_accepted'), ref('pstage_rejected')])]"/>
+        </record>
+
+        <record id="milestone_accompagnement" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">accompagnement</field>
+            <field name="name">Accompagnement</field>
+            <field name="sequence">50</field>
+            <field name="message">Votre accompagnement est en cours.</field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_matching'), ref('pstage_accompagnement')])]"/>
+        </record>
+
+        <record id="milestone_financement" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">financement</field>
+            <field name="name">Financement</field>
+            <field name="sequence">60</field>
+            <field name="message">La recherche de financement est engagée.</field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_financement')])]"/>
+        </record>
+
+        <record id="milestone_industrialisation" model="opex.innovation.milestone">
+            <field name="definition_id" ref="wf_innovation_project"/>
+            <field name="code">industrialisation</field>
+            <field name="name">Industrialisation</field>
+            <field name="sequence">70</field>
+            <field name="message">Votre projet entre en industrialisation.</field>
+            <field name="stage_ids" eval="[Command.set([
+                ref('pstage_industrialisation'), ref('pstage_closed')])]"/>
+        </record>
+
+    </data>
+</odoo>

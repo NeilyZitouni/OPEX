@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Sections 23 et 24 — un livrable, ses versions, ses décisions
+        ═══════════════════════════════════════════════════════════════
+
+        ⚠ Les boutons d'action viennent de `instance.transition_options()`.
+        Celui qui n'a pas le droit de franchir une transition ne la voit pas
+        proposée — et s'il forge la requête, `_check_transition_allowed()` la
+        refuse. Le gabarit n'est pas la barrière, il en est le reflet.
+    -->
+    <template id="portal_deliverable" name="Mon livrable">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <a t-att-href="'/my/innovation/%s' % deliverable.project_id.id"
+                   class="btn btn-link ps-0 mb-2">← Mon projet</a>
+
+                <h3 t-esc="deliverable.name"/>
+                <p class="text-muted mb-3">
+                    <span t-esc="deliverable.project_id.name"/>
+                    · version <span t-esc="deliverable.version"/>
+                </p>
+
+                <div t-if="error" class="alert alert-danger" role="alert"
+                     t-esc="error"/>
+
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <table class="table table-sm mb-0">
+                                    <tr><th style="width: 35%">Étape</th>
+                                        <td t-esc="deliverable.workflow_stage_label
+                                                   or deliverable.workflow_stage_id.name"/></tr>
+                                    <tr><th>Échéance</th>
+                                        <td>
+                                            <span t-if="deliverable.deadline"
+                                                  t-field="deliverable.deadline"/>
+                                            <span t-else="" class="text-muted">—</span>
+                                            <span t-if="deliverable.en_retard"
+                                                  class="badge text-bg-danger ms-2">En retard</span>
+                                        </td>
+                                    </tr>
+                                    <tr t-if="deliverable.description">
+                                        <th>Ce qui est attendu</th>
+                                        <td t-esc="deliverable.description"/></tr>
+                                    <tr><th>Fichier courant</th>
+                                        <td>
+                                            <a t-if="deliverable.file"
+                                               t-attf-href="/web/content/opex.innovation.deliverable/#{deliverable.id}/file/#{deliverable.filename or 'livrable'}?download=true"
+                                               t-esc="deliverable.filename or 'Télécharger'"/>
+                                            <span t-else="" class="text-muted">Aucun fichier déposé</span>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- ══════════ Le porteur dépose ══════════ -->
+                        <div t-if="deliverable.workflow_stage_id.code in ('todo', 'correction_requested')
+                                   and deliverable.partner_id == request.env.user.partner_id"
+                             class="card mb-3">
+                            <div class="card-header">
+                                <t t-if="deliverable.workflow_stage_id.code == 'correction_requested'">
+                                    Déposer une nouvelle version
+                                </t>
+                                <t t-else="">Déposer mon livrable</t>
+                            </div>
+                            <div class="card-body">
+                                <form method="post" enctype="multipart/form-data"
+                                      t-att-action="'/my/innovation/deliverable/%s/upload' % deliverable.id">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="file">Fichier</label>
+                                        <input type="file" class="form-control"
+                                               name="file" id="file"/>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <t t-if="deliverable.workflow_stage_id.code == 'correction_requested'">
+                                            Déposer la nouvelle version
+                                        </t>
+                                        <t t-else="">Déposer</t>
+                                    </button>
+                                    <p t-if="deliverable.workflow_stage_id.code == 'correction_requested'"
+                                       class="form-text mt-2">
+                                        La version actuelle sera archivée avec le
+                                        motif de la correction demandée. Elle
+                                        restera consultable.
+                                    </p>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- ══════════ L'expert décide — section 24 ══════════ -->
+                        <t t-set="decisions" t-value="[
+                            o for o in options
+                            if o['transition'].code in ('deliverable_validate',
+                                                        'deliverable_request_correction')
+                            and o['available']]"/>
+                        <div t-if="decisions" class="card mb-3">
+                            <div class="card-header">Nouveau livrable à vérifier</div>
+                            <div class="card-body">
+                                <form method="post"
+                                      t-att-action="'/my/innovation/deliverable/%s/decide' % deliverable.id">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <div class="mb-3">
+                                        <label class="form-label" for="comment">
+                                            Motif — obligatoire pour demander une correction
+                                        </label>
+                                        <textarea class="form-control" name="comment"
+                                                  id="comment" rows="3"
+                                                  placeholder="Ce qui doit être repris, précisément."/>
+                                    </div>
+                                    <t t-foreach="decisions" t-as="option">
+                                        <button type="submit" name="transition_code"
+                                                t-att-value="option['transition'].code"
+                                                t-attf-class="btn #{
+                                                    'btn-success' if option['transition'].code == 'deliverable_validate'
+                                                    else 'btn-warning'}"
+                                                t-esc="option['transition'].name"/>
+                                    </t>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ══════════ L'historique — section 24 ══════════ -->
+                    <div class="col-lg-5">
+                        <div class="card mb-3">
+                            <div class="card-header">Versions précédentes</div>
+                            <ul t-if="deliverable.history_ids"
+                                class="list-group list-group-flush">
+                                <li t-foreach="deliverable.history_ids" t-as="version"
+                                    class="list-group-item">
+                                    <div class="d-flex justify-content-between">
+                                        <strong>Version <t t-esc="version.version"/></strong>
+                                        <span class="text-muted small"
+                                              t-field="version.date"
+                                              t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                                    </div>
+                                    <a t-if="version.file"
+                                       t-attf-href="/web/content/opex.innovation.deliverable.version/#{version.id}/file/#{version.filename or 'livrable'}?download=true"
+                                       class="small"
+                                       t-esc="version.filename or 'Télécharger'"/>
+                                    <div t-if="version.motif_correction"
+                                         class="small text-muted mt-1">
+                                        Motif : <t t-esc="version.motif_correction"/>
+                                    </div>
+                                </li>
+                            </ul>
+                            <div t-else="" class="card-body text-muted">
+                                Aucune version antérieure : ce livrable n'a pas
+                                encore fait l'objet d'une demande de correction.
+                            </div>
+                        </div>
+
+                        <div t-if="corrections" class="card">
+                            <div class="card-header">Corrections demandées</div>
+                            <ul class="list-group list-group-flush">
+                                <li t-foreach="corrections" t-as="correction"
+                                    class="list-group-item">
+                                    <div class="small text-muted"
+                                         t-esc="correction['auteur']"/>
+                                    <div t-esc="correction['motif']"/>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

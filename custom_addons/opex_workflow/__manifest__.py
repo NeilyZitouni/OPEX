@@ -19,7 +19,7 @@ Le moteur ne contient aucune logique métier : il ne connaît ni « projet », n
     'website': "https://www.deltalog-conseil.com",
 
     'category': 'Services/Workflow',
-    'version': '19.0.1.6.0',
+    'version': '19.0.1.8.0',
 
     # Un moteur qui dépend de `sale` ou de `website` n'est pas un moteur.
     #
@@ -39,6 +39,7 @@ Le moteur ne contient aucune logique métier : il ne connaît ni « projet », n
         'security/ir.model.access.csv',
         'security/ir_rule.xml',
         'data/workflow_roles.xml',
+        'data/ir_cron.xml',
         'wizard/workflow_transition_wizard_views.xml',
         'views/workflow_definition_views.xml',
         'views/workflow_referential_views.xml',
@@ -46,6 +47,8 @@ Le moteur ne contient aucune logique métier : il ne connaît ni « projet », n
         'views/workflow_form_templates.xml',
         'views/workflow_instance_views.xml',
         'views/workflow_task_views.xml',
+        'views/matching_views.xml',
+        'views/workflow_portal_templates.xml',
         'views/workflow_menus.xml',
     ],
 

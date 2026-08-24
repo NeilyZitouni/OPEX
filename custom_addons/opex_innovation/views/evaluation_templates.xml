@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="portal_my_home_evaluations" name="Portail : mes évaluations"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="60">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes évaluations</t>
+                <t t-set="url" t-value="'/my/innovation/evaluations'"/>
+                <t t-set="text">Avis qui vous sont demandés</t>
+                <!-- Le compteur ne porte que les avis **non rendus** : une fois
+                     son travail fait, l'évaluateur n'a plus rien à ouvrir et la
+                     tuile s'efface. Voir la note de « Mes opportunités ». -->
+                <t t-set="placeholder_count"
+                   t-value="'innovation_evaluation_count'"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_my_evaluations" name="Mes évaluations">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Mes évaluations</h3>
+
+                <div class="alert alert-light" role="status">
+                    Votre avis est <strong>consultatif</strong>. La décision
+                    finale appartient au Comité d'évaluation, qui n'est pas tenu
+                    de le suivre.
+                </div>
+
+                <table t-if="evaluations" class="table">
+                    <thead>
+                        <tr><th>Projet</th><th>Secteur</th><th>État</th><th/></tr>
+                    </thead>
+                    <tbody>
+                        <!--
+                            ⚠ On itère sur les avis **de l'évaluateur**, pas sur
+                            les projets : parcourir un projet donnerait accès à
+                            ses `evaluation_ids`, donc aux avis des autres.
+                        -->
+                        <t t-foreach="evaluations" t-as="evaluation">
+                            <tr>
+                                <td t-esc="evaluation.project_id.name"/>
+                                <td t-esc="dict(evaluation.project_id._fields['secteur'].selection).get(evaluation.project_id.secteur, '')"/>
+                                <td t-esc="dict(evaluation._fields['state'].selection).get(evaluation.state, '')"/>
+                                <td>
+                                    <a t-att-href="'/my/innovation/evaluation/%s' % evaluation.id"
+                                       class="btn btn-sm btn-primary">
+                                        <t t-if="evaluation.state == 'submitted'">Consulter</t>
+                                        <t t-else="">Évaluer</t>
+                                    </a>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+
+                <div t-if="not evaluations" class="alert alert-light" role="status">
+                    Aucun avis ne vous est demandé pour le moment.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_evaluation_form" name="Grille d'évaluation">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="project.name"/>
+
+                <div t-if="error" class="alert alert-danger" role="alert" t-esc="error"/>
+                <div t-if="saved" class="alert alert-success" role="status">
+                    Votre avis a été enregistré. Vous pouvez y revenir tant que
+                    vous ne l'avez pas rendu.
+                </div>
+
+                <!--
+                    ═══════════════════════════════════════════════════════
+                    ⚠ AUCUN AVIS D'UN AUTRE ÉVALUATEUR N'EST RENDU ICI.
+                    ═══════════════════════════════════════════════════════
+
+                    Ni affiché, ni masqué en CSS, ni caché dans un attribut :
+                    absent du HTML. Le contexte de rendu ne contient que
+                    `evaluation` — celui de l'utilisateur — et `project`. Le
+                    gabarit ne touche jamais `project.evaluation_ids`, dont la
+                    seule lecture ferait entrer les autres avis dans la page.
+
+                    Un `t-if` de visibilité ne suffirait pas : QWeb évalue le
+                    contenu avant de décider, et un évaluateur curieux lit la
+                    source de la page.
+                -->
+
+                <div class="alert alert-info" role="status">
+                    Vous travaillez de façon indépendante : les avis des autres
+                    évaluateurs ne vous sont pas communiqués tant que vous
+                    n'avez pas rendu le vôtre.
+                </div>
+
+                <h5 class="mt-4">Le dossier</h5>
+                <table class="table table-sm">
+                    <tr><th style="width: 30%">Secteur</th>
+                        <td t-esc="dict(project._fields['secteur'].selection).get(project.secteur, '')"/></tr>
+                    <tr><th>Maturité</th>
+                        <td t-esc="dict(project._fields['maturite'].selection).get(project.maturite, '')"/></tr>
+                    <tr><th>Résumé</th><td t-esc="project.resume or '—'"/></tr>
+                    <tr><th>Problème</th><td t-esc="project.probleme or '—'"/></tr>
+                    <tr><th>Solution</th><td t-esc="project.solution or '—'"/></tr>
+                    <tr><th>Marché cible</th><td t-esc="project.marche_cible or '—'"/></tr>
+                    <tr><th>Proposition de valeur</th>
+                        <td t-esc="project.proposition_valeur or '—'"/></tr>
+                </table>
+
+                <form method="post"
+                      t-att-action="'/my/innovation/evaluation/%s' % evaluation.id">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                    <h5 class="mt-4">Grille d'évaluation</h5>
+                    <table class="table">
+                        <thead><tr><th>Critère</th><th style="width: 20%">Note</th></tr></thead>
+                        <tbody>
+                            <t t-foreach="criteria" t-as="criterion">
+                                <tr>
+                                    <td>
+                                        <t t-esc="criterion['label']"/>
+                                        <span class="text-muted"> / <t t-esc="criterion['max']"/></span>
+                                    </td>
+                                    <td>
+                                        <input class="form-control" type="number"
+                                               min="0" t-att-max="criterion['max']"
+                                               t-att-name="criterion['name']"
+                                               t-att-value="criterion['value']"
+                                               t-att-disabled="'disabled' if evaluation.state == 'submitted' else None"/>
+                                    </td>
+                                </tr>
+                            </t>
+                            <tr class="table-light">
+                                <th>Total</th>
+                                <th><t t-esc="evaluation.score_total"/> / 100</th>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <h5 class="mt-4">Votre avis</h5>
+                    <!--
+                        La liste vient du controller. Une liste Python écrite
+                        littéralement dans un attribut XML doit survivre à deux
+                        couches d'échappement, et une apostrophe française y
+                        suffit à produire un SyntaxError au rendu — c'est-à-dire
+                        une erreur 500 sur toute la page.
+                    -->
+                    <t t-foreach="text_fields" t-as="field">
+                        <div class="mb-3">
+                            <label class="form-label" t-att-for="field['name']"
+                                   t-esc="field['label']"/>
+                            <textarea class="form-control" rows="2"
+                                      t-att-id="field['name']" t-att-name="field['name']"
+                                      t-att-disabled="'disabled' if evaluation.state == 'submitted' else None"
+                                      t-esc="field['value']"/>
+                        </div>
+                    </t>
+
+                    <t t-if="evaluation.state != 'submitted'">
+                        <div class="alert alert-warning" role="alert">
+                            Une fois rendu, votre avis ne sera plus modifiable.
+                        </div>
+                        <button type="submit" name="action" value="save"
+                                class="btn btn-secondary">Enregistrer le brouillon</button>
+                        <button type="submit" name="action" value="submit"
+                                class="btn btn-primary">Rendre mon avis</button>
+                    </t>
+                    <div t-else="" class="alert alert-success" role="status">
+                        Votre avis a été rendu le <t t-esc="evaluation.date_submitted"/>.
+                    </div>
+                </form>
+
+                <a class="btn btn-secondary mt-3" href="/my/innovation/evaluations">
+                    Retour
+                </a>
+            </div>
+        </t>
+    </template>
+
+</odoo>

@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            INDUSTRIALISATION — section 27
+            ═══════════════════════════════════════════════════════════════
+
+            « Le cluster peut suivre : état d'industrialisation, partenaires,
+            livrables, financement, échéances, résultats. »
+
+            L'« état d'industrialisation » est ce graphe. Il n'existe aucun
+            champ `etat` sur `opex.innovation.industrialisation` : ajouter une
+            étape « Certification » entre Production pilote et Déploiement se
+            fait au configurateur, comme le Demo Day.
+
+            Troisième instance du moteur après le parcours d'innovation et le
+            Smart Crowdfunding — et la première à tourner sur un modèle qui
+            n'est pas `opex.innovation.project`.
+        -->
+
+        <record id="rule_indus_partenaires" model="opex.workflow.rule">
+            <field name="name">Partenaires identifiés</field>
+            <field name="code">indus_partenaires</field>
+            <field name="expression">bool(field('partenaire_ids'))</field>
+            <field name="message">Renseignez au moins un partenaire industriel avant de lancer la production pilote.</field>
+        </record>
+
+        <record id="rule_indus_finance" model="opex.workflow.rule">
+            <field name="name">Financement à moitié couvert</field>
+            <field name="code">indus_finance</field>
+            <field name="expression">field('progression_financement') &gt;= 50</field>
+            <field name="message">Le déploiement demande qu'au moins la moitié du besoin de financement soit couverte.</field>
+        </record>
+
+        <record id="rule_indus_resultats" model="opex.workflow.rule">
+            <field name="name">Résultats consignés</field>
+            <field name="code">indus_resultats</field>
+            <field name="expression">bool(field('resultats'))</field>
+            <field name="message">Consignez les résultats obtenus avant de clore l'industrialisation.</field>
+        </record>
+
+        <record id="action_indus_alerte_retard" model="opex.workflow.action">
+            <field name="name">Signaler le retard au cluster</field>
+            <field name="code">indus_alerte_retard</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>L'industrialisation de ce projet est suspendue. Un arbitrage est attendu.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="action_indus_informer_porteur" model="opex.workflow.action">
+            <field name="name">Informer le porteur de l'avancement</field>
+            <field name="code">indus_informer_porteur</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>L'industrialisation de votre projet a franchi une étape. Consultez votre espace.</p></field>
+        </record>
+
+        <!-- ══════════ La définition ══════════ -->
+
+        <record id="wf_industrialisation" model="opex.workflow.definition">
+            <field name="name">Industrialisation</field>
+            <field name="code">innovation_industrialisation</field>
+            <field name="model_id" ref="model_opex_innovation_industrialisation"/>
+            <field name="description">Suivi de la mise en production d'un projet abouti. Section 27 du cahier des charges Module 2.</field>
+        </record>
+
+        <!-- ══════════ Étapes ══════════ -->
+
+        <record id="indus_preparation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">preparation</field>
+            <field name="name">Préparation industrielle</field>
+            <field name="user_label">Préparer l'industrialisation</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="indus_partenariats" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">partenariats</field>
+            <field name="name">Partenariats</field>
+            <field name="user_label">Identifier les partenaires</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">45</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="indus_pilote" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">pilote</field>
+            <field name="name">Production pilote</field>
+            <field name="user_label">Production pilote en cours</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">90</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="indus_deploiement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">deploiement</field>
+            <field name="name">Déploiement</field>
+            <field name="user_label">Déploiement en cours</field>
+            <field name="sequence">40</field>
+            <field name="sla_days">120</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="indus_suspendue" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">suspendue</field>
+            <field name="name">Suspendue</field>
+            <field name="user_label">Industrialisation suspendue</field>
+            <field name="sequence">50</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="indus_industrialise" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">industrialise</field>
+            <field name="name">Industrialisé</field>
+            <field name="user_label">Projet industrialisé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="indus_abandonnee" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">abandonnee</field>
+            <field name="name">Abandonnée</field>
+            <field name="user_label">Industrialisation abandonnée</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">70</field>
+        </record>
+
+        <!-- ══════════ Transitions ══════════ -->
+
+        <record id="indus_tr_chercher_partenaires" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_chercher_partenaires</field>
+            <field name="name">Rechercher des partenaires</field>
+            <field name="source_stage_id" ref="indus_preparation"/>
+            <field name="target_stage_id" ref="indus_partenariats"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="indus_tr_lancer_pilote" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_lancer_pilote</field>
+            <field name="name">Lancer la production pilote</field>
+            <field name="source_stage_id" ref="indus_partenariats"/>
+            <field name="target_stage_id" ref="indus_pilote"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_indus_partenaires')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_informer_porteur')])]"/>
+        </record>
+
+        <record id="indus_tr_deployer" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_deployer</field>
+            <field name="name">Passer au déploiement</field>
+            <field name="source_stage_id" ref="indus_pilote"/>
+            <field name="target_stage_id" ref="indus_deploiement"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_indus_finance')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_informer_porteur')])]"/>
+        </record>
+
+        <record id="indus_tr_cloturer" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_cloturer</field>
+            <field name="name">Déclarer le projet industrialisé</field>
+            <field name="source_stage_id" ref="indus_deploiement"/>
+            <field name="target_stage_id" ref="indus_industrialise"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_indus_resultats')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_informer_porteur')])]"/>
+        </record>
+
+        <!--
+            Trois étapes peuvent être suspendues. Trois transitions, et non un
+            cas particulier dans le moteur : « suspendre » n'est pas une notion
+            générique, c'est une transition de ce processus-ci.
+        -->
+        <record id="indus_tr_suspendre_partenariats" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_suspendre_partenariats</field>
+            <field name="name">Suspendre l'industrialisation</field>
+            <field name="source_stage_id" ref="indus_partenariats"/>
+            <field name="target_stage_id" ref="indus_suspendue"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_alerte_retard')])]"/>
+        </record>
+
+        <record id="indus_tr_suspendre_pilote" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_suspendre_pilote</field>
+            <field name="name">Suspendre l'industrialisation</field>
+            <field name="source_stage_id" ref="indus_pilote"/>
+            <field name="target_stage_id" ref="indus_suspendue"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_alerte_retard')])]"/>
+        </record>
+
+        <record id="indus_tr_suspendre_deploiement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_suspendre_deploiement</field>
+            <field name="name">Suspendre l'industrialisation</field>
+            <field name="source_stage_id" ref="indus_deploiement"/>
+            <field name="target_stage_id" ref="indus_suspendue"/>
+            <field name="sequence">70</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_alerte_retard')])]"/>
+        </record>
+
+        <record id="indus_tr_reprendre" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_reprendre</field>
+            <field name="name">Reprendre l'industrialisation</field>
+            <field name="source_stage_id" ref="indus_suspendue"/>
+            <field name="target_stage_id" ref="indus_partenariats"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_indus_informer_porteur')])]"/>
+        </record>
+
+        <record id="indus_tr_abandonner" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_industrialisation"/>
+            <field name="code">indus_abandonner</field>
+            <field name="name">Abandonner l'industrialisation</field>
+            <field name="source_stage_id" ref="indus_suspendue"/>
+            <field name="target_stage_id" ref="indus_abandonnee"/>
+            <field name="sequence">90</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+    </data>
+
+    <!--
+        Hors du bloc `noupdate` : sinon la définition serait créée par une mise
+        à jour et resterait en brouillon, faute de `<function>` exécuté. Le
+        piège des Extensions 10, 12 et 20.
+    -->
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_industrialisation')]]"/>
+
+</odoo>

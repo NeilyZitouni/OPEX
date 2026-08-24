@@ -21,14 +21,14 @@
             <field name="name">Demo Porteur</field>
             <field name="login">wf_demo_porteur</field>
             <field name="password">wf_demo_porteur</field>
-            <field name="groups_id" eval="[Command.set([ref('base.group_portal')])]"/>
+            <field name="group_ids" eval="[Command.set([ref('base.group_portal')])]"/>
         </record>
 
         <record id="demo_user_expert" model="res.users">
             <field name="name">Demo Expert</field>
             <field name="login">wf_demo_expert</field>
             <field name="password">wf_demo_expert</field>
-            <field name="groups_id" eval="[Command.set([ref('base.group_portal')])]"/>
+            <field name="group_ids" eval="[Command.set([ref('base.group_portal')])]"/>
         </record>
 
         <!-- Le témoin : aucun rôle, aucune ligne d'acteur, aucun accès. -->
@@ -36,7 +36,7 @@
             <field name="name">Demo Sans Accès</field>
             <field name="login">wf_demo_etranger</field>
             <field name="password">wf_demo_etranger</field>
-            <field name="groups_id" eval="[Command.set([ref('base.group_portal')])]"/>
+            <field name="group_ids" eval="[Command.set([ref('base.group_portal')])]"/>
         </record>
 
         <!-- Un workflow d'essai à trois étapes, sur un modèle natif. -->

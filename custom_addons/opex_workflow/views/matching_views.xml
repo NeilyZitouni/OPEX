@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ==================== Critères ==================== -->
+
+    <record id="view_matching_criteria_list" model="ir.ui.view">
+        <field name="name">opex.matching.criteria.list</field>
+        <field name="model">opex.matching.criteria</field>
+        <field name="arch" type="xml">
+            <list string="Critères de matching" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="definition_id" options="{'no_create': True}"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="criteria_type"/>
+                <field name="source_expression"/>
+                <field name="target_field"/>
+                <field name="match_mode"/>
+                <field name="weight"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_matching_criteria" model="ir.actions.act_window">
+        <field name="name">Critères de matching</field>
+        <field name="res_model">opex.matching.criteria</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun critère configuré</p>
+            <p>
+                Un critère compare une valeur du dossier à un champ du candidat.
+                Sa correspondance rapporte son poids ; les poids sont normalisés,
+                seul leur rapport compte. Aucun apprentissage automatique :
+                chaque point du score se rattache à un critère nommé.
+            </p>
+        </field>
+    </record>
+
+    <!-- ==================== Candidats ==================== -->
+
+    <record id="view_matching_candidate_list" model="ir.ui.view">
+        <field name="name">opex.matching.candidate.list</field>
+        <field name="model">opex.matching.candidate</field>
+        <field name="arch" type="xml">
+            <list string="Candidats" create="false"
+                  decoration-success="state == 'accepted'"
+                  decoration-muted="state in ('rejected', 'excluded')">
+                <field name="instance_id"/>
+                <field name="partner_id"/>
+                <field name="candidate_type"/>
+                <field name="score" widget="percentage" digits="[5,2]"/>
+                <field name="added_manually" widget="boolean_toggle" optional="hide"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'accepted'"
+                       decoration-muted="state in ('rejected', 'excluded')"/>
+                <button name="action_accept" type="object" icon="fa-check"
+                        title="Retenir" invisible="state == 'accepted'"/>
+                <button name="action_reject" type="object" icon="fa-times"
+                        title="Écarter" invisible="state == 'rejected'"/>
+                <button name="action_exclude" type="object" icon="fa-ban"
+                        title="Exclure" invisible="state == 'excluded'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_matching_candidate_form" model="ir.ui.view">
+        <field name="name">opex.matching.candidate.form</field>
+        <field name="model">opex.matching.candidate</field>
+        <field name="arch" type="xml">
+            <form string="Candidat">
+                <header>
+                    <button name="action_accept" type="object" string="Retenir"
+                            class="btn-primary" invisible="state == 'accepted'"/>
+                    <button name="action_reject" type="object" string="Écarter"
+                            invisible="state == 'rejected'"/>
+                    <button name="action_exclude" type="object" string="Exclure"
+                            invisible="state == 'excluded'"/>
+                    <button name="action_reset" type="object" string="Remettre en proposition"
+                            invisible="state == 'proposed'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-warning" role="status">
+                        Le moteur <strong>recommande</strong> ; il ne décide pas.
+                        Retenir un candidat ne fait pas avancer le dossier : c'est
+                        une décision distincte, que vous prenez ensuite en
+                        connaissance de cause.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="partner_id" readonly="1"/></h1>
+                        <h2><field name="score" widget="percentage" digits="[5,2]" readonly="1"/></h2>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="instance_id" readonly="1"/>
+                            <field name="candidate_type"/>
+                        </group>
+                        <group>
+                            <field name="added_manually"/>
+                            <field name="decided_by_id"/>
+                            <field name="decision_date"/>
+                        </group>
+                    </group>
+                    <separator string="Comment ce score a été obtenu"/>
+                    <field name="detail" readonly="1" nolabel="1"
+                           widget="text" class="font-monospace"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_matching_candidate_search" model="ir.ui.view">
+        <field name="name">opex.matching.candidate.search</field>
+        <field name="model">opex.matching.candidate</field>
+        <field name="arch" type="xml">
+            <search string="Candidats">
+                <field name="partner_id"/>
+                <field name="instance_id"/>
+                <separator/>
+                <filter name="filter_proposed" string="À arbitrer"
+                        domain="[('state', '=', 'proposed')]"/>
+                <filter name="filter_accepted" string="Retenus"
+                        domain="[('state', '=', 'accepted')]"/>
+                <group name="group_by">
+                    <filter name="group_instance" string="Dossier"
+                            context="{'group_by': 'instance_id'}"/>
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'candidate_type'}"/>
+                    <filter name="group_state" string="État"
+                            context="{'group_by': 'state'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_matching_candidate" model="ir.actions.act_window">
+        <field name="name">Candidats proposés</field>
+        <field name="res_model">opex.matching.candidate</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_filter_proposed': 1}</field>
+    </record>
+
+    <!-- ==================== Relations ==================== -->
+
+    <record id="view_matching_relation_list" model="ir.ui.view">
+        <field name="name">opex.matching.relation.list</field>
+        <field name="model">opex.matching.relation</field>
+        <field name="arch" type="xml">
+            <list string="Mises en relation">
+                <field name="date"/>
+                <field name="instance_id"/>
+                <field name="partner_id"/>
+                <field name="access_level"/>
+                <field name="nda_signed" widget="boolean_toggle"/>
+                <field name="authorized_by_id"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_matching_relation_form" model="ir.ui.view">
+        <field name="name">opex.matching.relation.form</field>
+        <field name="model">opex.matching.relation</field>
+        <field name="arch" type="xml">
+            <form string="Mise en relation">
+                <header>
+                    <button name="action_sign_nda" type="object" string="Enregistrer le NDA"
+                            invisible="nda_signed"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="status">
+                        Le match ne donne pas le dossier. On monte d'un niveau à la
+                        fois : teaser, puis informations autorisées une fois
+                        l'intérêt exprimé, puis dossier détaillé une fois
+                        l'autorisation donnée.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="instance_id"/>
+                            <field name="partner_id"/>
+                            <field name="candidate_id"/>
+                        </group>
+                        <group>
+                            <field name="access_level"/>
+                            <field name="nda_signed"/>
+                            <field name="nda_date" invisible="not nda_signed"/>
+                            <field name="authorized_by_id"/>
+                            <field name="date"/>
+                        </group>
+                    </group>
+                    <field name="note" placeholder="Contexte de l'autorisation…"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_matching_relation" model="ir.actions.act_window">
+        <field name="name">Mises en relation</field>
+        <field name="res_model">opex.matching.relation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>

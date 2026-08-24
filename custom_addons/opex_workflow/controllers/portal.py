@@ -74,6 +74,36 @@ class WorkflowFormPortal(http.Controller):
         return request.render('opex_workflow.workflow_dynamic_form_page', values)
 
     @http.route(
+        ['/my/workflow/<int:instance_id>'],
+        type='http', auth='user', website=True,
+    )
+    def workflow_instance_page(self, instance_id, **kw):
+        """Page générique du dossier : progression et prochaine action.
+
+        Elle existe pour que le moteur soit démontrable seul, sans module
+        métier installé. Un module qui a sa propre page appelle plutôt le
+        gabarit `workflow_portal_progress` depuis la sienne.
+        """
+        instance = self._instance(instance_id)
+        if not instance:
+            return request.redirect('/my')
+
+        record = instance._get_record()
+        form = instance.current_stage_id.sudo().form_id
+        if not form:
+            form = request.env['opex.workflow.form'].form_for_stage(instance)
+
+        return request.render('opex_workflow.workflow_portal_instance_page', {
+            'instance': instance,
+            'record_name': record.sudo().display_name if record else '',
+            'form': form,
+            # L'historique est déjà borné par l'`ir.rule` de l'Extension 5 ;
+            # on le relit sous l'identité de l'utilisateur plutôt qu'en sudo,
+            # pour que la règle fasse son office plutôt que d'être contournée.
+            'history': instance.history_ids.sorted('date'),
+        })
+
+    @http.route(
         ['/my/workflow/<int:instance_id>/form'],
         type='http', auth='user', website=True,
     )

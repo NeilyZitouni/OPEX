@@ -13,3 +13,6 @@ from . import workflow_instance_actor
 from . import workflow_history
 from . import workflow_task
 from . import workflow_mixin
+
+# Extension 7 — Smart Matching
+from . import matching

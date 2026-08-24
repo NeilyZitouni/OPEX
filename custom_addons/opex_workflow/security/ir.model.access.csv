@@ -43,3 +43,12 @@ access_workflow_form_manager,workflow.form.manager,model_opex_workflow_form,grou
 access_workflow_form_field_user,workflow.form.field.user,model_opex_workflow_form_field,base.group_user,1,0,0,0
 access_workflow_form_field_designer,workflow.form.field.designer,model_opex_workflow_form_field,group_workflow_designer,1,1,1,1
 access_workflow_form_field_manager,workflow.form.field.manager,model_opex_workflow_form_field,group_workflow_manager,1,0,0,0
+access_matching_criteria_user,matching.criteria.user,model_opex_matching_criteria,base.group_user,1,0,0,0
+access_matching_criteria_designer,matching.criteria.designer,model_opex_matching_criteria,group_workflow_designer,1,1,1,1
+access_matching_criteria_manager,matching.criteria.manager,model_opex_matching_criteria,group_workflow_manager,1,0,0,0
+access_matching_candidate_user,matching.candidate.user,model_opex_matching_candidate,base.group_user,1,1,0,0
+access_matching_candidate_manager,matching.candidate.manager,model_opex_matching_candidate,group_workflow_manager,1,1,1,1
+access_matching_candidate_designer,matching.candidate.designer,model_opex_matching_candidate,group_workflow_designer,1,1,1,1
+access_matching_relation_user,matching.relation.user,model_opex_matching_relation,base.group_user,1,0,0,0
+access_matching_relation_manager,matching.relation.manager,model_opex_matching_relation,group_workflow_manager,1,1,1,1
+access_matching_relation_designer,matching.relation.designer,model_opex_matching_relation,group_workflow_designer,1,1,1,1

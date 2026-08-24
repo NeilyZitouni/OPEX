@@ -304,23 +304,29 @@ class TestActions(WorkflowCase):
     # Les stubs déclarés
     # ------------------------------------------------------------
 
-    def test_declared_but_unimplemented_types_fail_loudly(self):
-        """Ils lèvent plutôt que de ne rien faire.
+    def test_no_action_type_is_left_unimplemented(self):
+        """Fin du Bloc A : plus aucun type d'action n'est un stub.
 
-        Une action silencieusement inopérante se découvre en démonstration ;
-        une action qui lève se découvre au premier essai et laisse une trace.
+        Ce test remplace celui qui vérifiait que les stubs levaient bien.
+        `run_matching` a été implémenté en Extension 7, `launch_subworkflow` en
+        Extension 8 : la Selection ne promet donc plus rien qu'elle ne tienne.
+
+        Il reste utile en l'état : ajouter un type à la Selection sans écrire
+        son exécution le fait échouer immédiatement, plutôt qu'en
+        démonstration.
         """
-        for code, action_type in (
-            ('act_sub', 'launch_subworkflow'),
-            ('act_match', 'run_matching'),
-        ):
-            with self.subTest(action_type=action_type):
-                action = self.Action.create({
-                    'name': "Stub %s" % action_type, 'code': code,
-                    'action_type': action_type,
-                })
-                with self.assertRaises(NotImplementedError):
-                    action.execute(self.instance)
+        unimplemented = []
+        for action_type, _label in self.Action._fields['action_type'].selection:
+            method = getattr(self.Action, '_execute_%s' % action_type, None)
+            if method is None:
+                unimplemented.append(action_type)
+                continue
+            if 'NotImplementedError' in (method.__code__.co_names or ()):
+                unimplemented.append(action_type)
+        self.assertFalse(
+            unimplemented,
+            "Types d'action déclarés mais non exécutables : %s"
+            % ", ".join(unimplemented))
 
     # ------------------------------------------------------------
     # ⚠ La règle : un échec ne rollback pas la transition

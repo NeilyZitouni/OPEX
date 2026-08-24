@@ -1,0 +1,226 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Section 26 — [Voir le projet]
+        ═══════════════════════════════════════════════════════════════
+
+        ⚠ Ce gabarit ne reçoit **aucun recordset de projet**. Il itère sur le
+        dictionnaire `d`, construit par `_matching_detail()`. C'est la même
+        discipline que la vignette de la section 20, et pour la même raison :
+        ce qui n'est pas dans le dictionnaire ne peut pas être rendu par
+        inadvertance, même par un `t-field` écrit distraitement plus tard.
+
+        Le contrôle d'accès, lui, a déjà eu lieu — côté serveur, dans
+        `portal_opportunity_detail`, avant que ce dictionnaire n'existe.
+    -->
+    <template id="portal_opportunity_detail" name="Opportunité — le projet">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <a href="/my/innovation/opportunities"
+                   class="btn btn-link ps-0 mb-2">← Mes opportunités</a>
+
+                <h3 t-esc="d.get('projet', '')"/>
+
+                <div class="row">
+                    <div class="col-lg-7">
+                        <div class="card mb-3">
+                            <div class="card-header">Le projet</div>
+                            <div class="card-body">
+                                <table class="table table-sm mb-0">
+                                    <tr><th style="width: 35%">Secteur</th>
+                                        <td t-esc="d.get('secteur', '')"/></tr>
+                                    <tr t-if="d.get('maturite')"><th>Maturité</th>
+                                        <td t-esc="d.get('maturite')"/></tr>
+                                    <tr t-if="d.get('potentiel')"><th>Potentiel</th>
+                                        <td t-esc="d.get('potentiel')"/></tr>
+                                    <tr><th>Résumé</th>
+                                        <td t-esc="d.get('resume', '')"/></tr>
+                                    <tr t-if="d.get('probleme')"><th>Problème adressé</th>
+                                        <td t-esc="d.get('probleme')"/></tr>
+                                    <tr t-if="d.get('solution')"><th>Solution</th>
+                                        <td t-esc="d.get('solution')"/></tr>
+                                    <tr t-if="d.get('marche_cible')"><th>Marché cible</th>
+                                        <td t-esc="d.get('marche_cible')"/></tr>
+                                    <tr t-if="d.get('proposition_valeur')">
+                                        <th>Proposition de valeur</th>
+                                        <td t-esc="d.get('proposition_valeur')"/></tr>
+                                    <tr><th>Besoin</th>
+                                        <td t-esc="d.get('besoin', '')"/></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-5">
+                        <!-- Section 32 : « informations financières autorisées,
+                             progression du financement ». Absent du dictionnaire
+                             d'un expert, donc absent d'office de sa page. -->
+                        <div t-if="d.get('financier')" class="card mb-3">
+                            <div class="card-header">Financement</div>
+                            <div class="card-body">
+                                <table class="table table-sm">
+                                    <tr><th>Recherché</th>
+                                        <td>
+                                            <span t-esc="d.get('financement_recherche', 0)"
+                                                  t-options="{'widget': 'monetary', 'display_currency': d.get('currency')}"/>
+                                        </td>
+                                    </tr>
+                                    <tr><th>Déjà obtenu</th>
+                                        <td>
+                                            <span t-esc="d.get('financement_obtenu', 0)"
+                                                  t-options="{'widget': 'monetary', 'display_currency': d.get('currency')}"/>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <!--
+                                    ⚠ `t-attf-` et non `t-att-`.
+
+                                    Écrite en `t-att-style="'width: %s%%' % ..."`,
+                                    cette barre levait `ValueError: incomplete
+                                    format` au rendu et renvoyait une 500. QWeb
+                                    applique lui-même un formatage `%` sur la
+                                    valeur produite : le `%%` s'y retrouvait
+                                    réduit à un `%` isolé, que Python ne sait
+                                    pas terminer.
+
+                                    `t-attf-` interpole avec `#{}` et ne
+                                    rencontre jamais ce conflit.
+                                -->
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar" role="progressbar"
+                                         t-attf-style="width: #{d.get('progression_financement', 0)}%"
+                                         t-att-aria-valuenow="d.get('progression_financement', 0)"
+                                         aria-valuemin="0" aria-valuemax="100">
+                                        <span t-esc="d.get('progression_financement', 0)"/> %
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div t-if="d.get('etapes_financement')" class="card mb-3">
+                            <div class="card-header">Où en est le financement</div>
+                            <ul class="list-group list-group-flush">
+                                <li t-foreach="d.get('etapes_financement')" t-as="step"
+                                    class="list-group-item d-flex justify-content-between">
+                                    <span t-esc="step['label']"/>
+                                    <span t-if="step['state'] == 'done'" class="text-success">✓</span>
+                                    <span t-elif="step['state'] == 'current'"
+                                          class="badge text-bg-primary">en cours</span>
+                                    <span t-else="" class="text-muted">○</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div t-if="candidate.candidate_response == 'pending'">
+                    <form method="post"
+                          t-att-action="'/my/innovation/opportunities/%s/respond' % candidate.id">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <button type="submit" name="response" value="interested"
+                                class="btn btn-primary">
+                            <t t-if="d.get('financier')">Manifester mon intérêt</t>
+                            <t t-else="">Je suis intéressé</t>
+                        </button>
+                        <button type="submit" name="response" value="declined"
+                                class="btn btn-secondary">Je ne suis pas disponible</button>
+                    </form>
+                </div>
+                <div t-else="" class="alert alert-light" role="status">
+                    Vous avez répondu :
+                    <strong t-esc="dict(candidate._fields['candidate_response'].selection).get(candidate.candidate_response, '')"/>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Section 29 — l'évaluation finale
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <template id="portal_final_evaluation" name="Évaluation finale">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <a t-att-href="'/my/innovation/%s' % project.id"
+                   class="btn btn-link ps-0 mb-2">← Mon projet</a>
+
+                <h3>Évaluer l'accompagnement</h3>
+                <p class="text-muted">
+                    Projet : <strong t-esc="project.name"/>
+                </p>
+
+                <div t-if="error" class="alert alert-danger" role="alert"
+                     t-esc="error"/>
+
+                <!-- Les avis déjà remis, filtrés **côté serveur** par
+                     `visible_final_evaluations()`. Le porteur ne reçoit jamais
+                     dans son HTML l'avis que le cluster porte sur
+                     l'accompagnement qu'il a reçu. -->
+                <t t-set="submitted" t-value="mine.filtered(lambda e: e.state == 'submitted')"/>
+
+                <div t-if="submitted" class="card mb-4">
+                    <div class="card-header">Votre évaluation</div>
+                    <div class="card-body">
+                        <t t-foreach="submitted" t-as="evaluation">
+                            <table class="table table-sm">
+                                <tr t-foreach="criteria" t-as="criterion">
+                                    <th style="width: 60%" t-esc="criterion[1]"/>
+                                    <td><span t-esc="evaluation[criterion[0]]"/> / 5</td>
+                                </tr>
+                                <tr class="table-light">
+                                    <th>Note globale</th>
+                                    <td><span t-esc="evaluation.note_globale"/> / 5</td>
+                                </tr>
+                            </table>
+                            <p t-if="evaluation.commentaire" t-esc="evaluation.commentaire"/>
+                        </t>
+                    </div>
+                </div>
+
+                <form t-if="not submitted" method="post"
+                      t-att-action="'/my/innovation/%s/evaluation-finale' % project.id">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <!--
+                        ⚠ Aucun champ ne porte le côté (porteur / cluster). Il
+                        est déduit de l'identité côté serveur. Un `<input
+                        type="hidden" name="side">` serait modifiable par qui
+                        sait ouvrir les outils de développement.
+                    -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div t-foreach="criteria" t-as="criterion" class="mb-3">
+                                <label class="form-label" t-att-for="criterion[0]"
+                                       t-esc="criterion[1]"/>
+                                <select class="form-select" t-att-name="criterion[0]"
+                                        t-att-id="criterion[0]">
+                                    <option t-foreach="[0, 1, 2, 3, 4, 5]" t-as="note"
+                                            t-att-value="note" t-esc="note"/>
+                                </select>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="commentaire">Commentaire</label>
+                                <textarea class="form-control" name="commentaire"
+                                          id="commentaire" rows="4"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        Remettre mon évaluation
+                    </button>
+                    <p class="text-muted small mt-2">
+                        Une évaluation remise ne peut plus être modifiée.
+                    </p>
+                </form>
+            </div>
+        </t>
+    </template>
+
+</odoo>

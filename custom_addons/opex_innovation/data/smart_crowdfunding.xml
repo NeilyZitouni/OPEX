@@ -1,0 +1,657 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            SMART CROWDFUNDING — la seconde instance du moteur
+            ═══════════════════════════════════════════════════════════════
+
+            Le processus du document « Instance 01 — Smart Crowdfunding »,
+            sections 4 à 15, configuré **entièrement en données**.
+
+            Aucune ligne de Python n'a été ajoutée au moteur pour l'obtenir.
+            C'est le point : le même moteur qui fait tourner le parcours
+            d'innovation à quinze étapes fait tourner celui-ci, sans le savoir.
+
+            ⚠ Codes d'étapes **communs avec l'implémentation « texto »** de
+            Kassab. C'est ce qui rendra la comparaison finale lisible sans
+            ambiguïté : les deux modules parlent du même processus avec les
+            mêmes mots.
+
+            Trois points volontairement non simplifiés :
+
+            1. La pré-analyse a **quatre** sorties : GO, À clarifier, NO GO,
+               Orientation. Un `if` à deux branches aurait suffi à faire
+               tourner une démonstration ; il aurait effacé la moitié du
+               discernement que le document décrit.
+
+            2. Le Quality Gate a **trois** sorties : Conforme, À compléter,
+               Alerte. La troisième ne fait pas avancer le dossier — elle
+               alerte le CEO et le laisse au contrôle. C'est une transition
+               vers la même étape, et le moteur la gère sans rien de spécial.
+
+            3. La boucle Accompagnement → Réévaluation → Matching existe. C'est
+               elle qui distingue ce processus d'une séquence.
+        -->
+
+        <!-- ══════════ Le rôle propre à ce processus ══════════ -->
+
+        <record id="role_controle_qualite" model="opex.workflow.role">
+            <field name="name">Contrôle Qualité</field>
+            <field name="code">controle_qualite</field>
+            <field name="description">Quality Gate opérationnel : complétude, cohérence, conformité, anomalies. Le document prévoit qu'un agent IA le remplace à terme « sans modification du workflow métier » — c'est possible ici parce que le rôle est une donnée, pas du code.</field>
+        </record>
+
+        <!-- ══════════ Conditions réelles ══════════ -->
+
+        <record id="scf_rule_dossier_minimal" model="opex.workflow.rule">
+            <field name="name">Dépôt express complet</field>
+            <field name="code">scf_dossier_minimal</field>
+            <field name="expression">bool(field('resume') and field('probleme') and field('secteur'))</field>
+            <field name="message">Renseignez au minimum le résumé, le problème et le secteur avant de présenter votre projet.</field>
+        </record>
+
+        <record id="scf_rule_dossier_progressif" model="opex.workflow.rule">
+            <field name="name">Dossier progressif complet</field>
+            <field name="code">scf_dossier_progressif</field>
+            <field name="expression">bool(field('marche_cible') and field('proposition_valeur')) and has_document('business_plan')</field>
+            <field name="message">Le dossier doit comporter le marché cible, la proposition de valeur et le business plan avant le contrôle qualité.</field>
+        </record>
+
+        <record id="scf_rule_montant_defini" model="opex.workflow.rule">
+            <field name="name">Besoin de financement chiffré</field>
+            <field name="code">scf_montant_defini</field>
+            <field name="expression">field('montant_recherche') &gt; 0</field>
+            <field name="message">Le montant recherché doit être renseigné avant le matching financier.</field>
+        </record>
+
+        <!-- ══════════ Actions réelles ══════════ -->
+
+        <record id="scf_action_alerte_ceo" model="opex.workflow.action">
+            <field name="name">Alerter le CEO</field>
+            <field name="code">scf_alerte_ceo</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Anomalie détectée au Quality Gate : ce dossier demande votre arbitrage.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_action_informer_porteur" model="opex.workflow.action">
+            <field name="name">Informer le porteur</field>
+            <field name="code">scf_informer_porteur</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Votre dossier a évolué. Consultez votre espace personnel.</p></field>
+        </record>
+
+        <record id="scf_action_tache_qualite" model="opex.workflow.action">
+            <field name="name">Contrôler le dossier</field>
+            <field name="code">scf_tache_qualite</field>
+            <field name="action_type">create_task</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_controle_qualite')])]"/>
+            <field name="deadline_days">5</field>
+        </record>
+
+        <record id="scf_action_matching" model="opex.workflow.action">
+            <field name="name">Rechercher des acteurs financiers</field>
+            <field name="code">scf_matching_financier</field>
+            <field name="action_type">run_matching</field>
+            <field name="matching_candidate_type">investisseur</field>
+            <field name="matching_domain">[('is_investor', '=', True)]</field>
+            <field name="matching_limit">5</field>
+        </record>
+
+        <!-- ══════════ La définition ══════════ -->
+
+        <record id="wf_smart_crowdfunding" model="opex.workflow.definition">
+            <field name="name">Smart Crowdfunding</field>
+            <field name="code">smart_crowdfunding</field>
+            <field name="model_id" ref="model_opex_innovation_project"/>
+            <field name="description">Instance 01 du CEO Smart Workflow. Progressive commitment : on ne demande à chaque étape que le minimum nécessaire pour décider de la suivante. Configuré intégralement en données, sans une ligne de Python ajoutée au moteur.</field>
+        </record>
+
+        <!-- ══════════ Les étapes ══════════ -->
+
+        <record id="scf_depot_express" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">depot_express</field>
+            <field name="name">Dépôt express</field>
+            <field name="user_label">Présenter mon projet</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="scf_pre_analyse" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">pre_analyse</field>
+            <field name="name">Pré-analyse</field>
+            <field name="user_label">Demande reçue</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_clarification" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">clarification</field>
+            <field name="name">Clarification demandée</field>
+            <field name="user_label">Action requise : précisions attendues</field>
+            <field name="sequence">30</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="scf_dossier_progressif" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">dossier_progressif</field>
+            <field name="name">Dossier progressif</field>
+            <field name="user_label">Compléter mon dossier</field>
+            <field name="sequence">40</field>
+            <field name="sla_days">15</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="scf_quality_gate" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">quality_gate</field>
+            <field name="name">Quality Gate</field>
+            <field name="user_label">Contrôle qualité en cours</field>
+            <field name="sequence">50</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_controle_qualite')])]"/>
+        </record>
+
+        <record id="scf_quality_complement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">quality_complement</field>
+            <field name="name">Complément demandé</field>
+            <field name="user_label">Action requise : pièces à compléter</field>
+            <field name="sequence">60</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="scf_etude_decision" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">etude_decision</field>
+            <field name="name">Étude et décision CEO</field>
+            <field name="user_label">Étude en cours</field>
+            <field name="sequence">70</field>
+            <field name="sla_days">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_accompagnement" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">accompagnement</field>
+            <field name="name">Accompagnement CEO</field>
+            <field name="user_label">Accompagnement en cours</field>
+            <field name="sequence">80</field>
+            <field name="sla_days">90</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+        </record>
+
+        <record id="scf_reevaluation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">reevaluation</field>
+            <field name="name">Réévaluation</field>
+            <field name="user_label">Réévaluation du projet</field>
+            <field name="sequence">90</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_matching_financier" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">matching_financier</field>
+            <field name="name">Matching financier</field>
+            <field name="user_label">Recherche de financeurs</field>
+            <field name="sequence">100</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_mise_en_relation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">mise_en_relation</field>
+            <field name="name">Mise en relation contrôlée</field>
+            <field name="user_label">Mise en relation en cours</field>
+            <field name="sequence">110</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_decision_financeur" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">decision_financeur</field>
+            <field name="name">Décision de l'acteur financier</field>
+            <field name="user_label">Décision du financeur attendue</field>
+            <field name="sequence">120</field>
+            <field name="sla_days">30</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_investisseur')])]"/>
+        </record>
+
+        <record id="scf_closing" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">closing</field>
+            <field name="name">Closing et suivi</field>
+            <field name="user_label">Financement conclu</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">130</field>
+        </record>
+
+        <record id="scf_rejected" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">rejected</field>
+            <field name="name">Non retenu</field>
+            <field name="user_label">Projet non retenu</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">140</field>
+        </record>
+
+        <!-- ══════════ ① Dépôt express → Pré-analyse ══════════ -->
+
+        <record id="scf_tr_presenter" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">presenter</field>
+            <!-- Section 5 : le CTA est « Présenter mon projet », jamais
+                 « Constituer mon dossier de financement ». Le document insiste :
+                 le libellé conditionne le taux de dépôt. -->
+            <field name="name">Présenter mon projet</field>
+            <field name="source_stage_id" ref="scf_depot_express"/>
+            <field name="target_stage_id" ref="scf_pre_analyse"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('scf_rule_dossier_minimal')])]"/>
+        </record>
+
+        <!-- ══════════ ② Pré-analyse — QUATRE sorties ══════════ -->
+
+        <record id="scf_tr_go" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">go</field>
+            <field name="name">GO — poursuivre le dossier</field>
+            <field name="source_stage_id" ref="scf_pre_analyse"/>
+            <field name="target_stage_id" ref="scf_dossier_progressif"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
+        </record>
+
+        <record id="scf_tr_clarifier" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">a_clarifier</field>
+            <field name="name">À CLARIFIER — poser des questions ciblées</field>
+            <field name="source_stage_id" ref="scf_pre_analyse"/>
+            <field name="target_stage_id" ref="scf_clarification"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
+        </record>
+
+        <record id="scf_tr_no_go" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">no_go</field>
+            <field name="name">NO GO — clôture motivée</field>
+            <field name="source_stage_id" ref="scf_pre_analyse"/>
+            <field name="target_stage_id" ref="scf_rejected"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
+        </record>
+
+        <record id="scf_tr_orientation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">orientation</field>
+            <!-- Section 9 : « Le rejet ne doit pas être confondu avec la
+                 maturation. » Cette sortie envoie vers l'accompagnement, pas
+                 vers la clôture. -->
+            <field name="name">ORIENTATION — accompagnement conseillé</field>
+            <field name="source_stage_id" ref="scf_pre_analyse"/>
+            <field name="target_stage_id" ref="scf_accompagnement"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="scf_tr_repondre_clarification" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">repondre_clarification</field>
+            <field name="name">Répondre aux questions</field>
+            <field name="source_stage_id" ref="scf_clarification"/>
+            <field name="target_stage_id" ref="scf_pre_analyse"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <!-- ══════════ ③ Dossier progressif → Quality Gate ══════════ -->
+
+        <record id="scf_tr_soumettre_dossier" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">soumettre_dossier</field>
+            <field name="name">Soumettre mon dossier complet</field>
+            <field name="source_stage_id" ref="scf_dossier_progressif"/>
+            <field name="target_stage_id" ref="scf_quality_gate"/>
+            <field name="sequence">70</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('scf_rule_dossier_progressif')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_tache_qualite')])]"/>
+        </record>
+
+        <!-- ══════════ ④ Quality Gate — TROIS sorties ══════════ -->
+
+        <record id="scf_tr_conforme" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">qg_conforme</field>
+            <field name="name">Conforme — transmettre au CEO</field>
+            <field name="source_stage_id" ref="scf_quality_gate"/>
+            <field name="target_stage_id" ref="scf_etude_decision"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_controle_qualite')])]"/>
+        </record>
+
+        <record id="scf_tr_a_completer" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">qg_a_completer</field>
+            <field name="name">À compléter — retour au porteur</field>
+            <field name="source_stage_id" ref="scf_quality_gate"/>
+            <field name="target_stage_id" ref="scf_quality_complement"/>
+            <field name="sequence">90</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_controle_qualite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
+        </record>
+
+        <!--
+            ⚠ La troisième sortie ne fait pas avancer le dossier.
+
+            « Alerte → notification CEO, dossier maintenu en quality_gate. » La
+            transition boucle donc sur son étape de départ. Le moteur n'a rien
+            de spécial pour ça — une transition dont la source et la cible sont
+            la même étape est une transition comme une autre — mais l'événement
+            est daté dans l'historique, ce qu'un simple email n'aurait pas fait.
+        -->
+        <record id="scf_tr_alerte" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">qg_alerte</field>
+            <field name="name">Alerte — arbitrage CEO demandé</field>
+            <field name="source_stage_id" ref="scf_quality_gate"/>
+            <field name="target_stage_id" ref="scf_quality_gate"/>
+            <field name="sequence">100</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_controle_qualite')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_alerte_ceo')])]"/>
+        </record>
+
+        <record id="scf_tr_completer_dossier" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">completer_dossier</field>
+            <field name="name">Renvoyer mon dossier complété</field>
+            <field name="source_stage_id" ref="scf_quality_complement"/>
+            <field name="target_stage_id" ref="scf_quality_gate"/>
+            <field name="sequence">110</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <!-- ══════════ ⑤ Étude CEO — les trois routes de la section 9 ══════════ -->
+
+        <record id="scf_tr_investment_ready" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">route_investment_ready</field>
+            <field name="name">Route A — Investment Ready</field>
+            <field name="source_stage_id" ref="scf_etude_decision"/>
+            <field name="target_stage_id" ref="scf_matching_financier"/>
+            <field name="sequence">120</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('scf_rule_montant_defini')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_matching')])]"/>
+        </record>
+
+        <record id="scf_tr_maturation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">route_maturation</field>
+            <field name="name">Route B — maturation nécessaire</field>
+            <field name="source_stage_id" ref="scf_etude_decision"/>
+            <field name="target_stage_id" ref="scf_accompagnement"/>
+            <field name="sequence">130</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="scf_tr_non_retenu" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">route_non_retenu</field>
+            <field name="name">Route C — non retenu</field>
+            <field name="source_stage_id" ref="scf_etude_decision"/>
+            <field name="target_stage_id" ref="scf_rejected"/>
+            <field name="sequence">140</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
+        </record>
+
+        <!-- ══════════ ⑦ La boucle Accompagnement → Réévaluation → Matching ══════════ -->
+
+        <record id="scf_tr_fin_accompagnement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">fin_accompagnement</field>
+            <field name="name">Accompagnement terminé — réévaluer</field>
+            <field name="source_stage_id" ref="scf_accompagnement"/>
+            <field name="target_stage_id" ref="scf_reevaluation"/>
+            <field name="sequence">150</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+        </record>
+
+        <record id="scf_tr_reevaluation_ok" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">reevaluation_ok</field>
+            <field name="name">Projet mûr — lancer le matching</field>
+            <field name="source_stage_id" ref="scf_reevaluation"/>
+            <field name="target_stage_id" ref="scf_matching_financier"/>
+            <field name="sequence">160</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('scf_rule_montant_defini')])]"/>
+            <!--
+                ⚠ **Pas d'action de matching ici**, et c'est délibéré.
+
+                Le § 10 dit que le matching est une recommandation que le CEO
+                « valide, modifie, exclut, complète ». Sur la route B, la
+                recherche se lance donc à la demande, par la transition
+                « Relancer la recherche » ci-dessous — pas automatiquement à
+                l'arrivée.
+
+                Cela a une conséquence pratique décisive pour le test
+                d'acceptation du § 18. Insérer une étape entre Réévaluation et
+                Matching se fait en détournant cette transition. Si elle
+                portait l'action de matching, il faudrait aussi la lui retirer
+                pour la reporter sur la nouvelle transition — or `action_ids`
+                n'est exposé dans aucune vue du configurateur. Le test
+                d'acceptation serait alors infaisable depuis l'interface, non
+                pas à cause du moteur, mais à cause d'un mauvais placement
+                d'action dans **cette** configuration.
+
+                Trouvé en écrivant le protocole manuel écran par écran. Aucun
+                test automatisé ne l'aurait vu : l'ORM, lui, écrit `action_ids`
+                sans difficulté.
+            -->
+        </record>
+
+        <!--
+            La recherche à la demande, § 10 : « CEO peut Valider / Modifier /
+            Exclure / Ajouter un acteur. » Une transition qui boucle sur son
+            étape — le dossier ne bouge pas, l'action tourne, et le lancement
+            est daté dans l'historique.
+        -->
+        <record id="scf_tr_relancer_matching" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">relancer_matching</field>
+            <field name="name">Relancer la recherche d'acteurs financiers</field>
+            <field name="source_stage_id" ref="scf_matching_financier"/>
+            <field name="target_stage_id" ref="scf_matching_financier"/>
+            <field name="sequence">175</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_matching')])]"/>
+        </record>
+
+        <record id="scf_tr_reevaluation_ko" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">reevaluation_ko</field>
+            <field name="name">Poursuivre l'accompagnement</field>
+            <field name="source_stage_id" ref="scf_reevaluation"/>
+            <field name="target_stage_id" ref="scf_accompagnement"/>
+            <field name="sequence">170</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <!-- ══════════ ⑧ ⑨ ⑩ Mise en relation, décision, closing ══════════ -->
+
+        <record id="scf_tr_mise_en_relation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">mettre_en_relation</field>
+            <field name="name">Autoriser la mise en relation</field>
+            <field name="source_stage_id" ref="scf_matching_financier"/>
+            <field name="target_stage_id" ref="scf_mise_en_relation"/>
+            <field name="sequence">180</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_tr_transmettre_financeur" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">transmettre_financeur</field>
+            <field name="name">Transmettre le dossier détaillé</field>
+            <field name="source_stage_id" ref="scf_mise_en_relation"/>
+            <field name="target_stage_id" ref="scf_decision_financeur"/>
+            <field name="sequence">190</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <record id="scf_tr_financeur_interesse" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">financeur_interesse</field>
+            <field name="name">★ Intéressé — aller au closing</field>
+            <field name="source_stage_id" ref="scf_decision_financeur"/>
+            <field name="target_stage_id" ref="scf_closing"/>
+            <field name="sequence">200</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_investisseur')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
+        </record>
+
+        <!-- Section 14 : « Demander accompagnement CEO » est le second
+             déclencheur de l'accompagnement. C'est une transition, pas un
+             cas particulier codé. -->
+        <record id="scf_tr_financeur_accompagnement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">financeur_accompagnement</field>
+            <field name="name">↗ Intéressé sous condition d'accompagnement CEO</field>
+            <field name="source_stage_id" ref="scf_decision_financeur"/>
+            <field name="target_stage_id" ref="scf_accompagnement"/>
+            <field name="sequence">210</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_investisseur')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="scf_tr_financeur_non" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="code">financeur_non_interesse</field>
+            <field name="name">✕ Non intéressé</field>
+            <field name="source_stage_id" ref="scf_decision_financeur"/>
+            <field name="target_stage_id" ref="scf_matching_financier"/>
+            <field name="sequence">220</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_investisseur')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <!--
+            ══════════ Critères de matching — § 10 ══════════
+
+            ⚠ Les critères sont attachés à **une définition**. Ceux du parcours
+            d'innovation ne servent donc pas ici : sans ce bloc, l'action
+            « Rechercher des acteurs financiers » se déclenche, ne trouve aucun
+            critère, échoue, et — conformément à la règle de l'Extension 4 —
+            journalise son échec sans annuler la transition. Le dossier avance
+            avec une liste de candidats vide, et rien ne le signale à l'écran.
+
+            C'est exactement le genre de trou qu'une configuration silencieuse
+            produit. Il a été trouvé en exécutant le parcours, pas en le
+            relisant.
+
+            Le § 10 cite dix critères. Cinq trouvent aujourd'hui un champ en
+            face dans le référentiel ; les cinq autres — appétence au risque,
+            type de porteur, impact, historique, type de financement — n'ont pas
+            encore de contrepartie sur le profil investisseur. Ils s'ajouteront
+            en cinq enregistrements le jour où le champ existera, sans toucher
+            au moteur.
+        -->
+
+        <record id="scf_match_ticket" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="name">Ticket d'investissement</field>
+            <field name="code">scf_ticket</field>
+            <field name="criteria_type">montant</field>
+            <field name="sequence">10</field>
+            <field name="weight">4.0</field>
+            <field name="source_expression">field('montant_recherche')</field>
+            <field name="target_field">investor_montant_max</field>
+            <!-- Capacité, pas égalité : le financeur doit pouvoir couvrir. -->
+            <field name="match_mode">gte</field>
+        </record>
+
+        <record id="scf_match_secteur" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="name">Secteur</field>
+            <field name="code">scf_secteur</field>
+            <field name="criteria_type">secteur</field>
+            <field name="sequence">20</field>
+            <field name="weight">3.0</field>
+            <field name="source_expression">field('secteur')</field>
+            <field name="target_field">secteur_activite</field>
+            <field name="match_mode">contains</field>
+        </record>
+
+        <record id="scf_match_technologie" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="name">Technologies</field>
+            <field name="code">scf_technologie</field>
+            <field name="criteria_type">technologie</field>
+            <field name="sequence">30</field>
+            <field name="weight">3.0</field>
+            <field name="source_expression">field('besoin_competence_ids')</field>
+            <field name="target_field">investor_secteur_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <record id="scf_match_stade" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="name">Stade du projet</field>
+            <field name="code">scf_stade</field>
+            <field name="criteria_type">maturite</field>
+            <field name="sequence">40</field>
+            <field name="weight">2.0</field>
+            <field name="source_expression">field('maturite')</field>
+            <field name="target_field">investor_maturite</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <record id="scf_match_localisation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_smart_crowdfunding"/>
+            <field name="name">Localisation</field>
+            <field name="code">scf_localisation</field>
+            <field name="criteria_type">localisation</field>
+            <field name="sequence">50</field>
+            <field name="weight">1.0</field>
+            <field name="source_expression">field('wilaya')</field>
+            <field name="target_field">investor_zone</field>
+            <field name="match_mode">contains</field>
+        </record>
+
+    </data>
+
+    <!--
+        Publication hors du bloc `noupdate` : rejouée à chaque mise à jour, elle
+        revalide le graphe. Une configuration devenue incohérente fait alors
+        échouer le déploiement au lieu de se découvrir en démonstration.
+    -->
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_smart_crowdfunding')]]"/>
+
+</odoo>

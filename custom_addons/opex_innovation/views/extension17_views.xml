@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Le projet — financement, industrialisation, clôture
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <record id="view_innovation_project_form_ext17" model="ir.ui.view">
+        <field name="name">opex.innovation.project.form.financement</field>
+        <field name="model">opex.innovation.project</field>
+        <field name="inherit_id" ref="opex_innovation.view_innovation_project_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//header" position="inside">
+                <!--
+                    Le bouton n'apparaît qu'une fois le dossier clos, et
+                    disparaît dès qu'un bilan existe. `generate_for()` refuse
+                    de toute façon dans les deux cas : ce `invisible` évite un
+                    clic pour rien, il ne tient pas lieu de contrôle.
+                -->
+                <button name="action_generate_closure" type="object"
+                        string="Générer le bilan"
+                        invisible="workflow_state != 'done' or closure_id"/>
+                <field name="closure_id" invisible="1"/>
+            </xpath>
+
+            <xpath expr="//page[@name='besoins']" position="after">
+                <page string="Financement" name="financement">
+                    <group>
+                        <group string="Montants">
+                            <field name="montant_recherche"
+                                   string="Financement recherché"/>
+                            <field name="financement_obtenu"/>
+                            <field name="progression_financement"
+                                   widget="progressbar"/>
+                        </group>
+                        <group string="Suivi">
+                            <field name="industrialisation_id" readonly="1"/>
+                            <field name="closure_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <!--
+                        ⚠ `financement_recherche` n'est pas affiché ici, et ce
+                        n'est pas un oubli : c'est le **même stockage** que
+                        « Montant recherché ». Deux champs côte à côte portant
+                        la même valeur donneraient l'impression qu'on peut les
+                        régler séparément.
+                    -->
+                </page>
+
+                <page string="Évaluation finale" name="final_evaluation">
+                    <field name="final_evaluation_ids" readonly="1">
+                        <list>
+                            <field name="author_side"/>
+                            <field name="author_id"/>
+                            <field name="note_pertinence"/>
+                            <field name="note_mentorat"/>
+                            <field name="note_resultats"/>
+                            <field name="note_delais"/>
+                            <field name="note_globale"/>
+                            <field name="state"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Industrialisation — section 27
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <record id="view_industrialisation_form" model="ir.ui.view">
+        <field name="name">opex.innovation.industrialisation.form</field>
+        <field name="model">opex.innovation.industrialisation</field>
+        <field name="arch" type="xml">
+            <form string="Industrialisation">
+                <header>
+                    <!-- Un bouton unique, comme partout ailleurs : les étapes
+                         de l'industrialisation vivent dans la configuration. -->
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="project_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="date_debut"/>
+                            <field name="echeance"/>
+                            <field name="en_retard" widget="boolean_toggle"
+                                   readonly="1"/>
+                        </group>
+                        <group>
+                            <field name="currency_id" invisible="1"/>
+                            <field name="financement_obtenu" readonly="1"/>
+                            <field name="progression_financement"
+                                   widget="progressbar" readonly="1"/>
+                            <field name="livrable_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Partenaires">
+                        <field name="partenaire_ids" nolabel="1"
+                               widget="many2many_tags"/>
+                    </group>
+                    <group string="Résultats">
+                        <field name="resultats" nolabel="1"
+                               placeholder="Ce qui a été produit, mesuré, mis en service."/>
+                    </group>
+                    <notebook>
+                        <page string="Livrables" name="livrables">
+                            <field name="livrable_ids" readonly="1">
+                                <list decoration-success="workflow_stage_id.code == 'validated'">
+                                    <field name="name"/>
+                                    <field name="deadline"/>
+                                    <field name="workflow_stage_id"/>
+                                    <field name="version"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_industrialisation_list" model="ir.ui.view">
+        <field name="name">opex.innovation.industrialisation.list</field>
+        <field name="model">opex.innovation.industrialisation</field>
+        <field name="arch" type="xml">
+            <list string="Industrialisations"
+                  decoration-danger="en_retard == True">
+                <field name="project_id"/>
+                <field name="workflow_stage_id"/>
+                <field name="date_debut"/>
+                <field name="echeance"/>
+                <field name="en_retard" column_invisible="1"/>
+                <field name="progression_financement" widget="progressbar"/>
+                <field name="workflow_state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_industrialisation" model="ir.actions.act_window">
+        <field name="name">Industrialisations</field>
+        <field name="res_model">opex.innovation.industrialisation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Bilan de clôture — section 28
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <record id="view_closure_form" model="ir.ui.view">
+        <field name="name">opex.innovation.closure.form</field>
+        <field name="model">opex.innovation.closure</field>
+        <field name="arch" type="xml">
+            <form string="Bilan de clôture" create="false" edit="false">
+                <sheet>
+                    <div class="alert alert-info" role="status">
+                        Ce bilan est figé à sa génération. Il ne se modifie pas :
+                        un bilan qui change n'est pas un bilan.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="project_name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="Le parcours">
+                            <field name="project_id" readonly="1"/>
+                            <field name="date_depot" readonly="1"/>
+                            <field name="date_acceptation" readonly="1"/>
+                            <field name="duree_accompagnement_jours" readonly="1"/>
+                        </group>
+                        <group string="Le résultat">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="financement_obtenu" readonly="1"/>
+                            <field name="livrable_count" readonly="1"/>
+                            <field name="resultat_final" readonly="1"/>
+                            <field name="date_bilan" readonly="1"/>
+                            <field name="generated_by_id" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="Experts impliqués">
+                        <field name="expert_ids" nolabel="1"
+                               widget="many2many_tags" readonly="1"/>
+                    </group>
+                    <group string="Synthèse">
+                        <field name="synthese" nolabel="1" readonly="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_closure_list" model="ir.ui.view">
+        <field name="name">opex.innovation.closure.list</field>
+        <field name="model">opex.innovation.closure</field>
+        <field name="arch" type="xml">
+            <list string="Bilans de clôture" create="false">
+                <field name="project_name"/>
+                <field name="date_depot"/>
+                <field name="duree_accompagnement_jours"/>
+                <field name="financement_obtenu"/>
+                <field name="livrable_count"/>
+                <field name="resultat_final"/>
+                <field name="date_bilan"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_closure" model="ir.actions.act_window">
+        <field name="name">Bilans de clôture</field>
+        <field name="res_model">opex.innovation.closure</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Évaluation finale — section 29
+        ═══════════════════════════════════════════════════════════════
+    -->
+    <record id="view_final_evaluation_form" model="ir.ui.view">
+        <field name="name">opex.innovation.final.evaluation.form</field>
+        <field name="model">opex.innovation.final.evaluation</field>
+        <field name="arch" type="xml">
+            <form string="Évaluation finale">
+                <header>
+                    <button name="action_submit" type="object"
+                            string="Remettre" class="btn-primary"
+                            invisible="state == 'submitted'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="project_id"
+                                   readonly="state == 'submitted'"/>
+                            <field name="author_id"
+                                   readonly="state == 'submitted'"/>
+                            <field name="author_side"
+                                   readonly="state == 'submitted'"/>
+                        </group>
+                        <group>
+                            <field name="note_globale"/>
+                            <field name="date_submitted" readonly="1"/>
+                        </group>
+                    </group>
+                    <group string="La grille — quatre critères, notés sur 5">
+                        <field name="note_pertinence"
+                               readonly="state == 'submitted'"/>
+                        <field name="note_mentorat"
+                               readonly="state == 'submitted'"/>
+                        <field name="note_resultats"
+                               readonly="state == 'submitted'"/>
+                        <field name="note_delais"
+                               readonly="state == 'submitted'"/>
+                    </group>
+                    <group string="Commentaire">
+                        <field name="commentaire" nolabel="1"
+                               readonly="state == 'submitted'"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_final_evaluation_list" model="ir.ui.view">
+        <field name="name">opex.innovation.final.evaluation.list</field>
+        <field name="model">opex.innovation.final.evaluation</field>
+        <field name="arch" type="xml">
+            <list string="Évaluations finales">
+                <field name="project_id"/>
+                <field name="author_side"/>
+                <field name="author_id"/>
+                <field name="note_pertinence"/>
+                <field name="note_mentorat"/>
+                <field name="note_resultats"/>
+                <field name="note_delais"/>
+                <field name="note_globale"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_final_evaluation_search" model="ir.ui.view">
+        <field name="name">opex.innovation.final.evaluation.search</field>
+        <field name="model">opex.innovation.final.evaluation</field>
+        <field name="arch" type="xml">
+            <search string="Évaluations finales">
+                <field name="project_id"/>
+                <field name="author_id"/>
+                <filter name="filter_porteur" string="Avis des porteurs"
+                        domain="[('author_side', '=', 'porteur')]"/>
+                <filter name="filter_cluster" string="Avis du cluster"
+                        domain="[('author_side', '=', 'cluster')]"/>
+                <separator/>
+                <filter name="filter_submitted" string="Remises"
+                        domain="[('state', '=', 'submitted')]"/>
+                <group name="group_by">
+                    <filter name="group_side" string="Côté"
+                            context="{'group_by': 'author_side'}"/>
+                    <filter name="group_project" string="Projet"
+                            context="{'group_by': 'project_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_final_evaluation" model="ir.actions.act_window">
+        <field name="name">Évaluations finales</field>
+        <field name="res_model">opex.innovation.final.evaluation</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- ══════════ Menus ══════════ -->
+
+    <menuitem id="menu_industrialisation"
+              name="Industrialisations"
+              parent="opex_innovation.menu_innovation_root"
+              action="action_industrialisation"
+              sequence="45"/>
+
+    <menuitem id="menu_closure"
+              name="Bilans de clôture"
+              parent="opex_innovation.menu_innovation_root"
+              action="action_closure"
+              sequence="50"/>
+
+    <menuitem id="menu_final_evaluation"
+              name="Évaluations finales"
+              parent="opex_innovation.menu_innovation_root"
+              action="action_final_evaluation"
+              sequence="55"/>
+
+</odoo>

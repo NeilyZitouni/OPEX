@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LE CYCLE DE VIE D'UN LIVRABLE — sections 23 et 24
+            ═══════════════════════════════════════════════════════════════
+
+            Quatre étapes, un chemin de refus, un valideur désigné.
+
+                À faire ──dépôt──▶ Déposé ──validation──▶ Validé
+                                     │  ▲
+                        correction ──┘  └── nouvelle version
+                                     ▼  │
+                              Correction demandée
+
+            ⚠ **Quatre transitions, pas trois.** Le CLAUDE.md en annonce trois ;
+            la boucle que la section 24 exige — « Si correction → nouvelle
+            version → Validation » — en demande une quatrième. Sans
+            `deliverable_resubmit`, un livrable refusé reste refusé pour
+            toujours et l'historique des versions n'a jamais l'occasion
+            d'exister.
+
+            **Cinquième instance du moteur**, sur un cinquième modèle : demande
+            de profil, projet d'innovation, Smart Crowdfunding,
+            industrialisation, livrable. Zéro ligne de Python ajoutée à
+            `opex_workflow` pour aucune des cinq.
+
+            Le gain concret, si on veut le montrer en soutenance : « faire
+            valider par le mentor avant l'expert » s'obtient en insérant une
+            étape au configurateur. C'est l'exercice du Demo Day, sur un autre
+            processus.
+        -->
+
+        <record id="rule_deliverable_has_file" model="opex.workflow.rule">
+            <field name="name">Fichier joint</field>
+            <field name="code">deliverable_has_file</field>
+            <field name="expression">bool(field('file'))</field>
+            <field name="message">Joignez le fichier du livrable avant de le déposer.</field>
+        </record>
+
+        <!-- ══════════ La définition ══════════ -->
+
+        <record id="wf_deliverable" model="opex.workflow.definition">
+            <field name="name">Livrable</field>
+            <field name="code">innovation_deliverable</field>
+            <field name="model_id" ref="model_opex_innovation_deliverable"/>
+            <field name="description">Dépôt, validation et correction d'un livrable d'accompagnement. Sections 23 et 24 du cahier des charges Module 2.</field>
+        </record>
+
+        <!-- ══════════ Étapes ══════════ -->
+
+        <record id="dst_todo" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">todo</field>
+            <field name="name">À faire</field>
+            <field name="user_label">Déposer mon livrable</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="dst_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">submitted</field>
+            <field name="name">Déposé</field>
+            <field name="user_label">En attente de validation</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">7</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+        </record>
+
+        <record id="dst_correction" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">correction_requested</field>
+            <field name="name">Correction demandée</field>
+            <field name="user_label">Action requise : corriger mon livrable</field>
+            <field name="sequence">30</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="dst_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">validated</field>
+            <field name="name">Validé</field>
+            <field name="user_label">Livrable validé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">40</field>
+        </record>
+
+        <!-- ══════════ Transitions ══════════ -->
+
+        <record id="dtr_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">deliverable_submit</field>
+            <field name="name">Déposer le livrable</field>
+            <field name="source_stage_id" ref="dst_todo"/>
+            <field name="target_stage_id" ref="dst_submitted"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_deliverable_has_file')])]"/>
+        </record>
+
+        <record id="dtr_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">deliverable_validate</field>
+            <field name="name">✓ Valider</field>
+            <field name="source_stage_id" ref="dst_submitted"/>
+            <field name="target_stage_id" ref="dst_validated"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+        </record>
+
+        <!--
+            Le commentaire est obligatoire, et c'est le cœur de la section 24 :
+            « demander une correction » sans dire laquelle renverrait le porteur
+            au « améliorez votre projet » que la section 18 proscrit déjà pour
+            la remédiation. Le motif est journalisé, et c'est lui qu'on recopie
+            sur la version archivée.
+        -->
+        <record id="dtr_request_correction" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">deliverable_request_correction</field>
+            <field name="name">↻ Demander une correction</field>
+            <field name="source_stage_id" ref="dst_submitted"/>
+            <field name="target_stage_id" ref="dst_correction"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="dtr_resubmit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_deliverable"/>
+            <field name="code">deliverable_resubmit</field>
+            <field name="name">Déposer une nouvelle version</field>
+            <field name="source_stage_id" ref="dst_correction"/>
+            <field name="target_stage_id" ref="dst_submitted"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_deliverable_has_file')])]"/>
+        </record>
+
+    </data>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Les trois notifications orphelines de l'Extension 18, rebranchées
+        ═══════════════════════════════════════════════════════════════
+
+        ⑩ Nouveau livrable · ⑪ Livrable validé · ⑫ Correction demandée.
+
+        Elles étaient configurées depuis l'Extension 18 et rattachées à rien,
+        faute de transitions auxquelles les accrocher — l'Extension 16 n'existait
+        pas. `notification_inventory()` les signalait comme orphelines et un test
+        vérifiait que c'étaient exactement ces trois-là.
+
+        Les voilà branchées. Aucune n'a été réécrite : ce sont les mêmes
+        enregistrements, avec le même corps et le même sous-type. C'est
+        exactement ce qui avait été annoncé — « le jour où l'Extension 16 sera
+        faite, chacune se branche par une ligne de `<function>` ».
+
+        ⚠ Hors du bloc `noupdate` : les actions ont été créées par
+        `notifications.xml` et portent son drapeau `noupdate`. Un `<record>` qui
+        redéfinirait leur rattachement serait ignoré à la mise à jour.
+        Règle transversale 8.
+    -->
+
+    <!-- ⑩ Nouveau livrable à vérifier — au dépôt comme à la nouvelle version. -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('dtr_submit'), ref('dtr_resubmit')], {'action_ids': [
+                  Command.link(ref('notify_nouveau_livrable'))]}]"/>
+
+    <!-- ⑪ Livrable validé -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('dtr_validate')], {'action_ids': [
+                  Command.link(ref('notify_livrable_valide'))]}]"/>
+
+    <!-- ⑫ Correction demandée -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('dtr_request_correction')], {'action_ids': [
+                  Command.link(ref('notify_correction_demandee'))]}]"/>
+
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_deliverable')]]"/>
+
+</odoo>

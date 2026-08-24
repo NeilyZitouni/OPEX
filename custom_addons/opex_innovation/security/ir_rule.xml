@@ -1,0 +1,450 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Même principe que sur `opex.membership.file` du Module 1 : les droits du
+        CSV portent sur le modèle, pas sur l'enregistrement. Sans ces règles, un
+        membre portail lirait — et modifierait — les demandes de tous les
+        autres.
+
+        Le contrôle applicatif du controller existe déjà ; celui-ci est le
+        second verrou, celui qui porte sur toutes les requêtes, y compris celles
+        qu'on n'a pas écrites.
+    -->
+
+    <record id="rule_expert_profile_portal" model="ir.rule">
+        <field name="name">Profil expert : le membre n'accède qu'au sien</field>
+        <field name="model_id" ref="model_opex_innovation_expert_profile"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Écriture restreinte aux étapes où le membre est réellement attendu :
+        son brouillon, et le retour après demande de complément. Une fois la
+        demande soumise, il ne peut plus la réécrire sous le contrôleur.
+
+        Le domaine s'appuie sur `workflow_stage_id.code` — c'est-à-dire sur la
+        configuration, pas sur un champ d'état du modèle métier. Le processus
+        peut donc changer sans que cette règle bouge.
+    -->
+    <record id="rule_expert_profile_portal_write" model="ir.rule">
+        <field name="name">Profil expert : modifiable tant que le membre est attendu</field>
+        <field name="model_id" ref="model_opex_innovation_expert_profile"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['draft', 'complement_requested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_investor_profile_portal" model="ir.rule">
+        <field name="name">Profil investisseur : le membre n'accède qu'au sien</field>
+        <field name="model_id" ref="model_opex_innovation_investor_profile"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_investor_profile_portal_write" model="ir.rule">
+        <field name="name">Profil investisseur : modifiable tant que le membre est attendu</field>
+        <field name="model_id" ref="model_opex_innovation_investor_profile"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['draft', 'complement_requested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le projet : même verrou que le dossier d'adhésion du Module 1.
+
+        L'écriture est bornée aux étapes où le porteur est réellement attendu —
+        son brouillon, la demande de complément, la remédiation. Le domaine
+        s'appuie sur `workflow_stage_id.code`, c'est-à-dire sur la
+        configuration : le processus peut changer sans que cette règle bouge.
+    -->
+    <record id="rule_project_portal" model="ir.rule">
+        <field name="name">Projet : le porteur n'accède qu'aux siens</field>
+        <field name="model_id" ref="model_opex_innovation_project"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_project_portal_write" model="ir.rule">
+        <field name="name">Projet : modifiable tant que le porteur est attendu</field>
+        <field name="model_id" ref="model_opex_innovation_project"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['draft', 'complement_requested', 'remediation'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_project_document_portal" model="ir.rule">
+        <field name="name">Pièce jointe : limitée aux projets du porteur</field>
+        <field name="model_id" ref="model_opex_innovation_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_team_member_portal" model="ir.rule">
+        <field name="name">Équipe : limitée aux projets du porteur</field>
+        <field name="model_id" ref="model_opex_innovation_team_member"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_profile_document_portal" model="ir.rule">
+        <field name="name">Justificatif : le membre n'accède qu'aux siens</field>
+        <field name="model_id" ref="model_opex_innovation_profile_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('expert_profile_id.partner_id', '=', user.partner_id.id), ('investor_profile_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        ⚠ CONFIDENTIALITÉ DES AVIS — schéma 7
+        ═══════════════════════════════════════════════════════════════
+
+        « Chaque évaluateur travaille indépendamment. Il ne peut pas consulter
+        les avis ou les scores des autres évaluateurs avant la finalisation de
+        son propre avis. »
+
+        Cette règle est le **plancher de la base** : chacun voit le sien, plus
+        ceux qui ont déjà été rendus. Les écrans, eux, appliquent la règle
+        complète via `project.visible_evaluations()` — qui exige en plus que
+        l'évaluateur ait finalisé son propre avis.
+
+        L'écart est assumé et documenté : un domaine `ir.rule` ne sait pas
+        exprimer « à condition que mon propre avis soit rendu » sans champ
+        calculé stocké. La barrière forte est donc applicative, celle-ci borne
+        la base pour tout accès qu'on n'aurait pas prévu.
+    -->
+    <record id="rule_evaluation_evaluator" model="ir.rule">
+        <field name="name">Avis : le sien, plus ceux déjà rendus</field>
+        <field name="model_id" ref="model_opex_innovation_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('evaluator_id', '=', user.partner_id.id), ('state', '=', 'submitted')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- L'évaluateur ne modifie que le sien, et seulement tant qu'il ne l'a
+         pas rendu. Un avis figé est ce qui donne un sens à l'indépendance. -->
+    <record id="rule_evaluation_evaluator_write" model="ir.rule">
+        <field name="name">Avis : modifiable par son auteur tant qu'il n'est pas rendu</field>
+        <field name="model_id" ref="model_opex_innovation_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('evaluator_id', '=', user.partner_id.id), ('state', '!=', 'submitted')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Utilisateurs internes non habilités : même cloisonnement. Sans cette
+         règle, tout employé lirait les avis de tous les évaluateurs. -->
+    <record id="rule_evaluation_internal" model="ir.rule">
+        <field name="name">Avis : cloisonnement des utilisateurs internes</field>
+        <field name="model_id" ref="model_opex_innovation_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">['|', ('evaluator_id', '=', user.partner_id.id), ('state', '=', 'submitted')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_evaluation_committee" model="ir.rule">
+        <field name="name">Avis : le comité voit tout</field>
+        <field name="model_id" ref="model_opex_innovation_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('group_comite_evaluation')), Command.link(ref('group_innovation_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Extension 17 — industrialisation, bilan, évaluation finale
+        ═══════════════════════════════════════════════════════════════
+    -->
+
+    <record id="rule_industrialisation_portal" model="ir.rule">
+        <field name="name">Industrialisation : le porteur ne voit que la sienne</field>
+        <field name="model_id" ref="model_opex_innovation_industrialisation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_closure_portal" model="ir.rule">
+        <field name="name">Bilan : le porteur ne voit que le sien</field>
+        <field name="model_id" ref="model_opex_innovation_closure"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        ⚠ Section 29 — le porteur ne lit pas l'avis du cluster.
+
+        Même raisonnement que la confidentialité des avis d'évaluation : l'écart
+        entre l'avis du porteur et celui du cluster est le seul renseignement
+        que cette section produise. Si le porteur lit celui du cluster, il n'y a
+        plus deux avis indépendants, il y en a un et un commentaire.
+
+        La barrière applicative est `visible_final_evaluations()` ; celle-ci
+        borne la base pour tout accès qu'on n'aurait pas prévu.
+    -->
+    <record id="rule_final_evaluation_portal" model="ir.rule">
+        <field name="name">Évaluation finale : chacun ne lit que la sienne</field>
+        <field name="model_id" ref="model_opex_innovation_final_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('author_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_final_evaluation_portal_write" model="ir.rule">
+        <field name="name">Évaluation finale : modifiable tant qu'elle n'est pas remise</field>
+        <field name="model_id" ref="model_opex_innovation_final_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('author_id', '=', user.partner_id.id), ('state', '!=', 'submitted')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Utilisateurs internes non habilités : même cloisonnement que pour les
+         avis d'évaluation. Sans cette règle, tout employé lirait les avis
+         portés sur chaque accompagnement. -->
+    <record id="rule_final_evaluation_internal" model="ir.rule">
+        <field name="name">Évaluation finale : cloisonnement des utilisateurs internes</field>
+        <field name="model_id" ref="model_opex_innovation_final_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('author_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Extension 18 — section 32, ce qui manquait
+        ═══════════════════════════════════════════════════════════════
+
+        Le tableau de la section 32 nomme cinq acteurs. Un employé ordinaire
+        n'en fait pas partie — or il n'existait **aucune** `ir.rule` sur
+        `opex.innovation.project` pour les groupes internes. Tout utilisateur
+        interne lisait donc l'intégralité des projets, brouillons compris, et
+        pouvait les écrire (`perm_write` valait 1 dans le CSV, ramené à 0).
+
+        Le brouillon d'un porteur n'appartient qu'à lui : la section 32 dit que
+        le secrétariat voit les « projets soumis », pas les dossiers en cours de
+        rédaction. Le domaine s'appuie sur `workflow_stage_id.code`, donc sur la
+        configuration : le processus peut changer sans que cette règle bouge.
+
+        ⚠ Rappel de sémantique Odoo : les règles portées par les différents
+        groupes d'un même utilisateur sont **unies** (OR), pas intersectées. Un
+        gestionnaire Innovation, qui est aussi `base.group_user`, retrouve donc
+        l'accès complet par sa propre règle ci-dessous — il ne se le voit pas
+        retirer par celle des employés.
+    -->
+    <record id="rule_project_internal" model="ir.rule">
+        <field name="name">Projet : les internes ne voient pas les brouillons</field>
+        <field name="model_id" ref="model_opex_innovation_project"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('workflow_stage_id.code', '!=', 'draft')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_project_manager" model="ir.rule">
+        <field name="name">Projet : le gestionnaire Innovation voit tout</field>
+        <field name="model_id" ref="model_opex_innovation_project"/>
+        <field name="groups" eval="[Command.link(ref('group_innovation_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- Même cloisonnement pour les pièces jointes : sans lui, un employé
+         lisait le business plan de tous les brouillons. -->
+    <record id="rule_project_document_internal" model="ir.rule">
+        <field name="name">Pièce jointe : les internes ne voient pas celles des brouillons</field>
+        <field name="model_id" ref="model_opex_innovation_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('project_id.workflow_stage_id.code', '!=', 'draft')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_project_document_manager" model="ir.rule">
+        <field name="name">Pièce jointe : le gestionnaire Innovation voit tout</field>
+        <field name="model_id" ref="model_opex_innovation_document"/>
+        <field name="groups" eval="[Command.link(ref('group_innovation_manager')), Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        ⚠ **Les lignes « Expert » et « Investisseur » de la section 32 ne sont
+        volontairement PAS traduites en `ir.rule` permissive.**
+
+        On pourrait écrire `[('workflow_instance_id.actor_ids.user_id', '=',
+        user.id)]` et donner à l'expert la lecture des projets qui lui sont
+        affectés. Ce serait fidèle à la première moitié de la ligne — et une
+        régression sur la seconde.
+
+        La section dit « projets affectés, **informations autorisées** ». Une
+        `ir.rule` filtre des enregistrements, pas des champs : accorder la
+        lecture du projet donnerait à l'expert `montant_recherche`,
+        `financement_obtenu`, les coordonnées du porteur et les évaluations —
+        précisément ce que les sections 20 et 26 restreignent.
+
+        La restriction est donc appliquée au niveau du **contenu** :
+        `_matching_teaser()` et `_matching_detail()` renvoient une liste fermée
+        de clés, jamais le recordset. L'expert n'a aucun droit de lecture sur
+        `opex.innovation.project`, et c'est plus strict que la section, pas
+        moins. Un test le vérifie dans les deux sens : le teaser arrive, la
+        lecture ORM est refusée.
+    -->
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Extension 16 — accompagnement et livrables
+        ═══════════════════════════════════════════════════════════════
+
+        ⚠ Le porteur accède à **son** accompagnement, l'expert au sien par sa
+        ligne `instance.actor` sur le livrable. Comme partout ailleurs dans ce
+        module, la visibilité fine se tranche dans le contrôleur par
+        `instance._has_access()` ; ces règles sont le plancher de la base.
+    -->
+
+    <record id="rule_accompagnement_portal" model="ir.rule">
+        <field name="name">Accompagnement : le porteur ne voit que le sien</field>
+        <field name="model_id" ref="model_opex_innovation_accompagnement"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_roadmap_phase_portal" model="ir.rule">
+        <field name="name">Roadmap : limitée à l'accompagnement du porteur</field>
+        <field name="model_id" ref="model_opex_innovation_roadmap_phase"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('accompagnement_id.project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le livrable est lisible par son porteur **et** par l'expert qui doit le
+        valider — ce dernier par sa ligne d'acteur sur l'instance, pas par un
+        champ du livrable. Être expert du cluster ne donne accès à rien ; c'est
+        la désignation sur CE livrable qui ouvre la porte.
+    -->
+    <record id="rule_deliverable_portal" model="ir.rule">
+        <field name="name">Livrable : son porteur, ou l'expert désigné dessus</field>
+        <field name="model_id" ref="model_opex_innovation_deliverable"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('accompagnement_id.project_id.partner_id', '=', user.partner_id.id), ('workflow_instance_id.actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Le porteur dépose son fichier tant que le livrable l'attend. Une fois
+         déposé, il ne le réécrit plus sous le contrôleur : la version en cours
+         d'examen doit être celle que l'expert a lue. -->
+    <record id="rule_deliverable_portal_write" model="ir.rule">
+        <field name="name">Livrable : déposable tant que le porteur est attendu</field>
+        <field name="model_id" ref="model_opex_innovation_deliverable"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('accompagnement_id.project_id.partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['todo', 'correction_requested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_deliverable_version_portal" model="ir.rule">
+        <field name="name">Version de livrable : suit la visibilité du livrable</field>
+        <field name="model_id" ref="model_opex_innovation_deliverable_version"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('deliverable_id.accompagnement_id.project_id.partner_id', '=', user.partner_id.id), ('deliverable_id.workflow_instance_id.actor_ids.user_id', '=', user.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_final_evaluation_cluster" model="ir.rule">
+        <field name="name">Évaluation finale : le cluster voit tout</field>
+        <field name="model_id" ref="model_opex_innovation_final_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('group_comite_evaluation')), Command.link(ref('group_innovation_manager'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+</odoo>

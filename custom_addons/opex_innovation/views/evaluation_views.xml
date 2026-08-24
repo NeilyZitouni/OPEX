@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_evaluation_form" model="ir.ui.view">
+        <field name="name">opex.innovation.evaluation.form</field>
+        <field name="model">opex.innovation.evaluation</field>
+        <field name="arch" type="xml">
+            <form string="Évaluation">
+                <header>
+                    <button name="action_start" type="object" string="Commencer"
+                            invisible="state != 'requested'"/>
+                    <button name="action_submit" type="object" string="Rendre l'avis"
+                            class="btn-primary" invisible="state == 'submitted'"/>
+                    <field name="state" widget="statusbar"/>
+                </header>
+                <sheet>
+                    <div class="alert alert-info" role="status">
+                        Cet avis est <strong>consultatif</strong>. Le Comité
+                        d'évaluation n'est pas tenu de le suivre : la décision
+                        finale lui appartient exclusivement.
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="evaluator_id" readonly="1"/></h1>
+                        <h3><field name="project_id" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Grille">
+                            <field name="score_innovation"/>
+                            <field name="score_pertinence"/>
+                            <field name="score_faisabilite"/>
+                            <field name="score_marche"/>
+                            <field name="score_equipe"/>
+                            <field name="score_impact"/>
+                            <field name="score_total" readonly="1"/>
+                        </group>
+                        <group string="Suivi">
+                            <field name="date_requested"/>
+                            <field name="date_submitted"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Avis" name="avis">
+                            <group>
+                                <field name="commentaires"/>
+                                <field name="observations"/>
+                                <field name="points_forts"/>
+                                <field name="points_faibles"/>
+                                <field name="risques"/>
+                                <field name="recommandations"/>
+                                <field name="propositions_amelioration"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_evaluation_list" model="ir.ui.view">
+        <field name="name">opex.innovation.evaluation.list</field>
+        <field name="model">opex.innovation.evaluation</field>
+        <field name="arch" type="xml">
+            <list string="Évaluations">
+                <field name="project_id"/>
+                <field name="evaluator_id"/>
+                <field name="score_total"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'submitted'"/>
+                <field name="date_submitted"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_evaluation" model="ir.actions.act_window">
+        <field name="name">Évaluations</field>
+        <field name="res_model">opex.innovation.evaluation</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun avis sollicité</p>
+            <p>
+                Les évaluateurs sont désignés depuis un projet. Leur intervention
+                est optionnelle : le Comité peut évaluer directement.
+            </p>
+        </field>
+    </record>
+
+    <!-- Désignation depuis le projet -->
+    <record id="view_innovation_project_form_evaluations" model="ir.ui.view">
+        <field name="name">opex.innovation.project.form.evaluations</field>
+        <field name="model">opex.innovation.project</field>
+        <field name="inherit_id" ref="view_innovation_project_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='evaluations']" position="replace">
+                <page string="Évaluations" name="evaluations">
+                    <div class="alert alert-info" role="status">
+                        La sollicitation d'évaluateurs est <strong>optionnelle</strong>.
+                        Désigner quelqu'un ici lui ouvre l'accès à ce dossier —
+                        et à celui-ci seulement. Être expert du vivier n'ouvre
+                        aucun projet.
+                    </div>
+                    <field name="evaluation_ids">
+                        <list editable="bottom">
+                            <field name="evaluator_id"/>
+                            <field name="score_total" readonly="1"/>
+                            <field name="state" readonly="1"/>
+                            <field name="date_submitted" readonly="1"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

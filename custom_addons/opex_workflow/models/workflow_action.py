@@ -3,6 +3,7 @@ from datetime import timedelta
 
 from odoo import _, fields, models
 from odoo.exceptions import UserError
+from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
@@ -100,6 +101,38 @@ class WorkflowAction(models.Model):
         ondelete='set null',
         help="Utilisé par « Démarrer un sous-workflow ».",
     )
+    matching_candidate_type = fields.Selection(
+        [
+            ('expert', "Expert"),
+            ('mentor', "Mentor"),
+            ('investisseur', "Investisseur"),
+            ('sponsor', "Sponsor"),
+        ],
+        string="Type de candidat recherché",
+        default='expert',
+        required=True,
+        help="Utilisé par « Lancer le Smart Matching ».",
+    )
+    matching_limit = fields.Integer(
+        string="Nombre de propositions",
+        default=10,
+        help="Combien de candidats proposer, les mieux classés d'abord.",
+    )
+    matching_min_score = fields.Float(
+        string="Score minimum",
+        digits=(5, 2),
+        help="En deçà, le candidat n'est pas proposé. Zéro propose tout le "
+             "monde, classé par score.",
+    )
+    matching_domain = fields.Char(
+        string="Vivier de candidats",
+        help="Domaine Odoo restreignant les contacts examinés. Vide, le "
+             "matching parcourt toutes les personnes physiques.\n\n"
+             "Exemple : [('is_expert', '=', True)]\n\n"
+             "Sans ce champ, chercher un expert et chercher un investisseur "
+             "reviendraient à parcourir le même vivier — et à proposer les "
+             "mêmes contacts dans les deux catégories.",
+    )
     deadline_days = fields.Integer(
         string="Échéance (jours)",
         help="Utilisé par « Créer une tâche » : délai accordé à partir du "
@@ -152,14 +185,10 @@ class WorkflowAction(models.Model):
         if not roles:
             return self.env['res.partner'].browse()
 
-        partners = instance.sudo().actor_ids.filtered(
-            lambda a: a.role_id in roles and a.access_level != 'none'
-        ).user_id.partner_id
-
-        groups = roles.sudo().group_id
-        if groups:
-            partners |= groups.sudo().all_user_ids.partner_id
-        return partners
+        # Délègue à l'instance : les relances de SLA (Extension 8) résolvent
+        # les mêmes destinataires, et deux versions de cette règle
+        # divergeraient au premier ajustement.
+        return instance._partners_for_roles(roles)
 
     # ------------------------------------------------------------
     # Les types
@@ -282,15 +311,43 @@ class WorkflowAction(models.Model):
     # au premier essai et laisse une trace dans l'historique.
 
     def _execute_launch_subworkflow(self, instance, transition=None):
-        raise NotImplementedError(_(
-            "Les sous-workflows sont configurables mais pas encore exécutés "
-            "(Extension 8). L'action « %s » n'a rien fait ; la transition, "
-            "elle, a bien eu lieu."
-        ) % self.name)
+        """Démarre un second processus sur le même enregistrement."""
+        self.ensure_one()
+        if not self.sub_definition_id:
+            raise UserError(_(
+                "L'action « %s » doit désigner le workflow à démarrer."
+            ) % self.name)
+        child = instance.start_subworkflow(self.sub_definition_id.code)
+        return _("Sous-workflow « %(name)s » démarré (dossier #%(id)s)") % {
+            'name': self.sub_definition_id.name, 'id': child.id}
 
     def _execute_run_matching(self, instance, transition=None):
-        raise NotImplementedError(_(
-            "Le Smart Matching est configurable mais pas encore exécuté "
-            "(Extension 7). L'action « %s » n'a rien fait ; la transition, "
-            "elle, a bien eu lieu."
-        ) % self.name)
+        """Lance le Smart Matching et **s'arrête là**.
+
+        ⚠ L'action produit des propositions, jamais une décision. Elle n'écrit
+        rien sur l'objet métier et ne déclenche aucune transition : c'est le
+        responsable qui, ensuite, retient ou écarte, puis fait avancer le
+        dossier s'il le juge bon. Une action qui enchaînerait automatiquement
+        sur la base d'un score contredirait les deux documents sources.
+        """
+        self.ensure_one()
+        partners = None
+        if self.matching_domain:
+            # Domaine évalué comme une règle : même `safe_eval`, même
+            # tolérance. Un domaine fautif ne doit pas faire échouer une
+            # transition — il vide le vivier, et l'échec est journalisé.
+            domain = safe_eval(self.matching_domain, {})
+            partners = self.env['res.partner'].sudo().search(domain)
+
+        candidates = instance.run_matching(
+            candidate_type=self.matching_candidate_type,
+            partners=partners,
+            limit=self.matching_limit or 10,
+            min_score=self.matching_min_score,
+        )
+        return _("%(count)s candidat(s) proposé(s) (%(kind)s)") % {
+            'count': len(candidates),
+            'kind': dict(
+                self._fields['matching_candidate_type'].selection
+            )[self.matching_candidate_type],
+        }

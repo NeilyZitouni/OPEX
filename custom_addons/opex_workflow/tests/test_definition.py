@@ -217,12 +217,39 @@ class TestDefinition(WorkflowCase):
 
     #: Termes métier des documents sources. Aucun ne doit apparaître comme
     #: identifiant ou comme littéral exact dans le code exécutable du moteur.
+    #:
+    #: ⚠ `score` a été **retiré** de cette liste en Extension 7, et c'est une
+    #: distinction de fond, pas un assouplissement : le score d'un candidat de
+    #: matching est une primitive du moteur — tout système de scoring en a un —
+    #: alors que le score du *projet*, celui que lit `field('score') >= 70`,
+    #: reste une donnée de configuration que le moteur ne nomme nulle part.
     BUSINESS_VOCABULARY = {
-        'pitch_deck', 'business_plan', 'ceo_approval', 'score',
+        'pitch_deck', 'business_plan', 'ceo_approval',
         'depot_express', 'pre_analyse', 'dossier_progressif', 'quality_gate',
         'etude_decision', 'matching_financier', 'accompagnement',
         'mise_en_relation', 'decision_financeur', 'closing',
         'investisseur', 'porteur', 'remediation', 'evaluateur',
+    }
+
+    #: ⚠ Brèche connue et assumée, à rouvrir si elle gêne.
+    #:
+    #: Le périmètre de l'Extension 7 impose `candidate_type` en Selection avec
+    #: les valeurs expert / mentor / investisseur / sponsor. « Investisseur »
+    #: est du vocabulaire métier, et il est ici dans du code exécutable — c'est
+    #: la seule entorse à la règle « le moteur ne sait rien du métier » dans
+    #: tout le module.
+    #:
+    #: Elle est listée nommément plutôt que dissoute dans la liste ci-dessus,
+    #: pour qu'elle reste visible et qu'un ajout ultérieur ne passe pas
+    #: inaperçu derrière elle.
+    #:
+    #: La correction propre, si on la veut : remplacer la Selection par un
+    #: Many2one vers `opex.workflow.role`, dont le référentiel porte déjà
+    #: Expert et Investisseur en **données** — ce qui est déjà admis. Le code
+    #: du moteur redeviendrait alors muet sur le métier.
+    KNOWN_VOCABULARY_BREACHES = {
+        ('models/matching.py', 'investisseur'),
+        ('models/workflow_action.py', 'investisseur'),
     }
 
     def test_engine_contains_no_business_vocabulary(self):
@@ -278,9 +305,13 @@ class TestDefinition(WorkflowCase):
                         # métier.
                         found = node.value
 
-                    if found and found.lower() in self.BUSINESS_VOCABULARY:
-                        offenders.append('%s:%s: %s' % (
-                            relative, getattr(node, 'lineno', '?'), found))
+                    if not found or found.lower() not in self.BUSINESS_VOCABULARY:
+                        continue
+                    breach = (relative.replace(os.sep, '/'), found.lower())
+                    if breach in self.KNOWN_VOCABULARY_BREACHES:
+                        continue
+                    offenders.append('%s:%s: %s' % (
+                        relative, getattr(node, 'lineno', '?'), found))
 
         self.assertFalse(offenders, "\n".join(
             ["Vocabulaire métier trouvé dans le code exécutable du moteur :"]

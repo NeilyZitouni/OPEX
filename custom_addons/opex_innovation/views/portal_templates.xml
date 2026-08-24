@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <template id="portal_my_home_innovation" name="Portail : mes profils"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes profils</t>
+                <t t-set="url" t-value="'/my/innovation/profiles'"/>
+                <t t-set="text">Devenir Expert ou Investisseur du cluster</t>
+                <!--
+                    ⚠ Toujours visible : cette tuile est le seul chemin vers
+                    « Devenir Expert ». La masquer faute de profil la
+                    supprimerait pour tous ceux qui n'en ont pas encore — le
+                    public exact auquel elle s'adresse. Voir la note détaillée
+                    sur la tuile « Mes projets d'innovation ».
+                -->
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <template id="portal_my_profiles" name="Mes profils">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Mes profils</h3>
+
+                <div t-if="error" class="alert alert-warning" role="alert"
+                     t-esc="error"/>
+
+                <div t-if="not partner.is_member" class="alert alert-info" role="status">
+                    Votre adhésion doit être validée avant de pouvoir demander
+                    un profil Expert ou Investisseur.
+                </div>
+
+                <div class="row">
+                    <!-- ═══ Expert ═══ -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Expert</h5>
+
+                                <p t-if="partner.is_expert" class="text-success mb-2">
+                                    ✓ Votre profil Expert est actif.
+                                </p>
+
+                                <!--
+                                    ⚠ Le bouton est masqué quand le profil
+                                    existe déjà — mais c'est la route qui
+                                    l'interdit. Ce `t-if` n'est que de la
+                                    courtoisie visuelle.
+                                -->
+                                <a t-if="can_request_expert"
+                                   class="btn btn-primary"
+                                   href="/my/innovation/profiles/new/expert">
+                                    Devenir Expert
+                                </a>
+
+                                <div t-if="expert_profile" class="mt-2">
+                                    <t t-call="opex_workflow.workflow_portal_progress">
+                                        <t t-set="instance"
+                                           t-value="expert_profile.workflow_instance_id"/>
+                                    </t>
+                                    <a class="btn btn-sm btn-secondary mt-2"
+                                       href="/my/innovation/profiles/expert">
+                                        Voir ma demande
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ═══ Investisseur ═══ -->
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title">Investisseur</h5>
+
+                                <p t-if="partner.is_investor" class="text-success mb-2">
+                                    ✓ Votre profil Investisseur est actif.
+                                </p>
+
+                                <a t-if="can_request_investor"
+                                   class="btn btn-primary"
+                                   href="/my/innovation/profiles/new/investor">
+                                    Devenir Investisseur
+                                </a>
+
+                                <div t-if="investor_profile" class="mt-2">
+                                    <t t-call="opex_workflow.workflow_portal_progress">
+                                        <t t-set="instance"
+                                           t-value="investor_profile.workflow_instance_id"/>
+                                    </t>
+                                    <a class="btn btn-sm btn-secondary mt-2"
+                                       href="/my/innovation/profiles/investor">
+                                        Voir ma demande
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_profile_form" name="Demande de profil">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-if="profile_type == 'expert'">Devenir Expert</h3>
+                <h3 t-else="">Devenir Investisseur</h3>
+
+                <form method="post"
+                      t-att-action="'/my/innovation/profiles/new/%s' % profile_type">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <t t-if="profile_type == 'expert'">
+                        <div class="mb-3">
+                            <label class="form-label" for="domaine_expertise">Domaine d'expertise</label>
+                            <input class="form-control" type="text"
+                                   id="domaine_expertise" name="domaine_expertise"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="fonction">Fonction</label>
+                            <input class="form-control" type="text" id="fonction" name="fonction"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="specialites">Spécialités</label>
+                            <textarea class="form-control" rows="3" id="specialites" name="specialites"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="description_expertise">Décrivez votre expertise</label>
+                            <textarea class="form-control" rows="4"
+                                      id="description_expertise" name="description_expertise"/>
+                        </div>
+                    </t>
+
+                    <t t-else="">
+                        <div class="mb-3">
+                            <label class="form-label" for="type_investisseur">Type d'investisseur</label>
+                            <select class="form-select" id="type_investisseur" name="type_investisseur">
+                                <option value=""/>
+                                <option value="business_angel">Business angel</option>
+                                <option value="fonds">Fonds d'investissement</option>
+                                <option value="banque">Banque</option>
+                                <option value="institution">Institution publique</option>
+                                <option value="entreprise">Entreprise</option>
+                                <option value="sponsor">Sponsor</option>
+                                <option value="autre">Autre</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="domaines_investissement">Domaines d'investissement</label>
+                            <textarea class="form-control" rows="3"
+                                      id="domaines_investissement" name="domaines_investissement"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="zone_geographique">Zone géographique</label>
+                            <input class="form-control" type="text"
+                                   id="zone_geographique" name="zone_geographique"/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="presentation">Présentation</label>
+                            <textarea class="form-control" rows="4" id="presentation" name="presentation"/>
+                        </div>
+                    </t>
+
+                    <div class="alert alert-info" role="status">
+                        Votre demande sera créée en brouillon. Vous pourrez la
+                        compléter, joindre vos justificatifs, puis la soumettre
+                        depuis son écran de suivi.
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Créer ma demande</button>
+                    <a class="btn btn-secondary" href="/my/innovation/profiles">Annuler</a>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_profile_detail" name="Suivi de ma demande de profil">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-esc="profile.display_name"/>
+
+                <!--
+                    La progression vient du moteur, pas du métier : c'est le
+                    même gabarit que celui de n'importe quel autre processus du
+                    portail. Le porteur lit des libellés, jamais des codes.
+                -->
+                <t t-call="opex_workflow.workflow_portal_progress"/>
+
+                <div t-if="profile.motif_complement" class="alert alert-warning mt-3"
+                     role="alert">
+                    <strong>Complément demandé :</strong>
+                    <span t-esc="profile.motif_complement"/>
+                </div>
+
+                <div class="mt-4">
+                    <h5>Historique</h5>
+                    <table class="table table-sm">
+                        <thead><tr><th>Date</th><th>Étape</th><th>Commentaire</th></tr></thead>
+                        <tbody>
+                            <t t-foreach="instance.history_ids.sorted('date')" t-as="entry">
+                                <tr>
+                                    <td t-esc="entry.date"/>
+                                    <td t-esc="entry.to_stage_id.user_label or entry.to_stage_id.name"/>
+                                    <td t-esc="entry.comment or ''"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+                <a class="btn btn-secondary" href="/my/innovation/profiles">Retour</a>
+            </div>
+        </t>
+    </template>
+
+</odoo>
