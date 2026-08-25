@@ -1,4 +1,3 @@
-
 services:
 
   db:
@@ -10,13 +9,21 @@ services:
       POSTGRES_PASSWORD: odoo
     volumes:
       - odoo-db-data:/var/lib/postgresql/data
+    # Odoo attend une base prête : sans ce contrôle, le premier démarrage
+    # échoue une fois sur deux et redémarre en boucle.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     restart: unless-stopped
 
   web:
     image: odoo:19.0
     container_name: opex_web
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "${ODOO_PORT:-8069}:8069"
     environment:
@@ -24,7 +31,17 @@ services:
       USER: odoo
       PASSWORD: odoo
     volumes:
-      - ./custom_addons/opex_membership:/mnt/extra-addons/opex_membership
+      # Tout `custom_addons/` d'un bloc, et non module par module : un nouveau
+      # module apparaît sans qu'on ait à toucher à ce fichier.
+      - ./custom_addons:/mnt/extra-addons
+      # Configuration dédiée au conteneur. Le `odoo.conf` de la racine décrit
+      # l'installation Windows locale (chemins `C:\...`) et sert aux
+      # exécutions hors Docker : le monter ici donnerait un `addons_path`
+      # introuvable dans le conteneur.
+      - ./odoo-docker.conf:/etc/odoo/odoo.conf:ro
+      # Filestore : volume nommé, sinon les pièces jointes — dossiers, pitch
+      # decks, livrables, documents de closing — disparaissent à chaque
+      # recréation du conteneur.
       - odoo-web-data:/var/lib/odoo
     restart: unless-stopped
 
