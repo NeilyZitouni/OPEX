@@ -6,10 +6,49 @@
               sequence="26"
               groups="group_ceo,group_quality_control"/>
 
+    <menuitem id="menu_crowdfunding_work_queue"
+              name="Smart Work Queue"
+              parent="menu_crowdfunding_root"
+              action="action_crowdfunding_work_queue"
+              sequence="5"
+              groups="group_ceo"/>
+
     <menuitem id="menu_crowdfunding_projects"
               name="Projets"
               parent="menu_crowdfunding_root"
               action="action_crowdfunding_project"
               sequence="10"/>
+
+    <menuitem id="menu_crowdfunding_accompagnements"
+              name="Accompagnements"
+              parent="menu_crowdfunding_root"
+              action="action_crowdfunding_accompagnement"
+              sequence="15"
+              groups="group_ceo"/>
+
+    <menuitem id="menu_crowdfunding_actors"
+              name="Acteurs financiers"
+              parent="menu_crowdfunding_root"
+              action="action_crowdfunding_actors"
+              sequence="20"
+              groups="group_ceo"/>
+
+    <menuitem id="menu_crowdfunding_configuration"
+              name="Configuration"
+              parent="menu_crowdfunding_root"
+              sequence="90"
+              groups="group_ceo"/>
+
+    <menuitem id="menu_crowdfunding_criteria"
+              name="Critères de pré-analyse"
+              parent="menu_crowdfunding_configuration"
+              action="action_crowdfunding_criteria"
+              sequence="10"/>
+
+    <menuitem id="menu_crowdfunding_compensation_types"
+              name="Contreparties CEO"
+              parent="menu_crowdfunding_configuration"
+              action="action_crowdfunding_compensation_type"
+              sequence="20"/>
 
 </odoo>

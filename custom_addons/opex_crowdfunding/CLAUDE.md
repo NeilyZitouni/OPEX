@@ -205,9 +205,17 @@ côté de la spécification.
 
 ---
 
-## Extension 2 — Portail porteur
+## Extension 2 — Portail porteur ✅
 
-**Sections 5 (UX) et 16.**
+**Sections 5 (UX) et 16.** — *Faite le 25/08. 23 tests dans
+`tests/test_extension2.py` (portail + sécurité), 37 au total, tous verts.*
+
+⚠️ Piège du portail confirmé dans le code d'Odoo 19 : `portal.portal_docs_entry`
+rend la tuile avec `d-none`, et `portal_home_counters.js` ne la réaffiche que si
+le compteur revient **strictement positif**. Une tuile posée avec
+`placeholder_count` est donc invisible pour qui n'a encore rien déposé —
+exactement le porteur qu'on attend. Ici : `config_card="True"`, compteur calculé
+dans le gabarit, et un test qui vérifie l'absence de `d-none` sur la carte.
 
 Routes : `/my/projects`, `/my/projects/new`, `/my/projects/<id>`.
 
@@ -226,10 +234,26 @@ prochaine action attendue**, pas les codes d'états.
 
 ---
 
-## Extension 3 — Pré-analyse et Go / No Go
+## Extension 3 — Pré-analyse et Go / No Go ✅
 
 **Section 6.** La première étape où la nature « multi-sorties » du processus
-apparaît.
+apparaît. — *Faite le 25/08. 23 tests dans `tests/test_extension3.py`, 60 au
+total, tous verts.*
+
+⚠️ Ajouté hors liste, parce que l'étape n'avait pas de porte d'entrée :
+`action_start_pre_analyse()` (`depot_express` → `pre_analyse`). Sans elle un
+dossier déposé restait indéfiniment en « Demande déposée ».
+
+⚠️ Piège Odoo rencontré : le nom de table auto-généré du Many2many
+préqualification ↔ critères fait 64 caractères, une de trop pour PostgreSQL, et
+**le registre refuse de démarrer** avec un message sans rapport apparent. Table
+nommée à la main (`opex_cf_prequalification_criteria_rel`).
+
+📌 **Deuxième zone paramétrable imposée par la spécification** : « selon des
+critères configurables » (§6). Les sept critères sont semés en données, pas
+écrits dans le code — comme la contrepartie de l'Extension 8. À faire figurer
+tel quel dans le document de comparaison : le module texto n'est pas 100 % en
+dur, et le dire renforce la comparaison au lieu de l'affaiblir.
 
 `opex.crowdfunding.prequalification` : `project_id`, `criteria_ids`, `commentaire`,
 `resultat`, `evaluated_by_id`, `date`.
@@ -256,9 +280,16 @@ le coût d'une cinquième issue.
 
 ---
 
-## Extension 4 — Dossier progressif
+## Extension 4 — Dossier progressif ✅
 
 **Section 7.** Le formulaire complémentaire, demandé **uniquement après un GO**.
+— *Faite le 25/08. 17 tests dans `tests/test_extension4.py`, 77 au total, tous
+verts.*
+
+📌 Le décompte du **coût d'un quatrième type de besoin** est dans la docstring de
+`_champs_dossier_requis()` : **cinq fichiers, ≈ 114 lignes**, chiffres comptés
+sur la branche « sponsor » et non estimés. Les questionnaires sponsor et
+financement public sont des déductions — le document ne les détaille pas.
 
 Le document est explicite : le questionnaire dépend du besoin.
 
@@ -275,9 +306,24 @@ de besoin. Ce commentaire servira au document de comparaison final.
 
 ---
 
-## Extension 5 — Quality Gate
+## Extension 5 — Quality Gate ✅
 
-**Section 8.**
+**Section 8.** — *Faite le 25/08. 23 tests dans `tests/test_extension5.py`, 100
+au total, tous verts.*
+
+📌 **Quatre avis, trois sorties** : `alerte` et `non_conforme` empruntent la même
+transition (`action_quality_alerte`), conformément au bloc RÉSULTAT de
+l'infographie qui les réunit en une seule sortie rouge. Le contrôle qualité
+signale, il n'écarte jamais un projet lui-même.
+
+📌 La contrainte « remplaçable par un agent IA » est tenue par `_avis_suggere()`,
+seule méthode qui juge, et par l'absence totale de contrôle d'identité dans les
+trois transitions. Un test le prouve : la fiche remplie par un contrôleur peut
+être conclue par un autre.
+
+⚠️ Sortie d'une alerte : le dossier reste en `quality_gate` et un **second
+contrôle** le débloque. Le document ne dit pas ce que le comité fait d'une
+alerte ; c'est le seul chemin de sortie implémenté.
 
 `opex.crowdfunding.quality.control` : `project_id`, `controlled_by_id`, `date`, et
 les vérifications du document — complétude, cohérence, qualité des informations,
@@ -297,9 +343,24 @@ remplacement reste possible.
 
 ---
 
-## Extension 6 — Étude et décision CEO
+## Extension 6 — Étude et décision CEO ✅
 
-**Section 9.** Trois routes, trois méthodes.
+**Section 9.** Trois routes, trois méthodes. — *Faite le 25/08. 17 tests dans
+`tests/test_extension6.py`, 117 au total, tous verts.*
+
+📌 « Reste dans le pipeline » a été rendu mesurable : champ `in_pipeline`
+(calculé, stocké) dérivé de `_ETATS_HORS_PIPELINE`, et le filtre « En cours » de
+la vue de recherche s'appuie dessus au lieu de recopier une liste d'états. Un
+test vérifie le filtre lui-même — c'est le seul moyen d'empêcher un futur
+tableau de bord de ranger la maturation avec les refus.
+
+📌 `test_aucune_route_n_en_appelle_une_autre` lit le source des trois méthodes et
+échoue si l'une cite le nom d'une autre. C'est la forme testable de « les routes
+B et C ne partagent aucun code ».
+
+⚠️ Seul `_ensure_ceo()` est commun aux trois routes — la règle transversale n°2
+interdit de recopier un contrôle d'accès. Les préconditions d'état, elles, sont
+écrites trois fois.
 
 | Route | Méthode | Effet |
 |---|---|---|
@@ -313,9 +374,30 @@ aucun code, et un projet en route B reste visible dans tous les tableaux de bord
 
 ---
 
-## Extension 7 — Smart Matching financier
+## Extension 7 — Smart Matching financier ✅
 
-**Section 10.**
+**Section 10.** — *Faite le 25/08, alors qu'elle avait été sacrifiée le 24/08.
+Le périmètre arrêté plus haut est donc dépassé d'une extension : la boucle de 8
+et le benchmark (12) restent à faire. 22 tests dans `tests/test_extension7.py`,
+139 au total, tous verts.*
+
+📌 Dix critères pondérés (20/15/15/10/8/8/6/6/6/6 = 100), une méthode
+`_critere_*` chacun, rendant sa contribution **et son explication**. Aucun
+apprentissage : `detail` reconstitue le score ligne par ligne, et un test vérifie
+que la somme des contributions écrites égale bien le score affiché.
+
+📌 Le profil d'acteur financier vit sur `res.partner`, tous champs préfixés
+`cf_` : Membership étend le même modèle, et une collision y serait silencieuse
+au chargement puis fatale au runtime.
+
+📌 Deux critères sont **déduits du secteur** (impact, technologie) faute de champ
+dédié dans le dépôt express — ajouter ces champs aurait alourdi le formulaire du
+porteur pour deux critères sur dix. Simplification assumée, à mentionner si le
+jury creuse.
+
+⚠️ « Le matching est une recommandation » : aucune méthode du modèle candidat ne
+touche à l'état du projet. Seul `action_validate_matching()`, geste explicite du
+comité, met en relation.
 
 `opex.crowdfunding.matching.candidate` : `project_id`, `partner_id`,
 `candidate_type` (investisseur, fonds, programme public, sponsor, banque,
@@ -334,10 +416,31 @@ défendable devant un jury.
 
 ---
 
-## Extension 8 — Accompagnement CEO
+## Extension 8 — Accompagnement CEO ✅
 
 **Sections 11 et 12.** La partie la plus riche du module — c'est un sous-processus
-complet.
+complet. — *Faite en entier le 25/08 (et pas seulement sa boucle, comme le
+périmètre du 24/08 le prévoyait). 32 tests dans `tests/test_extension8.py`, 171
+au total, tous verts.*
+
+📌 **Les trois déclencheurs ne se comportent pas de la même façon**, et c'est
+délibéré : la recommandation du comité (route B) fait basculer le dossier dans
+l'étape « Accompagnement CEO » du parcours principal ; la condition d'un acteur
+financier et la demande du porteur ouvrent un **sous-workflow qui tourne à
+côté**, sans dérouter le dossier. Un porteur qui demande de l'aide pendant que
+son dossier est au contrôle qualité ne doit pas sortir du contrôle qualité.
+
+📌 La boucle est complète et testée de bout en bout : étude → route B →
+accompagnement → service fait → réévaluation → **retour au matching financier**.
+
+📌 Le « service fait » a un sens vérifié : toutes les missions terminées, tous
+les livrables validés. Sinon la formule ne voudrait rien dire.
+
+⚠️ **Zone paramétrable imposée** (la seconde après les critères de pré-analyse) :
+`opex.crowdfunding.compensation.type`, neuf types semés en données. Un test
+structurel vérifie que le champ reste un Many2one vers ce référentiel — si
+quelqu'un le remplace un jour par un `Selection` « c'est plus simple », il aura
+codé en dur le modèle économique, ce que la section 12 interdit.
 
 **Trois déclencheurs**, à implémenter tous les trois :
 1. recommandation CEO (route B de l'étude)
@@ -372,9 +475,34 @@ processus d'une séquence linéaire.
 
 ---
 
-## Extension 9 — Mise en relation contrôlée
+## Extension 9 — Mise en relation contrôlée ✅
 
-**Section 13.** Le point le plus sensible du module côté confidentialité.
+**Section 13.** Le point le plus sensible du module côté confidentialité. —
+*Faite le 25/08. 23 tests dans `tests/test_extension9.py`, 194 au total, tous
+verts.*
+
+📌 **Le contrôle vit dans une seule méthode**, `relation._portal_payload()`, qui
+renvoie `(gabarit, valeurs)`. Les trois niveaux ne se distinguent pas par des
+`t-if` : chaque gabarit ne reçoit que les valeurs de son niveau. Ni la relation
+ni le projet ne sont passés au gabarit — avec l'enregistrement en main, un
+`t-out="relation.project_id.name"` contournerait tout le filtrage.
+
+📌 Aucun droit d'écriture portail sur `opex.crowdfunding.relation` : avec
+`perm_write` à 1, une requête forgée poserait `niveau_acces = 'full'` sur sa
+propre relation. Les deux gestes autorisés passent par des méthodes appelées par
+le contrôleur après vérification d'appartenance.
+
+⚠️ **Piège n°6, variante coûteuse — trouvée en falsifiant, pas en relisant.**
+Le test central cherchait les données réservées dans le HTML brut… avec des
+chaînes contenant une apostrophe. QWeb rend `'` en `&#39;` : l'assertion ne
+pouvait donc jamais échouer. Une fuite volontaire (`titre` passé au gabarit puis
+masqué en `d-none`) est passée **au vert**. Corrigé en déséchappant la réponse
+avant la recherche (`html.unescape`) ; la même fuite fait maintenant tomber
+3 tests.
+
+**Règle à retenir pour les extensions suivantes** : toute assertion négative sur
+du HTML doit porter sur du texte déséchappé, et tout `assertNotIn` doit être
+prouvé falsifiable avant d'être cru.
 
 > Le matching ne signifie pas automatiquement partage du dossier complet.
 
@@ -394,9 +522,27 @@ routes concernées (règle transversale 2).
 
 ---
 
-## Extension 10 — Décision de l'acteur financier, closing et suivi
+## Extension 10 — Décision de l'acteur financier, closing et suivi ✅
 
-**Sections 14 et 15.**
+**Sections 14 et 15.** — *Faite le 25/08. 28 tests dans
+`tests/test_extension10.py`, 222 au total, tous verts.*
+
+📌 Cinq méthodes sur `opex.crowdfunding.relation`, une par bouton. Un test vérifie
+qu'**aucun code d'état** n'apparaît dans le HTML de l'écran acteur (recherche sur
+le HTML déséchappé, leçon de l'Extension 9). Les boutons n'apparaissent qu'à
+partir du dossier limité : au teaser, l'acteur n'a rien lu qui permette de
+décider.
+
+📌 « Demander accompagnement CEO » rebranche sur le déclencheur n°2 de
+l'Extension 8. **Défaut trouvé en le branchant** : `action_accompagnement_
+demande_financeur()` cherchait le demandeur parmi les candidats au matching, et
+ne le trouvait pas quand la demande venait d'une relation. La méthode accepte
+maintenant le `partner` que l'appelant connaît.
+
+📌 La nature de l'opération commande ses exigences (`EXIGENCES_PAR_TYPE`) :
+documents, échéancier, reporting. `action_close()` refuse tant qu'elles ne sont
+pas satisfaites — « clôturé » veut dire quelque chose. Une huitième nature = une
+entrée dans la table + une valeur de Selection + un redéploiement.
 
 Cinq actions simples côté acteur financier — il ne doit pas avoir à comprendre le
 workflow interne :
@@ -419,9 +565,37 @@ post-financement.
 
 ---
 
-## Extension 11 — Les quatre interfaces et la Smart Work Queue
+## Extension 11 — Les quatre interfaces et la Smart Work Queue ✅
 
-**Section 16.** Le principe :
+**Section 16.** — *Faite le 26/08. 25 tests dans `tests/test_extension11.py`,
+247 au total, tous verts. **Fin du module fonctionnel** : reste l'Extension 12,
+le benchmark.*
+
+📌 Les quatre écrans sont vérifiés avec **un compte de chaque acteur**, et un
+garde commun (`_assert_aucun_code_etat`) balaye chaque page à la recherche des
+onze codes d'états — sur le HTML déséchappé, attributs `href`/`action` retirés
+(une route nommée `/accompagnement/demander` n'expose pas un état).
+
+📌 Six décisions passées en `mt_comment` (GO, orientation, routes A et B,
+clarifications, refus). Le **motif** d'un refus reste en `mt_note` : le porteur
+reçoit la décision, pas l'argumentaire d'instruction. Choix réversible d'une
+ligne, signalé dans le code.
+
+📌 Smart Work Queue : six compteurs, six domaines définis **une seule fois** et
+utilisés pour compter et pour ouvrir. Le test compare le compteur au domaine que
+le **bouton** ouvre — première version tautologique, corrigée — et garnit chaque
+file, sans quoi il passerait au vert avec six zéros.
+
+⚠️ **Deux pièges Odoo 19 découverts ici :**
+1. `target="inline"` n'existe plus sur `ir.actions.act_window` : le module refuse
+   de s'installer, avec un `ParseError` qui ne nomme pas la valeur fautive.
+2. **Odoo désactive le suivi des champs pour un enregistrement créé dans la
+   transaction courante.** Créer un projet puis changer son état dans le même
+   test ne laisse aucune trace, et tout historique bâti dessus paraît vide sans
+   que rien ne soit cassé. En production les deux gestes sont dans deux
+   requêtes ; en test, il faut vider le marqueur
+   (`cr.precommit.data.pop('mail.tracking.<modèle>')`) puis
+   `cr.precommit.run()`.
 
 > **Ne pas demander à l'utilisateur de piloter le workflow. Le workflow doit guider
 > l'utilisateur.**

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Les sept critères de validation préliminaire de la section 6.
+
+        Ils sont semés en données et non écrits dans le code : le document dit
+        « selon des critères configurables ». Le comité CEO peut donc en
+        ajouter un depuis l'interface, sans développeur — c'est une des deux
+        zones (avec la contrepartie de l'accompagnement) où la spécification
+        impose du paramétrable jusque dans l'implémentation texto.
+
+        Ce qui reste en dur, c'est l'usage qu'on en fait : quatre issues,
+        quatre méthodes Python.
+    -->
+
+    <record id="criteria_adequation" model="opex.crowdfunding.criteria">
+        <field name="name">Adéquation avec les domaines CEO</field>
+        <field name="description">Le projet entre dans les domaines d'intervention du comité.</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="criteria_potentiel" model="opex.crowdfunding.criteria">
+        <field name="name">Potentiel</field>
+        <field name="description">Perspective de développement ou d'impact suffisante.</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="criteria_innovation" model="opex.crowdfunding.criteria">
+        <field name="name">Caractère innovant</field>
+        <field name="description">Apport nouveau par rapport à l'existant.</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="criteria_faisabilite" model="opex.crowdfunding.criteria">
+        <field name="name">Faisabilité apparente</field>
+        <field name="description">Rien n'indique, à ce stade, que le projet soit irréalisable.</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="criteria_maturite" model="opex.crowdfunding.criteria">
+        <field name="name">Maturité minimale</field>
+        <field name="description">Le projet est assez avancé pour qu'une instruction ait du sens.</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="criteria_besoin" model="opex.crowdfunding.criteria">
+        <field name="name">Besoin identifiable</field>
+        <field name="description">Le besoin exprimé est clair et correspond à une offre du dispositif.</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="criteria_credibilite" model="opex.crowdfunding.criteria">
+        <field name="name">Crédibilité du porteur</field>
+        <field name="description">Le porteur paraît en mesure de mener le projet.</field>
+        <field name="sequence">70</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Missions, jalons, livrables
+         ============================================================ -->
+    <record id="view_crowdfunding_mission_form" model="ir.ui.view">
+        <field name="name">opex.crowdfunding.mission.form</field>
+        <field name="model">opex.crowdfunding.mission</field>
+        <field name="arch" type="xml">
+            <form string="Mission d'expert">
+                <header>
+                    <!-- Les deux boutons de la section 16, côté expert. -->
+                    <button name="action_accept" type="object" string="Accepter"
+                            class="oe_highlight" invisible="state != 'proposee'"/>
+                    <button name="action_decline" type="object" string="Décliner"
+                            invisible="state != 'proposee'"/>
+                    <button name="action_terminate" type="object" string="Terminer la mission"
+                            class="oe_highlight" invisible="state != 'acceptee'"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="proposee,acceptee,terminee"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Mission">
+                            <field name="expert_id"
+                                   options="{'no_create': True}"/>
+                            <field name="date_debut"/>
+                            <field name="date_fin"/>
+                        </group>
+                        <group string="Contrepartie de l'expert">
+                            <field name="contrepartie_type_id" options="{'no_create': True}"/>
+                            <field name="contrepartie"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="objectif"/>
+                    </group>
+                    <notebook>
+                        <page string="Jalons" name="jalons">
+                            <field name="jalon_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="date_prevue"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'atteint'"
+                                           decoration-danger="state == 'manque'"/>
+                                    <field name="commentaire"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Livrables" name="livrables">
+                            <field name="livrable_ids">
+                                <list editable="bottom"
+                                      decoration-success="state == 'valide'"
+                                      decoration-danger="state == 'refuse'">
+                                    <field name="name"/>
+                                    <field name="description" optional="show"/>
+                                    <field name="fichier" filename="fichier_filename"/>
+                                    <field name="fichier_filename" column_invisible="True"/>
+                                    <field name="date_remise" optional="hide"/>
+                                    <field name="commentaire"/>
+                                    <field name="state" widget="badge"/>
+                                    <button name="action_remettre" type="object"
+                                            string="Remettre" icon="fa-upload"
+                                            invisible="state in ('remis', 'valide')"/>
+                                    <button name="action_valider" type="object"
+                                            string="Valider" icon="fa-check"
+                                            invisible="state != 'remis'"/>
+                                    <button name="action_refuser" type="object"
+                                            string="Refuser" icon="fa-times"
+                                            invisible="state != 'remis'"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_crowdfunding_mission_list" model="ir.ui.view">
+        <field name="name">opex.crowdfunding.mission.list</field>
+        <field name="model">opex.crowdfunding.mission</field>
+        <field name="arch" type="xml">
+            <list string="Missions">
+                <field name="expert_id"/>
+                <field name="objectif"/>
+                <field name="date_debut" optional="show"/>
+                <field name="date_fin" optional="show"/>
+                <field name="contrepartie_type_id" optional="show"/>
+                <field name="state" widget="badge"
+                       decoration-success="state == 'terminee'"
+                       decoration-danger="state == 'declinee'"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         L'accompagnement lui-même
+         ============================================================ -->
+    <record id="view_crowdfunding_accompagnement_form" model="ir.ui.view">
+        <field name="name">opex.crowdfunding.accompagnement.form</field>
+        <field name="model">opex.crowdfunding.accompagnement</field>
+        <field name="arch" type="xml">
+            <form string="Accompagnement CEO">
+                <header>
+                    <button name="action_start_diagnostic" type="object"
+                            string="Engager le diagnostic" class="oe_highlight"
+                            invisible="state != 'demande'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_propose" type="object"
+                            string="Soumettre la proposition" class="oe_highlight"
+                            invisible="state != 'diagnostic'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!--
+                        Section 12 : la transition « proposé → actif » a pour
+                        précondition « Convention acceptée = TRUE ». Le bouton
+                        reste visible mais la méthode refuse tant que le
+                        porteur n'a pas accepté — le refus explique pourquoi.
+                    -->
+                    <button name="action_accept_convention" type="object"
+                            string="Activer l'accompagnement" class="oe_highlight"
+                            invisible="state != 'propose'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_refuse_convention" type="object"
+                            string="Proposition refusée"
+                            invisible="state != 'propose'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_service_fait" type="object"
+                            string="Constater le service fait" class="oe_highlight"
+                            invisible="state != 'actif'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_evaluate" type="object"
+                            string="Clore après évaluation" class="oe_highlight"
+                            invisible="state != 'service_fait'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <field name="state" widget="statusbar"
+                           statusbar_visible="demande,diagnostic,propose,actif,service_fait,evalue"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group string="Origine">
+                            <field name="project_id" readonly="1"/>
+                            <field name="origine"/>
+                            <field name="requested_by_partner_id"
+                                   invisible="origine != 'acteur_financier'"/>
+                        </group>
+                        <group string="Convention">
+                            <field name="compensation_type_id" options="{'no_create': True}"/>
+                            <field name="compensation_detail"/>
+                            <field name="convention_acceptee"/>
+                            <field name="date_acceptation" invisible="not date_acceptation"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Diagnostic et proposition" name="diagnostic">
+                            <group>
+                                <field name="demande" invisible="origine != 'porteur'"/>
+                                <field name="diagnostic"/>
+                                <field name="proposition"/>
+                                <field name="conditions"/>
+                            </group>
+                        </page>
+                        <page string="Missions" name="missions">
+                            <field name="expert_suggestion_ids" widget="many2many_tags"
+                                   readonly="1"
+                                   string="Experts suggérés (même secteur)"/>
+                            <field name="mission_ids" nolabel="1"
+                                   context="{'default_accompagnement_id': id}"/>
+                        </page>
+                        <page string="Évaluation" name="evaluation">
+                            <field name="evaluation_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="mission_id"
+                                           domain="[('accompagnement_id', '=', parent.id)]"/>
+                                    <field name="note"/>
+                                    <field name="commentaire"/>
+                                    <field name="evaluated_by_id" optional="show"/>
+                                    <field name="date" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_crowdfunding_accompagnement_list" model="ir.ui.view">
+        <field name="name">opex.crowdfunding.accompagnement.list</field>
+        <field name="model">opex.crowdfunding.accompagnement</field>
+        <field name="arch" type="xml">
+            <list string="Accompagnements">
+                <field name="project_id"/>
+                <field name="origine"/>
+                <field name="compensation_type_id" optional="show"/>
+                <field name="convention_acceptee" widget="boolean_toggle"/>
+                <field name="state" widget="badge"
+                       decoration-success="state in ('service_fait', 'evalue')"
+                       decoration-danger="state == 'refuse'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_crowdfunding_accompagnement" model="ir.actions.act_window">
+        <field name="name">Accompagnements</field>
+        <field name="res_model">opex.crowdfunding.accompagnement</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucun accompagnement en cours.
+            </p>
+            <p>
+                Un accompagnement naît d'une recommandation du comité, de la
+                condition posée par un acteur financier, ou d'une demande du
+                porteur.
+            </p>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         Le référentiel des contreparties — section 12
+         ============================================================ -->
+    <record id="view_crowdfunding_compensation_type_list" model="ir.ui.view">
+        <field name="name">opex.crowdfunding.compensation.type.list</field>
+        <field name="model">opex.crowdfunding.compensation.type</field>
+        <field name="arch" type="xml">
+            <list string="Contreparties CEO" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_crowdfunding_compensation_type" model="ir.actions.act_window">
+        <field name="name">Contreparties CEO</field>
+        <field name="res_model">opex.crowdfunding.compensation.type</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Définissez les contreparties possibles d'un accompagnement.
+            </p>
+            <p>
+                « Le workflow ne doit pas coder en dur le modèle économique »
+                (section 12) : en ajouter une ne demande pas de développeur.
+            </p>
+        </field>
+    </record>
+
+</odoo>

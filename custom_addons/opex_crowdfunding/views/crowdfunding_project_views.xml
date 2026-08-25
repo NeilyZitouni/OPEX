@@ -29,6 +29,112 @@
                 <header>
                     <button name="action_submit" type="object" string="Présenter mon projet"
                             class="oe_highlight" invisible="state != 'draft'"/>
+                    <button name="action_start_pre_analyse" type="object"
+                            string="Ouvrir la pré-analyse" class="oe_highlight"
+                            invisible="state != 'depot_express'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!--
+                        Les quatre issues de la section 6, dans l'ordre du bloc
+                        « RÉSULTAT » de l'infographie. Quatre boutons pour
+                        quatre méthodes : aucun sélecteur d'issue, aucune
+                        méthode à paramètre.
+                    -->
+                    <button name="action_go" type="object" string="GO"
+                            class="oe_highlight" invisible="state != 'pre_analyse'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_clarify" type="object" string="À clarifier"
+                            invisible="state != 'pre_analyse'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_orientation" type="object" string="Orientation"
+                            invisible="state != 'pre_analyse'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_no_go" type="object" string="NO GO"
+                            invisible="state != 'pre_analyse'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!--
+                        Quality Gate : quatre avis, trois boutons. « Alerte » et
+                        « Non conforme » passent par la même sortie — le
+                        contrôle qualité signale au comité, il n'écarte pas.
+                    -->
+                    <button name="action_quality_ok" type="object"
+                            string="Conforme — transmettre au comité"
+                            class="oe_highlight" invisible="state != 'quality_gate'"
+                            groups="opex_crowdfunding.group_quality_control"/>
+                    <button name="action_quality_complement" type="object"
+                            string="À compléter — renvoyer au porteur"
+                            invisible="state != 'quality_gate'"
+                            groups="opex_crowdfunding.group_quality_control"/>
+                    <button name="action_quality_alerte" type="object"
+                            string="Signaler au comité CEO"
+                            invisible="state != 'quality_gate'"
+                            groups="opex_crowdfunding.group_quality_control"/>
+                    <!--
+                        Étude CEO : trois routes. La route B (maturation) n'est
+                        pas un refus — elle est présentée comme une décision
+                        positive, et le bouton de refus est le seul en rouge.
+                    -->
+                    <button name="action_route_investment_ready" type="object"
+                            string="Route A — Investment Ready"
+                            class="oe_highlight" invisible="state != 'etude_decision'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_route_maturation" type="object"
+                            string="Route B — Maturation nécessaire"
+                            class="oe_highlight" invisible="state != 'etude_decision'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_route_rejected" type="object"
+                            string="Route C — Non retenu"
+                            invisible="state != 'etude_decision'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!--
+                        Matching : « Lancer » ne fait qu'établir une liste.
+                        Seul « Valider le matching » fait avancer le dossier,
+                        et c'est un geste du comité — jamais un seuil de score.
+                    -->
+                    <button name="action_run_matching" type="object"
+                            string="Lancer le matching"
+                            invisible="state != 'matching_financier'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_validate_matching" type="object"
+                            string="Valider le matching et mettre en relation"
+                            class="oe_highlight" invisible="state != 'matching_financier'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!--
+                        Accompagnement : le déclencheur 2 (condition d'un
+                        acteur financier) et la boucle de réévaluation. Le
+                        déclencheur 1 est dans la route B, le déclencheur 3
+                        est au portail.
+                    -->
+                    <button name="action_accompagnement_demande_financeur" type="object"
+                            string="Accompagnement demandé par un acteur financier"
+                            invisible="state not in ('matching_financier', 'mise_en_relation', 'decision_financeur')"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!-- Closing et clôture — section 15. -->
+                    <button name="action_start_closing" type="object"
+                            string="Ouvrir le closing" class="oe_highlight"
+                            invisible="state != 'decision_financeur'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_close" type="object"
+                            string="Clôturer le financement" class="oe_highlight"
+                            invisible="state != 'closing'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_reevaluation" type="object"
+                            string="Réévaluer après accompagnement" class="oe_highlight"
+                            invisible="state != 'accompagnement'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <button name="action_retour_matching" type="object"
+                            string="Inscrire au Demo Day" class="oe_highlight"
+                            invisible="state != 'reevaluation'"
+                            groups="opex_crowdfunding.group_ceo"/>
+                    <!--
+                        Demo Day (section 18) : trois conditions vérifiées par
+                        la méthode — accord CEO, pitch deck, note ≥ 70. Elles
+                        se saisissent dans l'onglet Étude CEO et dans le
+                        dossier complémentaire.
+                    -->
+                    <button name="action_valider_demo_day" type="object"
+                            string="Valider le Demo Day" class="oe_highlight"
+                            invisible="state != 'demo_day'"
+                            groups="opex_crowdfunding.group_ceo"/>
                     <!--
                         Les états de sortie (« Non retenu », « Clôturé ») et les
                         états de retour au porteur ne figurent pas dans la barre
@@ -36,7 +142,7 @@
                         reculé dans le parcours, il attend une réponse.
                     -->
                     <field name="state" widget="statusbar"
-                           statusbar_visible="draft,depot_express,pre_analyse,dossier_progressif,quality_gate,etude_decision,matching_financier,mise_en_relation,decision_financeur,closing"/>
+                           statusbar_visible="draft,depot_express,pre_analyse,dossier_progressif,quality_gate,etude_decision,demo_day,matching_financier,mise_en_relation,decision_financeur,closing"/>
                 </header>
                 <sheet>
                     <div class="oe_title">
@@ -73,6 +179,299 @@
                                 <field name="pitch_filename" invisible="1"/>
                             </group>
                         </page>
+                        <!--
+                            Le dossier complémentaire, section 7. Trois groupes,
+                            un par besoin, affichés par la même condition que
+                            celle du portail. Un quatrième besoin ajoute ici un
+                            groupe entier.
+                        -->
+                        <page string="Dossier complémentaire" name="dossier"
+                              invisible="state in ('draft', 'depot_express', 'pre_analyse', 'clarification')">
+                            <group string="Dossier investisseur"
+                                   invisible="besoin_type != 'investisseur'">
+                                <field name="business_model"/>
+                                <field name="marche"/>
+                                <field name="traction"/>
+                                <field name="equipe"/>
+                                <field name="besoin_financier"/>
+                                <field name="utilisation_fonds"/>
+                                <field name="valorisation"/>
+                                <field name="previsions_financieres"/>
+                                <field name="pitch_deck" filename="pitch_deck_filename"/>
+                                <field name="pitch_deck_filename" invisible="1"/>
+                            </group>
+                            <group string="Dossier sponsor"
+                                   invisible="besoin_type != 'sponsor'">
+                                <field name="sponsor_objectif"/>
+                                <field name="sponsor_public_cible"/>
+                                <field name="sponsor_visibilite"/>
+                                <field name="sponsor_retombees"/>
+                                <field name="sponsor_budget"/>
+                                <field name="sponsor_calendrier"/>
+                                <field name="sponsor_partenaires"/>
+                                <field name="sponsor_document" filename="sponsor_document_filename"/>
+                                <field name="sponsor_document_filename" invisible="1"/>
+                            </group>
+                            <group string="Dossier financement public"
+                                   invisible="besoin_type != 'financement_public'">
+                                <field name="public_dispositif"/>
+                                <field name="public_eligibilite"/>
+                                <field name="public_montant"/>
+                                <field name="public_plan_financement"/>
+                                <field name="public_impact"/>
+                                <field name="public_conformite"/>
+                                <field name="public_calendrier"/>
+                                <field name="public_document" filename="public_document_filename"/>
+                                <field name="public_document_filename" invisible="1"/>
+                            </group>
+                        </page>
+                        <!--
+                            Closing et suivi. La nature de l'opération commande
+                            les pièces exigées : « Préparer le dossier » crée
+                            les lignes attendues, et la clôture vérifie qu'elles
+                            sont validées.
+                        -->
+                        <page string="Closing et suivi" name="closing"
+                              invisible="state not in ('decision_financeur', 'closing', 'closed')">
+                            <field name="closing_ids" nolabel="1">
+                                <form string="Closing">
+                                    <header>
+                                        <button name="action_preparer_dossier" type="object"
+                                                string="Préparer le dossier"
+                                                groups="opex_crowdfunding.group_ceo"/>
+                                        <button name="action_confirmer_signature" type="object"
+                                                string="Confirmer la signature"
+                                                class="oe_highlight"
+                                                invisible="signature_confirmee"
+                                                groups="opex_crowdfunding.group_ceo"/>
+                                    </header>
+                                    <sheet>
+                                        <group>
+                                            <group string="Opération">
+                                                <field name="type_operation"/>
+                                                <field name="partner_id"/>
+                                                <field name="montant"/>
+                                                <field name="currency_id" invisible="1"/>
+                                            </group>
+                                            <group string="Signature">
+                                                <field name="signature_confirmee"/>
+                                                <field name="date_signature"
+                                                       invisible="not signature_confirmee"/>
+                                            </group>
+                                        </group>
+                                        <notebook>
+                                            <page string="Documents" name="documents">
+                                                <field name="document_ids">
+                                                    <list editable="bottom"
+                                                          decoration-success="valide">
+                                                        <field name="name"/>
+                                                        <field name="fichier"
+                                                               filename="fichier_filename"/>
+                                                        <field name="fichier_filename"
+                                                               column_invisible="True"/>
+                                                        <field name="commentaire"/>
+                                                        <field name="valide" widget="boolean_toggle"/>
+                                                        <button name="action_valider" type="object"
+                                                                string="Valider" icon="fa-check"
+                                                                invisible="valide"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Versements" name="versements">
+                                                <field name="versement_ids">
+                                                    <list editable="bottom"
+                                                          decoration-success="state == 'verse'">
+                                                        <field name="name"/>
+                                                        <field name="montant"/>
+                                                        <field name="currency_id"
+                                                               column_invisible="True"/>
+                                                        <field name="date_prevue"/>
+                                                        <field name="date_versement" readonly="1"/>
+                                                        <field name="state" widget="badge"/>
+                                                        <button name="action_constater_versement"
+                                                                type="object" string="Constater"
+                                                                icon="fa-money"
+                                                                invisible="state != 'prevu'"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                            <page string="Engagements et reporting" name="engagements">
+                                                <group>
+                                                    <field name="engagements_porteur"/>
+                                                    <field name="reporting"/>
+                                                </group>
+                                            </page>
+                                            <page string="Suivi post-financement" name="suivi">
+                                                <field name="suivi_ids">
+                                                    <list editable="bottom">
+                                                        <field name="date"/>
+                                                        <field name="name"/>
+                                                        <field name="commentaire"/>
+                                                        <field name="auteur_id" optional="show"/>
+                                                    </list>
+                                                </field>
+                                            </page>
+                                        </notebook>
+                                    </sheet>
+                                </form>
+                                <list>
+                                    <field name="type_operation"/>
+                                    <field name="partner_id"/>
+                                    <field name="montant"/>
+                                    <field name="currency_id" column_invisible="True"/>
+                                    <field name="signature_confirmee" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+                        <!--
+                            La mise en relation contrôlée. Le comité voit qui
+                            en est où ; les crans se franchissent depuis cette
+                            liste, un par un et jamais tout seuls.
+                        -->
+                        <page string="Mise en relation" name="relations"
+                              invisible="not relation_ids">
+                            <field name="relation_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="partner_id" readonly="1"/>
+                                    <field name="interet_exprime" widget="boolean_toggle" readonly="1"/>
+                                    <field name="niveau_acces" widget="badge"
+                                           decoration-info="niveau_acces == 'teaser'"
+                                           decoration-warning="niveau_acces == 'limited'"
+                                           decoration-success="niveau_acces == 'full'"/>
+                                    <field name="nda_requis" widget="boolean_toggle"/>
+                                    <field name="nda_signe" widget="boolean_toggle" readonly="1"/>
+                                    <field name="autorise_par_id" optional="show" readonly="1"/>
+                                    <field name="date_autorisation" optional="hide" readonly="1"/>
+                                    <button name="action_signer_nda" type="object"
+                                            string="NDA signé" icon="fa-pencil-square-o"
+                                            invisible="not nda_requis or nda_signe"/>
+                                    <button name="action_ouvrir_dossier_complet" type="object"
+                                            string="Ouvrir le dossier détaillé" icon="fa-unlock"
+                                            invisible="niveau_acces != 'limited'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Accompagnement" name="accompagnement"
+                              invisible="not accompagnement_ids">
+                            <field name="accompagnement_ids" nolabel="1"/>
+                        </page>
+                        <!--
+                            L'écran de matching. Trié par score décroissant par
+                            le `_order` du modèle. Le comité peut Valider,
+                            Modifier (les lignes sont éditables), Exclure et
+                            Ajouter un acteur — un acteur ajouté à la main
+                            arrive en « Ajouté manuellement », c'est la valeur
+                            par défaut du champ.
+                        -->
+                        <page string="Matching financier" name="matching"
+                              invisible="not matching_candidate_ids and state != 'matching_financier'">
+                            <field name="matching_candidate_ids" nolabel="1">
+                                <list editable="bottom" decoration-muted="state == 'excluded'"
+                                      decoration-success="state == 'validated'">
+                                    <field name="partner_id"/>
+                                    <field name="candidate_type"/>
+                                    <field name="score" widget="progressbar"/>
+                                    <field name="state" widget="badge"/>
+                                    <field name="detail" widget="text" optional="show"/>
+                                    <button name="action_validate" type="object"
+                                            string="Valider" icon="fa-check"
+                                            invisible="state == 'validated'"/>
+                                    <button name="action_exclude" type="object"
+                                            string="Exclure" icon="fa-ban"
+                                            invisible="state == 'excluded'"/>
+                                    <button name="action_reevaluate" type="object"
+                                            string="Recalculer" icon="fa-refresh"/>
+                                </list>
+                            </field>
+                        </page>
+                        <!--
+                            L'écran d'étude du comité : ce qu'il faut sous les
+                            yeux pour choisir une route. Le dossier complet est
+                            dans l'onglet voisin ; ici, la synthèse et l'avis
+                            du Quality Gate.
+                        -->
+                        <page string="Étude CEO" name="etude"
+                              invisible="state in ('draft', 'depot_express', 'pre_analyse',
+                                                   'clarification', 'dossier_progressif')">
+                            <group>
+                                <group string="Ce que dit le contrôle qualité">
+                                    <field name="avis_qualite" readonly="1"/>
+                                    <field name="anomalies_qualite" readonly="1"/>
+                                </group>
+                                <group string="Suivi">
+                                    <field name="score"/>
+                                    <field name="ceo_approval"/>
+                                    <field name="in_pipeline" readonly="1"/>
+                                </group>
+                            </group>
+                            <separator string="Motif du refus"/>
+                            <field name="motif_rejet" nolabel="1"
+                                   placeholder="Obligatoire pour la route C. La maturation, elle, n'est pas un refus et n'en demande pas."/>
+                        </page>
+                        <!--
+                            Le Quality Gate. Les six vérifications sont des
+                            données saisies ; `avis_suggere` en découle par la
+                            seule méthode qui juge, `_avis_suggere()`. Le jour
+                            où un agent IA tiendra ce poste, c'est cette
+                            colonne-là qu'il remplira — la page ne bouge pas.
+                        -->
+                        <page string="Contrôle qualité" name="quality"
+                              invisible="not quality_control_ids">
+                            <field name="quality_control_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="completude" widget="boolean_toggle"/>
+                                    <field name="coherence" widget="boolean_toggle"/>
+                                    <field name="qualite_informations" widget="boolean_toggle"/>
+                                    <field name="conformite_criteres" widget="boolean_toggle"/>
+                                    <field name="justificatifs" widget="boolean_toggle"/>
+                                    <field name="anomalies"/>
+                                    <field name="avis_suggere" optional="show"/>
+                                    <field name="avis" widget="badge"
+                                           decoration-success="avis == 'ok'"
+                                           decoration-warning="avis == 'a_completer'"
+                                           decoration-danger="avis in ('alerte', 'non_conforme')"/>
+                                    <field name="controlled_by_id" optional="show"/>
+                                    <field name="date" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="Pré-analyse" name="pre_analyse"
+                              invisible="not prequalification_ids and state != 'pre_analyse'">
+                            <field name="prequalification_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="criteria_ids" widget="many2many_tags"
+                                           string="Critères satisfaits"
+                                           options="{'no_create': True}"/>
+                                    <field name="commentaire"/>
+                                    <field name="resultat" widget="badge"
+                                           decoration-success="resultat == 'go'"
+                                           decoration-warning="resultat == 'clarify'"
+                                           decoration-danger="resultat == 'no_go'"
+                                           decoration-info="resultat == 'orientation'"/>
+                                    <field name="evaluated_by_id" optional="show"/>
+                                    <field name="date" optional="show"/>
+                                </list>
+                            </field>
+                            <!--
+                                Les questions se rédigent ici et ne partent au
+                                porteur qu'au clic sur « À clarifier » : une
+                                question à moitié écrite ne doit pas lui
+                                arriver.
+                            -->
+                            <separator string="Questions de clarification"/>
+                            <field name="clarification_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="question"/>
+                                    <field name="reponse" readonly="1"/>
+                                    <field name="state" widget="badge"
+                                           decoration-success="state == 'answered'"
+                                           decoration-warning="state == 'asked'"/>
+                                </list>
+                            </field>
+                            <separator string="Motif du refus"/>
+                            <field name="motif_rejet" nolabel="1"
+                                   placeholder="Obligatoire pour un NO GO — le porteur a droit à une décision motivée."/>
+                        </page>
                     </notebook>
                 </sheet>
                 <chatter/>
@@ -88,8 +487,17 @@
                 <field name="name"/>
                 <field name="partner_id"/>
                 <filter name="filter_draft" string="Brouillons" domain="[('state', '=', 'draft')]"/>
+                <!--
+                    « En cours » s'appuie sur `in_pipeline`, pas sur une liste
+                    d'états recopiée ici : un projet en maturation (route B)
+                    doit apparaître dans ce filtre, un projet non retenu
+                    (route C) non. Recopier la liste, c'est se donner une
+                    chance de confondre les deux dans six mois.
+                -->
                 <filter name="filter_en_cours" string="En cours"
-                        domain="[('state', 'not in', ('draft', 'closed', 'rejected'))]"/>
+                        domain="[('in_pipeline', '=', True)]"/>
+                <filter name="filter_maturation" string="En maturation"
+                        domain="[('state', 'in', ('accompagnement', 'reevaluation'))]"/>
                 <filter name="filter_rejected" string="Non retenus" domain="[('state', '=', 'rejected')]"/>
                 <separator/>
                 <group>

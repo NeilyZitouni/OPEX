@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Le profil d'acteur financier, sur la fiche contact. Onglet séparé :
+        il ne concerne qu'une poignée de contacts, et le module Membership
+        pose ses propres champs sur le même formulaire.
+    -->
+    <record id="view_partner_form_crowdfunding" model="ir.ui.view">
+        <field name="name">res.partner.form.crowdfunding</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="Acteur financier" name="crowdfunding_actor"
+                      groups="opex_crowdfunding.group_ceo">
+                    <group>
+                        <group string="Rôle">
+                            <field name="cf_is_financial_actor"/>
+                            <field name="cf_actor_type"
+                                   invisible="not cf_is_financial_actor"
+                                   required="cf_is_financial_actor"/>
+                        </group>
+                        <group string="Ticket" invisible="not cf_is_financial_actor">
+                            <field name="cf_ticket_min"/>
+                            <field name="cf_ticket_max"/>
+                            <field name="cf_currency_id" invisible="1"/>
+                        </group>
+                        <group string="Ce que l'acteur recherche"
+                               invisible="not cf_is_financial_actor">
+                            <field name="cf_secteur"/>
+                            <field name="cf_tous_secteurs"/>
+                            <field name="cf_stade_min"/>
+                            <field name="cf_porteur_type_prefere"/>
+                        </group>
+                        <group string="Profil" invisible="not cf_is_financial_actor">
+                            <field name="cf_appetence_risque"/>
+                            <field name="cf_localisation"/>
+                            <field name="cf_recherche_impact"/>
+                            <field name="cf_interet_technologie"/>
+                        </group>
+                    </group>
+                    <div class="text-muted" invisible="not cf_is_financial_actor">
+                        Ces informations alimentent les dix critères pondérés du
+                        matching. Un champ laissé vide neutralise son critère :
+                        il ne pénalise pas l'acteur.
+                    </div>
+                </page>
+            </notebook>
+        </field>
+    </record>
+
+    <record id="view_crowdfunding_actor_list" model="ir.ui.view">
+        <field name="name">res.partner.list.crowdfunding.actor</field>
+        <field name="model">res.partner</field>
+        <field name="arch" type="xml">
+            <list string="Acteurs financiers">
+                <field name="display_name" string="Acteur"/>
+                <field name="cf_actor_type"/>
+                <field name="cf_secteur" optional="show"/>
+                <field name="cf_ticket_min" optional="show"/>
+                <field name="cf_ticket_max" optional="show"/>
+                <field name="cf_currency_id" column_invisible="True"/>
+                <field name="cf_appetence_risque" optional="hide"/>
+                <field name="cf_localisation" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_crowdfunding_actors" model="ir.actions.act_window">
+        <field name="name">Acteurs financiers</field>
+        <field name="res_model">res.partner</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_crowdfunding_actor_list"/>
+        <field name="domain">[('cf_is_financial_actor', '=', True)]</field>
+        <field name="context">{'default_cf_is_financial_actor': True}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">
+                Aucun acteur financier au référentiel.
+            </p>
+            <p>
+                Investisseurs, fonds, programmes publics, sponsors, banques et
+                partenaires stratégiques. Sans eux, le matching n'a personne à
+                proposer.
+            </p>
+        </field>
+    </record>
+
+</odoo>

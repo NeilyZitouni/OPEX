@@ -2,7 +2,7 @@ from odoo.exceptions import AccessError, UserError
 from odoo.tests.common import TransactionCase, new_test_user, tagged
 from odoo.tools import mute_logger
 
-#: Les seize états du workflow, dans l'ordre. Cette liste est le contrat passé
+#: Les dix-sept états du workflow, dans l'ordre. Cette liste est le contrat passé
 #: avec le module générique : les mêmes codes y sont configurés en base. Si
 #: elle change d'un côté sans changer de l'autre, la comparaison finale perd
 #: son point de repère — d'où un test qui la fige.
@@ -17,6 +17,7 @@ ETATS_ATTENDUS = [
     'etude_decision',
     'accompagnement',
     'reevaluation',
+    'demo_day',
     'matching_financier',
     'mise_en_relation',
     'decision_financeur',
@@ -130,7 +131,7 @@ class TestExtension1(TransactionCase):
     # ------------------------------------------------------------------
     # Le vocabulaire commun aux deux modules
     # ------------------------------------------------------------------
-    def test_les_seize_etats_du_workflow(self):
+    def test_les_etats_du_workflow(self):
         codes = [code for code, _libelle in self.Project._fields['state'].selection]
         self.assertEqual(codes, ETATS_ATTENDUS)
 

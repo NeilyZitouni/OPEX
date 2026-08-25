@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Les neuf contreparties citées en exemple par la section 12.
+
+        « Par exemple » : la liste du document n'est pas fermée, et c'est bien
+        pour ça qu'elle est en données. Le comité peut en ajouter une depuis
+        l'interface, sans développeur et sans redéploiement.
+    -->
+
+    <record id="compensation_forfait" model="opex.crowdfunding.compensation.type">
+        <field name="name">Forfait</field>
+        <field name="description">Montant fixe convenu à la signature de la convention.</field>
+        <field name="sequence">10</field>
+    </record>
+
+    <record id="compensation_commission_succes" model="opex.crowdfunding.compensation.type">
+        <field name="name">Commission au succès</field>
+        <field name="description">Due seulement si le financement aboutit.</field>
+        <field name="sequence">20</field>
+    </record>
+
+    <record id="compensation_success_fee" model="opex.crowdfunding.compensation.type">
+        <field name="name">Success fee</field>
+        <field name="description">Pourcentage du montant levé.</field>
+        <field name="sequence">30</field>
+    </record>
+
+    <record id="compensation_participation" model="opex.crowdfunding.compensation.type">
+        <field name="name">Participation</field>
+        <field name="description">Entrée au capital du porteur en échange de l'accompagnement.</field>
+        <field name="sequence">40</field>
+    </record>
+
+    <record id="compensation_abonnement" model="opex.crowdfunding.compensation.type">
+        <field name="name">Abonnement</field>
+        <field name="description">Montant périodique pendant la durée de l'accompagnement.</field>
+        <field name="sequence">50</field>
+    </record>
+
+    <record id="compensation_prestation" model="opex.crowdfunding.compensation.type">
+        <field name="name">Prestation d'accompagnement</field>
+        <field name="description">Facturation classique des jours d'expertise.</field>
+        <field name="sequence">60</field>
+    </record>
+
+    <record id="compensation_sponsoring" model="opex.crowdfunding.compensation.type">
+        <field name="name">Sponsoring</field>
+        <field name="description">L'accompagnement est financé par un tiers sponsor.</field>
+        <field name="sequence">70</field>
+    </record>
+
+    <record id="compensation_gratuite" model="opex.crowdfunding.compensation.type">
+        <field name="name">Gratuité dans le cadre d'un programme</field>
+        <field name="description">Aucune contrepartie : l'accompagnement relève d'un programme public ou interne.</field>
+        <field name="sequence">80</field>
+    </record>
+
+    <record id="compensation_autre" model="opex.crowdfunding.compensation.type">
+        <field name="name">Autre convention</field>
+        <field name="description">À détailler dans les conditions de la proposition.</field>
+        <field name="sequence">90</field>
+    </record>
+
+</odoo>

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        La Smart Work Queue de la section 16. Six compteurs, six listes.
+        Chaque bouton ouvre exactement ce qu'il a compté — le domaine est
+        défini une seule fois côté modèle et sert aux deux.
+    -->
+    <record id="view_crowdfunding_work_queue_form" model="ir.ui.view">
+        <field name="name">opex.crowdfunding.work.queue.form</field>
+        <field name="model">opex.crowdfunding.work.queue</field>
+        <field name="arch" type="xml">
+            <form string="Smart Work Queue" create="false" edit="false">
+                <sheet>
+                    <div class="oe_title mb-4">
+                        <h1>Smart Work Queue</h1>
+                        <p class="text-muted">
+                            Ce qui attend le comité, dossier par dossier. Cliquez
+                            un compteur pour ouvrir la liste correspondante.
+                        </p>
+                    </div>
+                    <div class="row">
+                        <div class="col-12 col-lg-6">
+                            <button name="action_open_prequalifications" type="object"
+                                    class="btn btn-light w-100 text-start p-3 mb-2">
+                                <span class="fs-3 fw-bold me-3">
+                                    <field name="prequalifications" nolabel="1"/>
+                                </span>
+                                Préqualifications
+                            </button>
+                            <button name="action_open_controles_anomalie" type="object"
+                                    class="btn btn-light w-100 text-start p-3 mb-2">
+                                <span class="fs-3 fw-bold me-3">
+                                    <field name="controles_anomalie" nolabel="1"/>
+                                </span>
+                                Contrôles en anomalie
+                            </button>
+                            <button name="action_open_decisions_ceo" type="object"
+                                    class="btn btn-light w-100 text-start p-3 mb-2">
+                                <span class="fs-3 fw-bold me-3">
+                                    <field name="decisions_ceo" nolabel="1"/>
+                                </span>
+                                Décisions CEO
+                            </button>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <button name="action_open_matchings_a_valider" type="object"
+                                    class="btn btn-light w-100 text-start p-3 mb-2">
+                                <span class="fs-3 fw-bold me-3">
+                                    <field name="matchings_a_valider" nolabel="1"/>
+                                </span>
+                                Matchings à valider
+                            </button>
+                            <button name="action_open_investisseurs_en_attente" type="object"
+                                    class="btn btn-light w-100 text-start p-3 mb-2">
+                                <span class="fs-3 fw-bold me-3">
+                                    <field name="investisseurs_en_attente" nolabel="1"/>
+                                </span>
+                                Investisseurs en attente
+                            </button>
+                            <button name="action_open_accompagnements_en_retard" type="object"
+                                    class="btn btn-light w-100 text-start p-3 mb-2">
+                                <span class="fs-3 fw-bold me-3">
+                                    <field name="accompagnements_en_retard" nolabel="1"/>
+                                </span>
+                                Accompagnements en retard
+                            </button>
+                        </div>
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_crowdfunding_work_queue" model="ir.actions.act_window">
+        <field name="name">Smart Work Queue</field>
+        <field name="res_model">opex.crowdfunding.work.queue</field>
+        <field name="view_mode">form</field>
+        <field name="view_id" ref="view_crowdfunding_work_queue_form"/>
+        <!--
+            `main` et pas `inline` : Odoo 19 a retiré `inline` des cibles
+            possibles d'une `act_window`, et le module refuse de s'installer
+            avec — l'erreur remonte comme un ParseError sur le fichier de vues,
+            sans nommer la valeur fautive.
+        -->
+        <field name="target">main</field>
+    </record>
+
+</odoo>

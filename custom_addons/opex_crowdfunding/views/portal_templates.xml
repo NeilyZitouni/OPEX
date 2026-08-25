@@ -1,0 +1,1481 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         Accueil du portail
+         ============================================================ -->
+    <template id="portal_my_home_crowdfunding" name="Portail : mes projets"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="30">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes projets</t>
+                <t t-set="text">Présenter un projet au comité CEO et suivre son avancement</t>
+                <t t-set="url" t-value="'/my/projects'"/>
+                <!--
+                    Pas de `placeholder_count` ici, et c'est délibéré.
+                    `portal.portal_docs_entry` rend la tuile avec la classe
+                    `d-none`, et le script `portal_home_counters` ne la
+                    réaffiche que si le compteur revient strictement positif.
+                    Le porteur qui n'a encore aucun projet — précisément celui
+                    qu'on attend — ne verrait donc jamais l'entrée qui lui
+                    permet d'en déposer un. `config_card` la garde visible
+                    quoi qu'il arrive ; le compteur est calculé ici, et laissé
+                    vide à zéro pour ne pas afficher « 0 Mes projets ».
+                -->
+                <t t-set="config_card" t-value="True"/>
+                <t t-set="count"
+                   t-value="request.env['opex.crowdfunding.project'].search_count(
+                                [('partner_id', '=', request.env.user.partner_id.id)]) or ''"/>
+            </t>
+        </div>
+    </template>
+
+    <template id="portal_breadcrumbs_crowdfunding" name="Portail : fil d'Ariane projets"
+              inherit_id="portal.portal_breadcrumbs" priority="30">
+        <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
+            <li t-if="page_name in ('crowdfunding', 'crowdfunding_new')"
+                t-attf-class="breadcrumb-item #{'active ' if not project and page_name != 'crowdfunding_new' else ''}">
+                <a t-if="project or page_name == 'crowdfunding_new'" href="/my/projects">Mes projets</a>
+                <t t-else="">Mes projets</t>
+            </li>
+            <li t-if="page_name == 'crowdfunding_new'" class="breadcrumb-item active">
+                Présenter mon projet
+            </li>
+            <li t-if="page_name == 'crowdfunding' and project" class="breadcrumb-item active">
+                <span t-out="project.name"/>
+            </li>
+        </xpath>
+    </template>
+
+    <!-- ============================================================
+         Liste — /my/projects
+         ============================================================ -->
+    <template id="portal_my_projects" name="Portail : mes projets">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <t t-call="portal.portal_searchbar">
+                <t t-set="title">Mes projets</t>
+            </t>
+
+            <div t-if="draft" class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
+                <span>
+                    Vous avez une présentation en cours :
+                    <strong t-out="draft.name"/>. Nous avons conservé votre saisie.
+                </span>
+                <a href="/my/projects/new" class="btn btn-primary btn-sm">Reprendre</a>
+            </div>
+
+            <div t-if="not projects" class="text-center py-5">
+                <p class="text-muted">
+                    Vous n'avez encore présenté aucun projet.
+                </p>
+                <p class="text-muted">
+                    Quelques minutes suffisent : décrivez votre projet en quelques
+                    lignes, le comité CEO vous dira s'il peut vous accompagner.
+                </p>
+                <a href="/my/projects/new" class="btn btn-primary btn-lg">
+                    Présenter mon projet
+                </a>
+            </div>
+
+            <div t-if="projects and not draft" class="mb-4">
+                <a href="/my/projects/new" class="btn btn-primary">
+                    <i class="fa fa-plus me-1"/>Présenter mon projet
+                </a>
+            </div>
+
+            <t t-if="projects" t-call="portal.portal_table">
+                <thead>
+                    <tr class="active">
+                        <th>Projet</th>
+                        <th>Besoin recherché</th>
+                        <th class="text-end">Présenté le</th>
+                        <th class="text-center">Où en est-il ?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr t-foreach="projects" t-as="project">
+                        <td>
+                            <a t-attf-href="/my/projects/#{project.id}"><span t-out="project.name"/></a>
+                        </td>
+                        <td><span t-field="project.besoin_type"/></td>
+                        <td class="text-end">
+                            <span t-field="project.create_date" t-options="{'widget': 'date'}"/>
+                        </td>
+                        <td class="text-center">
+                            <!--
+                                Le libellé vient du modèle (`_state_label`),
+                                jamais du code d'état : le gabarit n'a aucune
+                                connaissance du workflow technique.
+                            -->
+                            <span class="badge rounded-pill text-bg-info"
+                                  t-out="project._state_label()"/>
+                        </td>
+                    </tr>
+                </tbody>
+            </t>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         Dépôt — /my/projects/new (deux écrans)
+         ============================================================ -->
+    <template id="portal_project_form" name="Portail : présenter mon projet">
+        <t t-call="portal.portal_layout">
+            <t t-set="Project" t-value="request.env['opex.crowdfunding.project']"/>
+
+            <div class="row">
+                <div class="col-12 col-lg-9">
+
+                    <h3 class="mb-1">Présenter mon projet</h3>
+                    <p class="text-muted">
+                        <t t-if="step == 'projet'">Étape 1 sur 2 — votre projet</t>
+                        <t t-if="step == 'besoin'">Étape 2 sur 2 — votre besoin</t>
+                    </p>
+
+                    <div t-if="reprise" class="alert alert-info" role="alert">
+                        Vous aviez commencé à présenter
+                        <strong t-out="project.name"/>. Votre saisie a été
+                        conservée : reprenez où vous en étiez.
+                    </div>
+
+                    <div t-if="error" class="alert alert-warning" role="alert">
+                        <t t-foreach="error.split('\n')" t-as="ligne">
+                            <div t-out="ligne"/>
+                        </t>
+                    </div>
+
+                    <!-- Écran 1 : le projet -->
+                    <form t-if="step == 'projet'" action="/my/projects/new" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="name">Titre du projet</label>
+                            <input type="text" class="form-control" name="name" id="name"
+                                   placeholder="Le projet en une ligne"
+                                   t-att-value="saisie.get('name') or project.name or ''"/>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="porteur_type">Vous êtes</label>
+                            <t t-set="valeur" t-value="saisie.get('porteur_type') or project.porteur_type"/>
+                            <select class="form-select" name="porteur_type" id="porteur_type">
+                                <option value="">—</option>
+                                <t t-foreach="Project._fields['porteur_type']._description_selection(request.env)"
+                                   t-as="choix">
+                                    <option t-att-value="choix[0]" t-att-selected="choix[0] == valeur and 'selected'">
+                                        <t t-out="choix[1]"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="probleme">Quel problème ou quelle opportunité ?</label>
+                            <textarea class="form-control" name="probleme" id="probleme" rows="4"
+                                      t-out="saisie.get('probleme') or project.probleme or ''"/>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="solution">La solution que vous proposez</label>
+                            <textarea class="form-control" name="solution" id="solution" rows="4"
+                                      t-out="saisie.get('solution') or project.solution or ''"/>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="/my/projects" class="btn btn-link ps-0">Retour à mes projets</a>
+                            <button type="submit" class="btn btn-primary">Continuer</button>
+                        </div>
+                    </form>
+
+                    <!-- Écran 2 : le besoin -->
+                    <form t-if="step == 'besoin'" action="/my/projects/new/besoin"
+                          method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="secteur">Secteur</label>
+                            <select class="form-select" name="secteur" id="secteur">
+                                <option value="">—</option>
+                                <t t-foreach="Project._fields['secteur']._description_selection(request.env)"
+                                   t-as="choix">
+                                    <option t-att-value="choix[0]"
+                                            t-att-selected="choix[0] == project.secteur and 'selected'">
+                                        <t t-out="choix[1]"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="maturite">Où en est le projet aujourd'hui ?</label>
+                            <select class="form-select" name="maturite" id="maturite">
+                                <option value="">—</option>
+                                <t t-foreach="Project._fields['maturite']._description_selection(request.env)"
+                                   t-as="choix">
+                                    <option t-att-value="choix[0]"
+                                            t-att-selected="choix[0] == project.maturite and 'selected'">
+                                        <t t-out="choix[1]"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="besoin_type">Que recherchez-vous ?</label>
+                            <select class="form-select" name="besoin_type" id="besoin_type">
+                                <option value="">—</option>
+                                <t t-foreach="Project._fields['besoin_type']._description_selection(request.env)"
+                                   t-as="choix">
+                                    <option t-att-value="choix[0]"
+                                            t-att-selected="choix[0] == project.besoin_type and 'selected'">
+                                        <t t-out="choix[1]"/>
+                                    </option>
+                                </t>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="montant_indicatif">
+                                Montant indicatif <span class="text-muted">(facultatif)</span>
+                            </label>
+                            <input type="text" class="form-control" name="montant_indicatif"
+                                   id="montant_indicatif" placeholder="Une fourchette suffit"
+                                   t-att-value="project.montant_indicatif or ''"/>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" for="pitch_document">
+                                Document ou pitch <span class="text-muted">(facultatif)</span>
+                            </label>
+                            <input type="file" class="form-control" name="pitch_document" id="pitch_document"/>
+                            <div t-if="project.pitch_filename" class="form-text">
+                                Déjà déposé : <span t-out="project.pitch_filename"/>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a href="/my/projects/new" class="btn btn-link ps-0">Revenir à l'étape précédente</a>
+                            <div class="d-flex gap-2">
+                                <button type="submit" name="enregistrer" value="1"
+                                        class="btn btn-outline-secondary">
+                                    Enregistrer et continuer plus tard
+                                </button>
+                                <button type="submit" class="btn btn-primary">Présenter mon projet</button>
+                            </div>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         Suivi — /my/projects/<id> : la vue « Mon projet » de la section 16
+         ============================================================ -->
+    <template id="portal_project_page" name="Portail : mon projet">
+        <t t-call="portal.portal_layout">
+            <t t-set="breadcrumbs_searchbar" t-value="True"/>
+
+            <div class="row">
+                <div class="col-12 col-lg-8">
+
+                    <h3 class="mb-4"><span t-out="project.name"/></h3>
+
+                    <!--
+                        La progression, en libellés lisibles. Les codes d'états
+                        techniques n'atteignent jamais cette page : le modèle
+                        les a repliés sur cinq jalons.
+                    -->
+                    <div class="card mb-4">
+                        <div class="card-body">
+                            <ul class="list-unstyled mb-0">
+                                <li t-foreach="progress" t-as="jalon" class="py-1">
+                                    <t t-if="jalon['status'] == 'done'">
+                                        <span class="text-success me-2">✓</span>
+                                        <span t-out="jalon['label']"/>
+                                    </t>
+                                    <t t-elif="jalon['status'] == 'current'">
+                                        <span class="text-primary me-2">●</span>
+                                        <strong t-out="jalon['label']"/>
+                                    </t>
+                                    <t t-else="">
+                                        <span class="text-muted me-2">○</span>
+                                        <span class="text-muted" t-out="jalon['label']"/>
+                                    </t>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4 border-primary">
+                        <div class="card-body">
+                            <h5 class="card-title">Votre prochaine action</h5>
+                            <p class="card-text" t-out="next_action['message']"/>
+                            <a t-if="next_action['url']" t-att-href="next_action['url']"
+                               class="btn btn-primary">
+                                <span t-out="next_action['label']"/>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div t-if="demande_complement" class="alert alert-warning mb-4" role="alert">
+                        <div class="fw-bold mb-1">Compléments demandés</div>
+                        <div t-out="demande_complement"/>
+                    </div>
+
+                    <!--
+                        L'accompagnement CEO. Il tourne à côté du parcours
+                        principal : ce bloc apparaît quel que soit l'état du
+                        dossier, et n'affiche jamais le diagnostic interne du
+                        comité — seulement la proposition qui lui est faite.
+                    -->
+                    <div t-if="accompagnement" class="card mb-4">
+                        <div class="card-body">
+                            <h5 class="card-title">Accompagnement CEO</h5>
+                            <p t-if="accompagnement.state == 'demande'" class="card-text">
+                                Votre demande d'accompagnement est enregistrée.
+                                Le comité va l'examiner.
+                            </p>
+                            <p t-elif="accompagnement.state == 'diagnostic'" class="card-text">
+                                Le comité établit un diagnostic de votre projet.
+                            </p>
+                            <p t-elif="accompagnement.state == 'propose'" class="card-text">
+                                Une proposition d'accompagnement vous est soumise.
+                            </p>
+                            <p t-elif="accompagnement.state == 'actif'" class="card-text">
+                                Votre accompagnement est en cours.
+                            </p>
+                            <p t-elif="accompagnement.state == 'service_fait'" class="card-text">
+                                L'accompagnement est terminé : les livrables ont été validés.
+                            </p>
+                            <a t-if="accompagnement.state == 'propose'"
+                               t-attf-href="/my/projects/#{project.id}/accompagnement"
+                               class="btn btn-primary">
+                                Voir la proposition
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <a t-attf-href="/my/projects/#{project.id}/historique"
+                           class="btn btn-link ps-0">
+                            Voir l'historique de mon projet
+                        </a>
+                    </div>
+
+                    <div t-if="project.relation_ids" class="mb-4">
+                        <a t-attf-href="/my/projects/#{project.id}/relations"
+                           class="btn btn-outline-primary">
+                            Qui s'intéresse à mon projet
+                        </a>
+                    </div>
+
+                    <div t-if="peut_demander_accompagnement" class="mb-4">
+                        <a t-attf-href="/my/projects/#{project.id}/accompagnement/demander"
+                           class="btn btn-outline-primary">
+                            Être accompagné par CEO
+                        </a>
+                    </div>
+
+                    <!--
+                        Les échanges avec le comité, quand il y en a. Le
+                        contrôleur a déjà écarté les questions en préparation :
+                        la page est rendue en `sudo()`, c'est donc à lui de le
+                        faire — la règle d'enregistrement ne s'applique pas là.
+                    -->
+                    <div t-if="echanges" class="mb-4">
+                        <h5>Les questions du comité</h5>
+                        <div t-foreach="echanges" t-as="clarification" class="mb-3">
+                            <div class="fw-bold" t-out="clarification.question"/>
+                            <div t-if="clarification.reponse" class="ps-3 border-start"
+                                 t-out="clarification.reponse"/>
+                            <div t-else="" class="ps-3 border-start text-muted">
+                                En attente de votre réponse.
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5>Ce que vous avez présenté</h5>
+                    <table class="table table-sm">
+                        <tr t-if="project.porteur_type">
+                            <td class="text-muted" style="width: 40%;">Vous êtes</td>
+                            <td><span t-field="project.porteur_type"/></td>
+                        </tr>
+                        <tr t-if="project.secteur">
+                            <td class="text-muted">Secteur</td>
+                            <td><span t-field="project.secteur"/></td>
+                        </tr>
+                        <tr t-if="project.maturite">
+                            <td class="text-muted">Maturité</td>
+                            <td><span t-field="project.maturite"/></td>
+                        </tr>
+                        <tr t-if="project.besoin_type">
+                            <td class="text-muted">Besoin recherché</td>
+                            <td><span t-field="project.besoin_type"/></td>
+                        </tr>
+                        <tr t-if="project.montant_indicatif">
+                            <td class="text-muted">Montant indicatif</td>
+                            <td><span t-field="project.montant_indicatif"/></td>
+                        </tr>
+                        <tr t-if="project.pitch_filename">
+                            <td class="text-muted">Document</td>
+                            <td><span t-out="project.pitch_filename"/></td>
+                        </tr>
+                    </table>
+
+                    <div t-if="project.probleme" class="mb-3">
+                        <div class="text-muted">Problème / opportunité</div>
+                        <div t-out="project.probleme"/>
+                    </div>
+                    <div t-if="project.solution" class="mb-3">
+                        <div class="text-muted">Solution proposée</div>
+                        <div t-out="project.solution"/>
+                    </div>
+
+                    <a href="/my/projects" class="btn btn-link ps-0">Retour à mes projets</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         Dossier complémentaire — /my/projects/<id>/dossier
+         ============================================================ -->
+    <template id="portal_project_dossier" name="Portail : compléter mon dossier">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+
+                    <h3 class="mb-1">Compléter mon dossier</h3>
+                    <p class="text-muted"><span t-out="project.name"/></p>
+
+                    <div t-if="error" class="alert alert-warning" role="alert">
+                        <t t-foreach="error.split('\n')" t-as="ligne">
+                            <div t-out="ligne"/>
+                        </t>
+                    </div>
+
+                    <!--
+                        Ce que le contrôle qualité demande de corriger. Seules
+                        les anomalies remontent jusqu'ici : l'avis retenu et le
+                        détail des vérifications restent internes.
+                    -->
+                    <div t-if="demande_complement" class="alert alert-warning" role="alert">
+                        <div class="fw-bold mb-1">Compléments demandés</div>
+                        <div t-out="demande_complement"/>
+                    </div>
+
+                    <p t-if="not demande_complement">
+                        Votre projet a été retenu à la pré-analyse. Les
+                        informations ci-dessous permettront au comité d'instruire
+                        votre dossier. Vous pouvez enregistrer et revenir plus
+                        tard : rien n'est perdu.
+                    </p>
+                    <p t-else="">
+                        Corrigez ce qui est demandé ci-dessus, puis renvoyez
+                        votre dossier. Vous pouvez enregistrer et revenir plus
+                        tard : rien n'est perdu.
+                    </p>
+
+                    <form t-attf-action="/my/projects/#{project.id}/dossier"
+                          method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <!--
+                            L'aiguillage, en version texto : une branche par
+                            besoin. Un quatrième type de besoin ajoute un
+                            `t-if` ici et un gabarit complet en dessous.
+                        -->
+                        <t t-if="project.besoin_type == 'investisseur'"
+                           t-call="opex_crowdfunding.portal_dossier_investisseur"/>
+                        <t t-elif="project.besoin_type == 'sponsor'"
+                           t-call="opex_crowdfunding.portal_dossier_sponsor"/>
+                        <t t-elif="project.besoin_type == 'financement_public'"
+                           t-call="opex_crowdfunding.portal_dossier_public"/>
+                        <div t-else="" class="alert alert-info">
+                            Le besoin exprimé pour ce projet ne correspond à aucun
+                            questionnaire. Contactez le comité CEO.
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-4">
+                            <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                                Retour au suivi de mon projet
+                            </a>
+                            <div class="d-flex gap-2">
+                                <button type="submit" name="enregistrer" value="1"
+                                        class="btn btn-outline-secondary">
+                                    Enregistrer et continuer plus tard
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    Envoyer mon dossier
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Branche 1 — investisseur (liste explicite de la section 7) -->
+    <template id="portal_dossier_investisseur" name="Portail : dossier investisseur">
+        <div class="mb-3">
+            <label class="form-label" for="business_model">Business model</label>
+            <textarea class="form-control" name="business_model" id="business_model" rows="3"
+                      t-out="project.business_model or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="marche">Marché</label>
+            <textarea class="form-control" name="marche" id="marche" rows="3"
+                      t-out="project.marche or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="traction">Traction</label>
+            <textarea class="form-control" name="traction" id="traction" rows="3"
+                      placeholder="Clients, chiffre d'affaires, utilisateurs, partenariats déjà signés."
+                      t-out="project.traction or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="equipe">Équipe</label>
+            <textarea class="form-control" name="equipe" id="equipe" rows="3"
+                      t-out="project.equipe or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="besoin_financier">Besoin financier</label>
+            <input type="text" class="form-control" name="besoin_financier" id="besoin_financier"
+                   t-att-value="project.besoin_financier or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="utilisation_fonds">Utilisation des fonds</label>
+            <textarea class="form-control" name="utilisation_fonds" id="utilisation_fonds" rows="3"
+                      t-out="project.utilisation_fonds or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="valorisation">
+                Valorisation envisagée <span class="text-muted">(facultative)</span>
+            </label>
+            <input type="text" class="form-control" name="valorisation" id="valorisation"
+                   t-att-value="project.valorisation or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="previsions_financieres">Prévisions financières</label>
+            <textarea class="form-control" name="previsions_financieres"
+                      id="previsions_financieres" rows="3"
+                      t-out="project.previsions_financieres or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="pitch_deck">
+                Pitch deck <span class="text-muted">(facultatif)</span>
+            </label>
+            <input type="file" class="form-control" name="pitch_deck" id="pitch_deck"/>
+            <div t-if="project.pitch_deck_filename" class="form-text">
+                Déjà déposé : <span t-out="project.pitch_deck_filename"/>
+            </div>
+        </div>
+    </template>
+
+    <!-- Branche 2 — sponsor : une opération et sa visibilité, pas du capital -->
+    <template id="portal_dossier_sponsor" name="Portail : dossier sponsor">
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_objectif">Objet du sponsoring</label>
+            <textarea class="form-control" name="sponsor_objectif" id="sponsor_objectif" rows="3"
+                      placeholder="Ce que le sponsor financerait précisément."
+                      t-out="project.sponsor_objectif or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_public_cible">Public touché</label>
+            <textarea class="form-control" name="sponsor_public_cible" id="sponsor_public_cible"
+                      rows="3" t-out="project.sponsor_public_cible or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_visibilite">Visibilité offerte au sponsor</label>
+            <textarea class="form-control" name="sponsor_visibilite" id="sponsor_visibilite" rows="3"
+                      placeholder="Supports, présence, mentions, durée."
+                      t-out="project.sponsor_visibilite or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_retombees">Retombées attendues</label>
+            <textarea class="form-control" name="sponsor_retombees" id="sponsor_retombees" rows="3"
+                      t-out="project.sponsor_retombees or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_budget">Budget de l'opération</label>
+            <input type="text" class="form-control" name="sponsor_budget" id="sponsor_budget"
+                   t-att-value="project.sponsor_budget or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_calendrier">Calendrier de l'opération</label>
+            <textarea class="form-control" name="sponsor_calendrier" id="sponsor_calendrier" rows="2"
+                      t-out="project.sponsor_calendrier or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_partenaires">
+                Partenaires déjà engagés <span class="text-muted">(facultatif)</span>
+            </label>
+            <textarea class="form-control" name="sponsor_partenaires" id="sponsor_partenaires"
+                      rows="2" t-out="project.sponsor_partenaires or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="sponsor_document">
+                Dossier de sponsoring <span class="text-muted">(facultatif)</span>
+            </label>
+            <input type="file" class="form-control" name="sponsor_document" id="sponsor_document"/>
+            <div t-if="project.sponsor_document_filename" class="form-text">
+                Déjà déposé : <span t-out="project.sponsor_document_filename"/>
+            </div>
+        </div>
+    </template>
+
+    <!-- Branche 3 — financement public : un dispositif et son éligibilité -->
+    <template id="portal_dossier_public" name="Portail : dossier financement public">
+        <div class="mb-3">
+            <label class="form-label" for="public_dispositif">Dispositif public visé</label>
+            <textarea class="form-control" name="public_dispositif" id="public_dispositif" rows="2"
+                      placeholder="Programme, appel à projets ou guichet concerné."
+                      t-out="project.public_dispositif or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_eligibilite">Éligibilité au dispositif</label>
+            <textarea class="form-control" name="public_eligibilite" id="public_eligibilite" rows="3"
+                      t-out="project.public_eligibilite or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_montant">Montant demandé</label>
+            <input type="text" class="form-control" name="public_montant" id="public_montant"
+                   t-att-value="project.public_montant or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_plan_financement">Plan de financement</label>
+            <textarea class="form-control" name="public_plan_financement"
+                      id="public_plan_financement" rows="3"
+                      placeholder="Apport propre, cofinancements, emprunts déjà obtenus."
+                      t-out="project.public_plan_financement or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_impact">Impact socio-économique</label>
+            <textarea class="form-control" name="public_impact" id="public_impact" rows="3"
+                      placeholder="Emplois, territoire, filière, bénéficiaires."
+                      t-out="project.public_impact or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_conformite">Conformité réglementaire</label>
+            <textarea class="form-control" name="public_conformite" id="public_conformite" rows="2"
+                      placeholder="Agréments, autorisations, obligations déclaratives."
+                      t-out="project.public_conformite or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_calendrier">Calendrier d'exécution</label>
+            <textarea class="form-control" name="public_calendrier" id="public_calendrier" rows="2"
+                      t-out="project.public_calendrier or ''"/>
+        </div>
+        <div class="mb-3">
+            <label class="form-label" for="public_document">
+                Dossier administratif <span class="text-muted">(facultatif)</span>
+            </label>
+            <input type="file" class="form-control" name="public_document" id="public_document"/>
+            <div t-if="project.public_document_filename" class="form-text">
+                Déjà déposé : <span t-out="project.public_document_filename"/>
+            </div>
+        </div>
+    </template>
+
+    <!-- ============================================================
+         Mise en relation contrôlée — section 13
+
+         Trois gabarits, un par niveau. Ils ne se distinguent pas par des
+         `t-if` : chacun ne reçoit que les valeurs de son niveau, filtrées
+         par `_portal_payload()`. Le gabarit du teaser n'a pas accès au titre
+         du projet — il ne peut donc pas le laisser fuir.
+         ============================================================ -->
+    <template id="portal_my_home_opportunities" name="Portail : mes opportunités"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="35">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes opportunités</t>
+                <t t-set="text">Les dossiers qui vous sont soumis</t>
+                <t t-set="url" t-value="'/my/opportunities'"/>
+                <!-- Même piège que la tuile « Mes projets » : sans
+                     `config_card`, la carte reste en `d-none`. -->
+                <t t-set="config_card" t-value="True"/>
+                <t t-set="count"
+                   t-value="request.env['opex.crowdfunding.relation'].sudo().search_count(
+                                [('partner_id', '=', request.env.user.partner_id.id)]) or ''"/>
+            </t>
+        </div>
+    </template>
+
+    <!--
+        La vue investisseur de la section 16 : « N projets correspondent à vos
+        critères », le score du matching, et un bouton Découvrir. Rien d'autre
+        — surtout pas l'état du dossier dans le workflow du comité.
+    -->
+    <template id="portal_my_opportunities" name="Portail : mes opportunités">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12">
+                    <h3 class="mb-4">
+                        <t t-if="opportunites">
+                            <span t-out="len(opportunites)"/>
+                            projet<t t-if="len(opportunites) &gt; 1">s</t>
+                            correspond<t t-if="len(opportunites) &gt; 1">ent</t>
+                            à vos critères
+                        </t>
+                        <t t-else="">Mes opportunités</t>
+                    </h3>
+
+                    <div t-if="not opportunites" class="alert alert-info" role="alert">
+                        Aucun dossier ne vous est soumis pour l'instant. Le comité
+                        CEO vous proposera les projets qui correspondent à votre
+                        profil d'investissement.
+                    </div>
+
+                    <div t-foreach="opportunites" t-as="opportunite" class="card mb-3">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="card-title mb-1">
+                                    <span t-out="opportunite.get('titre') or opportunite['reference']"/>
+                                </h5>
+                                <div class="text-muted">
+                                    <span t-out="opportunite['secteur']"/> ·
+                                    <span t-out="opportunite['besoin']"/> ·
+                                    <span t-out="opportunite['fourchette']"/>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div t-if="opportunite['score']" class="fs-4 fw-bold text-primary">
+                                    <span t-out="'%.0f' % opportunite['score']"/> %
+                                </div>
+                                <a t-attf-href="/my/opportunities/#{opportunite['relation_id']}"
+                                   class="btn btn-primary btn-sm mt-1">Découvrir</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Niveau 1 — teaser anonymisé -->
+    <template id="portal_relation_teaser" name="Portail : teaser anonymisé">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-8">
+                    <h3 class="mb-1">Dossier <span t-out="reference"/></h3>
+                    <p class="text-muted">Teaser anonymisé</p>
+
+                    <div class="alert alert-secondary" role="alert">
+                        L'identité du porteur et le détail du dossier ne sont
+                        communiqués qu'après son autorisation.
+                    </div>
+
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-muted" style="width: 40%;">Secteur</td>
+                            <td><span t-out="secteur"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Maturité</td>
+                            <td><span t-out="maturite"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Type de porteur</td>
+                            <td><span t-out="porteur_type"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Besoin recherché</td>
+                            <td><span t-out="besoin"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Montant recherché</td>
+                            <td><span t-out="fourchette"/></td>
+                        </tr>
+                    </table>
+
+                    <form t-if="not interet_exprime"
+                          t-attf-action="/my/opportunities/#{relation_id}/interet"
+                          method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <button type="submit" class="btn btn-primary">
+                            Ce dossier m'intéresse
+                        </button>
+                    </form>
+                    <div t-else="" class="alert alert-info" role="alert">
+                        Votre intérêt a été transmis. Le porteur décide s'il vous
+                        ouvre son dossier.
+                    </div>
+
+                    <a href="/my/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Niveau 2 — dossier limité, après autorisation du porteur -->
+    <template id="portal_relation_limited" name="Portail : dossier limité">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-8">
+                    <h3 class="mb-1"><span t-out="titre"/></h3>
+                    <p class="text-muted">
+                        Dossier <span t-out="reference"/> — accès limité
+                    </p>
+
+                    <div class="alert alert-secondary" role="alert">
+                        Le porteur vous a ouvert son dossier. Son identité et le
+                        détail financier restent réservés au dossier détaillé.
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="text-muted">Problème / opportunité</div>
+                        <div t-out="probleme"/>
+                    </div>
+                    <div class="mb-3">
+                        <div class="text-muted">Solution proposée</div>
+                        <div t-out="solution"/>
+                    </div>
+
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-muted" style="width: 40%;">Secteur</td>
+                            <td><span t-out="secteur"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Maturité</td>
+                            <td><span t-out="maturite"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Montant recherché</td>
+                            <td>
+                                <span t-out="montant"
+                                      t-options="{'widget': 'monetary', 'display_currency': devise}"/>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div t-if="nda_requis and not nda_signe" class="alert alert-warning" role="alert">
+                        Un accord de confidentialité est requis avant l'accès au
+                        dossier détaillé. Le comité CEO vous contactera.
+                    </div>
+
+                    <t t-call="opex_crowdfunding.portal_relation_decision"/>
+
+                    <a href="/my/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Niveau 3 — dossier détaillé -->
+    <template id="portal_relation_full" name="Portail : dossier détaillé">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-8">
+                    <h3 class="mb-1"><span t-out="titre"/></h3>
+                    <p class="text-muted">
+                        Dossier <span t-out="reference"/> — accès détaillé
+                    </p>
+
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-muted" style="width: 40%;">Porteur</td>
+                            <td>
+                                <span t-out="porteur"/>
+                                <span t-if="porteur_email" class="text-muted">
+                                    — <span t-out="porteur_email"/>
+                                </span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Secteur</td>
+                            <td><span t-out="secteur"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Maturité</td>
+                            <td><span t-out="maturite"/></td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Montant recherché</td>
+                            <td>
+                                <span t-out="montant"
+                                      t-options="{'widget': 'monetary', 'display_currency': devise}"/>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div class="mb-3">
+                        <div class="text-muted">Problème / opportunité</div>
+                        <div t-out="probleme"/>
+                    </div>
+                    <div class="mb-3">
+                        <div class="text-muted">Solution proposée</div>
+                        <div t-out="solution"/>
+                    </div>
+
+                    <h5>Le dossier</h5>
+                    <table class="table table-sm">
+                        <tr t-foreach="dossier" t-as="ligne">
+                            <td class="text-muted" style="width: 40%;">
+                                <span t-out="ligne[0]"/>
+                            </td>
+                            <td><span t-out="ligne[1]"/></td>
+                        </tr>
+                    </table>
+
+                    <t t-call="opex_crowdfunding.portal_relation_decision"/>
+
+                    <a href="/my/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        Les cinq actions de la section 14. Cinq boutons dans le vocabulaire de
+        l'acteur financier : aucun état technique, aucun nom d'étape, rien qui
+        suppose de connaître le workflow interne du comité.
+    -->
+    <template id="portal_relation_decision" name="Portail : décision de l'acteur financier">
+        <div t-if="decision" class="alert alert-info mt-4" role="alert">
+            Votre réponse a été transmise : <strong t-out="decision_label"/>.
+        </div>
+
+        <div t-else="" class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title">Votre réponse</h5>
+
+                <form t-attf-action="/my/opportunities/#{relation_id}/decision"
+                      method="post" class="mb-3">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" name="choix" value="interesse"
+                                class="btn btn-primary">★ Intéressé</button>
+                        <button type="submit" name="choix" value="accompagnement"
+                                class="btn btn-outline-primary">
+                            ↗ Demander un accompagnement CEO
+                        </button>
+                        <button type="submit" name="choix" value="non_interesse"
+                                class="btn btn-outline-secondary">✕ Non intéressé</button>
+                    </div>
+                </form>
+
+                <form t-attf-action="/my/opportunities/#{relation_id}/decision"
+                      method="post" class="mb-3">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div class="mb-2">
+                        <label class="form-label" for="message_info">
+                            ? Besoin d'informations
+                        </label>
+                        <textarea class="form-control" name="message" id="message_info" rows="2"
+                                  placeholder="Votre question au comité."/>
+                    </div>
+                    <button type="submit" name="choix" value="informations"
+                            class="btn btn-outline-primary">Envoyer ma question</button>
+                </form>
+
+                <form t-attf-action="/my/opportunities/#{relation_id}/decision"
+                      method="post">
+                    <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                    <div class="mb-2">
+                        <label class="form-label" for="date_rendez_vous">
+                            ↔ Proposer un rendez-vous
+                        </label>
+                        <input type="datetime-local" class="form-control"
+                               name="date_rendez_vous" id="date_rendez_vous"/>
+                    </div>
+                    <button type="submit" name="choix" value="rendez_vous"
+                            class="btn btn-outline-primary">Proposer ce créneau</button>
+                </form>
+            </div>
+        </div>
+    </template>
+
+    <!-- Le projet suivi — section 15 -->
+    <template id="portal_project_financement" name="Portail : mon financement">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+                    <h3 class="mb-1">Mon financement</h3>
+                    <p class="text-muted"><span t-out="project.name"/></p>
+
+                    <table class="table table-sm">
+                        <tr>
+                            <td class="text-muted" style="width: 40%;">Nature de l'opération</td>
+                            <td><span t-out="financement['operation']"/></td>
+                        </tr>
+                        <tr t-if="financement['montant']">
+                            <td class="text-muted">Montant</td>
+                            <td>
+                                <span t-out="financement['montant']"
+                                      t-options="{'widget': 'monetary', 'display_currency': financement['devise']}"/>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">Signature</td>
+                            <td>
+                                <t t-if="financement['signature_confirmee']">
+                                    Confirmée le
+                                    <span t-out="financement['date_signature']"
+                                          t-options="{'widget': 'date'}"/>
+                                </t>
+                                <t t-else="">En attente</t>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <div t-if="financement['versements']" class="mb-4">
+                        <h5>Versements</h5>
+                        <table class="table table-sm">
+                            <thead>
+                                <tr>
+                                    <th>Tranche</th>
+                                    <th class="text-end">Montant</th>
+                                    <th>Échéance</th>
+                                    <th class="text-center">État</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="financement['versements']" t-as="versement">
+                                    <td><span t-out="versement['libelle']"/></td>
+                                    <td class="text-end">
+                                        <span t-out="versement['montant']"
+                                              t-options="{'widget': 'monetary', 'display_currency': financement['devise']}"/>
+                                    </td>
+                                    <td>
+                                        <span t-out="versement['date_prevue']"
+                                              t-options="{'widget': 'date'}"/>
+                                    </td>
+                                    <td class="text-center">
+                                        <span t-attf-class="badge #{'text-bg-success' if versement['verse'] else 'text-bg-secondary'}"
+                                              t-out="versement['etat']"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div t-if="financement['engagements']" class="mb-4">
+                        <h5>Vos engagements</h5>
+                        <div t-out="financement['engagements']"/>
+                    </div>
+
+                    <div t-if="financement['reporting']" class="mb-4">
+                        <h5>Reporting attendu</h5>
+                        <div t-out="financement['reporting']"/>
+                    </div>
+
+                    <div t-if="financement['suivi']" class="mb-4">
+                        <h5>Suivi de votre projet</h5>
+                        <div t-foreach="financement['suivi']" t-as="entree" class="mb-2">
+                            <div>
+                                <span class="text-muted" t-out="entree['date']"
+                                      t-options="{'widget': 'date'}"/>
+                                — <strong t-out="entree['libelle']"/>
+                            </div>
+                            <div t-if="entree['commentaire']" class="ps-3"
+                                 t-out="entree['commentaire']"/>
+                        </div>
+                    </div>
+
+                    <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                        Retour au suivi de mon projet
+                    </a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         L'écran de l'expert — section 16
+         ============================================================ -->
+    <template id="portal_my_home_missions" name="Portail : mes missions"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="40">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">Mes missions</t>
+                <t t-set="text">Les missions d'expertise qui vous sont confiées</t>
+                <t t-set="url" t-value="'/my/missions'"/>
+                <t t-set="config_card" t-value="True"/>
+                <t t-set="count"
+                   t-value="request.env['opex.crowdfunding.mission'].sudo().search_count(
+                                [('expert_id', '=', request.env.user.partner_id.id)]) or ''"/>
+            </t>
+        </div>
+    </template>
+
+    <template id="portal_my_missions" name="Portail : mes missions">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+                    <h3 class="mb-4">Mes missions</h3>
+
+                    <div t-if="not missions" class="alert alert-info" role="alert">
+                        Aucune mission ne vous est confiée pour l'instant.
+                    </div>
+
+                    <div t-foreach="missions" t-as="mission" class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <t t-if="mission['a_repondre']">Nouvelle mission proposée</t>
+                                <t t-else="">Mission</t>
+                            </h5>
+                            <table class="table table-sm">
+                                <tr>
+                                    <td class="text-muted" style="width: 30%;">Projet</td>
+                                    <td><span t-out="mission['projet']"/></td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">Besoin</td>
+                                    <td><span t-out="mission['objectif']"/></td>
+                                </tr>
+                                <tr t-if="mission['date_fin']">
+                                    <td class="text-muted">Échéance</td>
+                                    <td>
+                                        <span t-out="mission['date_fin']"
+                                              t-options="{'widget': 'date'}"/>
+                                    </td>
+                                </tr>
+                                <tr t-if="mission['contrepartie']">
+                                    <td class="text-muted">Contrepartie</td>
+                                    <td>
+                                        <span t-out="mission['contrepartie']"/>
+                                        <span t-if="mission['contrepartie_detail']" class="text-muted">
+                                            — <span t-out="mission['contrepartie_detail']"/>
+                                        </span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="text-muted">État</td>
+                                    <td><span class="badge text-bg-info" t-out="mission['etat']"/></td>
+                                </tr>
+                            </table>
+
+                            <div t-if="mission['jalons']" class="mb-2">
+                                <div class="text-muted">Jalons</div>
+                                <ul class="mb-0">
+                                    <li t-foreach="mission['jalons']" t-as="jalon">
+                                        <span t-out="jalon['libelle']"/>
+                                        <span t-if="jalon['echeance']" class="text-muted">
+                                            — <span t-out="jalon['echeance']"
+                                                    t-options="{'widget': 'date'}"/>
+                                        </span>
+                                        <span class="badge text-bg-light" t-out="jalon['etat']"/>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div t-if="mission['livrables']" class="mb-2">
+                                <div class="text-muted">Livrables</div>
+                                <ul class="mb-0">
+                                    <li t-foreach="mission['livrables']" t-as="livrable">
+                                        <span t-out="livrable['libelle']"/>
+                                        <span class="badge text-bg-light" t-out="livrable['etat']"/>
+                                        <span t-if="livrable['commentaire']" class="text-muted">
+                                            — <span t-out="livrable['commentaire']"/>
+                                        </span>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <form t-if="mission['a_repondre']"
+                                  t-attf-action="/my/missions/#{mission['mission_id']}/reponse"
+                                  method="post" class="mt-3">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" name="reponse" value="accepter"
+                                            class="btn btn-primary">Accepter</button>
+                                    <button type="submit" name="reponse" value="decliner"
+                                            class="btn btn-outline-secondary">Décliner</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         L'historique du porteur — l'audit trail, côté portail
+         ============================================================ -->
+    <template id="portal_project_historique" name="Portail : historique de mon projet">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+                    <h3 class="mb-1">Historique de mon projet</h3>
+                    <p class="text-muted"><span t-out="project.name"/></p>
+
+                    <div t-if="not historique" class="alert alert-info" role="alert">
+                        Rien à afficher pour l'instant.
+                    </div>
+
+                    <table t-if="historique" class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th style="width: 20%;">Date</th>
+                                <th style="width: 25%;">Par</th>
+                                <th>Événement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="historique" t-as="entree">
+                                <td>
+                                    <span t-out="entree['date']"
+                                          t-options="{'widget': 'datetime'}"/>
+                                </td>
+                                <td><span t-out="entree['auteur']"/></td>
+                                <td>
+                                    <div t-out="entree['libelle']"/>
+                                    <div t-if="entree['detail']" class="text-muted"
+                                         t-out="entree['detail']"/>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                        Retour au suivi de mon projet
+                    </a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- Côté porteur : qui s'intéresse, et jusqu'où j'ouvre -->
+    <template id="portal_project_relations" name="Portail : qui s'intéresse à mon projet">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+                    <h3 class="mb-1">Qui s'intéresse à mon projet</h3>
+                    <p class="text-muted"><span t-out="project.name"/></p>
+
+                    <div t-if="not relations" class="alert alert-info" role="alert">
+                        Aucun acteur financier n'a encore été mis en relation avec
+                        votre projet.
+                    </div>
+
+                    <div t-foreach="relations" t-as="relation" class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title" t-out="relation.partner_id.display_name"/>
+                            <p class="card-text">
+                                <t t-if="relation.niveau_acces == 'teaser'">
+                                    Cet acteur ne voit qu'un résumé anonymisé de votre projet.
+                                </t>
+                                <t t-elif="relation.niveau_acces == 'limited'">
+                                    Vous lui avez ouvert votre dossier, sans votre identité.
+                                </t>
+                                <t t-else="">
+                                    Il a accès au dossier détaillé.
+                                </t>
+                            </p>
+                            <p t-if="relation.interet_exprime and relation.niveau_acces == 'teaser'"
+                               class="card-text text-success">
+                                Cet acteur s'est déclaré intéressé.
+                            </p>
+                            <form t-if="relation.interet_exprime and relation.niveau_acces == 'teaser'"
+                                  t-attf-action="/my/projects/#{project.id}/relations/#{relation.id}/autoriser"
+                                  method="post">
+                                <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-primary">
+                                    Autoriser le partage de mon dossier
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                        Retour au suivi de mon projet
+                    </a>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         Accompagnement CEO — sections 11 et 12
+         ============================================================ -->
+    <template id="portal_accompagnement_demande" name="Portail : demander un accompagnement">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+
+                    <h3 class="mb-1">Être accompagné par CEO</h3>
+                    <p class="text-muted"><span t-out="project.name"/></p>
+
+                    <div t-if="error" class="alert alert-warning" role="alert">
+                        <t t-out="error"/>
+                    </div>
+
+                    <p>
+                        Le comité peut mobiliser un ou plusieurs experts pour
+                        vous aider : diagnostic, business model, préparation à
+                        l'investissement, accompagnement technique ou commercial.
+                        Décrivez ce dont vous auriez besoin.
+                    </p>
+
+                    <form t-attf-action="/my/projects/#{project.id}/accompagnement/demander"
+                          method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                        <div class="mb-3">
+                            <label class="form-label" for="demande">Votre besoin</label>
+                            <textarea class="form-control" name="demande" id="demande" rows="4"
+                                      placeholder="Sur quoi souhaitez-vous être aidé ?"/>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                                Retour au suivi de mon projet
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                Envoyer ma demande
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_accompagnement" name="Portail : proposition d'accompagnement">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+
+                    <h3 class="mb-1">Proposition d'accompagnement</h3>
+                    <p class="text-muted"><span t-out="project.name"/></p>
+
+                    <div t-if="error" class="alert alert-warning" role="alert">
+                        <t t-out="error"/>
+                    </div>
+
+                    <t t-if="accompagnement.state == 'propose'">
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">Ce que le comité vous propose</h5>
+                                <div t-out="accompagnement.proposition"/>
+                            </div>
+                        </div>
+
+                        <!--
+                            La contrepartie vient du référentiel : c'est son
+                            libellé qui s'affiche, jamais un code. Section 12.
+                        -->
+                        <div class="card mb-3">
+                            <div class="card-body">
+                                <h5 class="card-title">Contrepartie</h5>
+                                <p class="mb-1">
+                                    <strong t-out="accompagnement.compensation_type_id.name"/>
+                                </p>
+                                <div t-if="accompagnement.compensation_detail"
+                                     t-out="accompagnement.compensation_detail"/>
+                                <div t-if="accompagnement.conditions" class="mt-2">
+                                    <div class="text-muted">Conditions</div>
+                                    <div t-out="accompagnement.conditions"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form t-attf-action="/my/projects/#{project.id}/accompagnement"
+                              method="post">
+                            <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                                    Décider plus tard
+                                </a>
+                                <div class="d-flex gap-2">
+                                    <button type="submit" name="refuser" value="1"
+                                            class="btn btn-outline-secondary">
+                                        Refuser
+                                    </button>
+                                    <button type="submit" class="btn btn-primary">
+                                        Accepter la convention
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </t>
+
+                    <t t-else="">
+                        <div class="alert alert-info" role="alert">
+                            Aucune proposition n'attend votre réponse pour l'instant.
+                        </div>
+                        <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                            Retour au suivi de mon projet
+                        </a>
+                    </t>
+
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ============================================================
+         Répondre au comité — /my/projects/<id>/clarifications
+         ============================================================ -->
+    <template id="portal_project_clarifications" name="Portail : répondre au comité">
+        <t t-call="portal.portal_layout">
+            <div class="row">
+                <div class="col-12 col-lg-9">
+
+                    <h3 class="mb-1">Les questions du comité</h3>
+                    <p class="text-muted">
+                        <span t-out="project.name"/>
+                    </p>
+
+                    <div t-if="error" class="alert alert-warning" role="alert">
+                        <t t-out="error"/>
+                    </div>
+
+                    <p>
+                        Le comité CEO a besoin de quelques précisions avant de
+                        statuer. Vos réponses sont enregistrées au fur et à
+                        mesure : vous pouvez revenir les compléter.
+                    </p>
+
+                    <form t-attf-action="/my/projects/#{project.id}/clarifications" method="post">
+                        <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
+
+                        <div t-foreach="clarifications" t-as="clarification" class="mb-4">
+                            <label class="form-label fw-bold"
+                                   t-attf-for="reponse_#{clarification.id}"
+                                   t-out="clarification.question"/>
+                            <textarea t-if="clarification.state == 'asked'"
+                                      class="form-control" rows="3"
+                                      t-attf-name="reponse_#{clarification.id}"
+                                      t-attf-id="reponse_#{clarification.id}"
+                                      t-out="clarification.reponse or ''"/>
+                            <div t-else="" class="ps-3 border-start">
+                                <div t-out="clarification.reponse"/>
+                                <span class="badge text-bg-success">Répondu</span>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                                Retour au suivi de mon projet
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                Envoyer mes réponses
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

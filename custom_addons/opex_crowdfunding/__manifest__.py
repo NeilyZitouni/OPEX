@@ -30,8 +30,16 @@ La comparaison des deux est le livrable.
     'data': [
         'security/security.xml',
         'security/ir.model.access.csv',
+        'security/ir_rule.xml',
+        'data/criteria.xml',
+        'data/compensation_types.xml',
+        'views/crowdfunding_accompagnement_views.xml',
+        'views/crowdfunding_work_queue_views.xml',
         'views/crowdfunding_project_views.xml',
+        'views/crowdfunding_criteria_views.xml',
+        'views/res_partner_views.xml',
         'views/crowdfunding_menus.xml',
+        'views/portal_templates.xml',
     ],
 
     'installable': True,

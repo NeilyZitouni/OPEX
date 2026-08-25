@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Les droits de `ir.model.access.csv` sont donnés au modèle, pas à
+        l'enregistrement : sans les règles ci-dessous, un porteur portail
+        lirait et modifierait les projets de tous les autres porteurs.
+
+        La surcharge de `create()` empêche de déposer au nom d'autrui ; ces
+        règles empêchent d'atteindre le dossier d'autrui. Les deux sont
+        nécessaires — l'une garde l'écriture, l'autre la lecture.
+
+        Les deux règles portent sur des opérations disjointes (lecture et
+        création d'un côté, écriture de l'autre) : elles ne se recouvrent pas.
+    -->
+
+    <record id="rule_crowdfunding_project_portal" model="ir.rule">
+        <field name="name">Projet : le porteur n'accède qu'à ses propres projets</field>
+        <field name="model_id" ref="model_opex_crowdfunding_project"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le porteur écrit quand le parcours lui rend la main, et seulement
+        alors : sa présentation tant qu'elle est un brouillon (section 5), son
+        dossier complémentaire une fois le GO obtenu (section 7), ses
+        corrections quand le contrôle qualité en demande (section 8). Entre
+        ces moments, le dossier appartient au comité.
+
+        Le contrôle qualité, lui, n'apparaît nulle part dans ces règles : le
+        porteur n'a aucun droit sur `opex.crowdfunding.quality.control`. Il lit
+        les anomalies qu'on lui adresse, transmises par le contrôleur portail,
+        jamais l'avis ni le détail des vérifications.
+    -->
+    <record id="rule_crowdfunding_project_portal_write_draft" model="ir.rule">
+        <field name="name">Projet : le porteur ne modifie son dossier que quand il a la main</field>
+        <field name="model_id" ref="model_opex_crowdfunding_project"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('state', 'in', ['draft', 'dossier_progressif', 'quality_complement'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Les questions de clarification suivent la même logique que le projet
+        qui les porte : le porteur ne voit que les siennes, et n'écrit sa
+        réponse que tant que le comité l'attend.
+
+        La lecture est bornée aux questions effectivement posées : une question
+        encore en préparation côté comité n'a pas à être lisible du porteur —
+        « présent dans le HTML » suffirait à la lui montrer.
+    -->
+    <record id="rule_crowdfunding_clarification_portal" model="ir.rule">
+        <field name="name">Clarification : le porteur ne voit que les questions qu'on lui a posées</field>
+        <field name="model_id" ref="model_opex_crowdfunding_clarification"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id), ('state', '!=', 'draft')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        La mise en relation, en lecture seule pour le portail — des deux côtés
+        du fil : l'acteur financier voit les relations qui le concernent, le
+        porteur celles de son projet.
+
+        Aucun droit d'écriture n'est donné ici, et c'est délibéré : avec un
+        `perm_write` à 1, une requête forgée pourrait poser
+        `niveau_acces = 'full'` sur sa propre relation et s'ouvrir le dossier
+        toute seule. Les deux gestes autorisés — exprimer son intérêt,
+        autoriser le partage — passent par des méthodes du modèle, appelées
+        par le contrôleur après vérification de l'identité.
+    -->
+    <record id="rule_crowdfunding_relation_portal" model="ir.rule">
+        <field name="name">Relation : chacun ne voit que les siennes</field>
+        <field name="model_id" ref="model_opex_crowdfunding_relation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        L'expert ne voit que les missions qui lui sont confiées, et leurs
+        jalons et livrables. Rien du dossier du porteur : « accès au périmètre
+        de sa mission » (section 3).
+    -->
+    <record id="rule_crowdfunding_mission_portal" model="ir.rule">
+        <field name="name">Mission : l'expert ne voit que les siennes</field>
+        <field name="model_id" ref="model_opex_crowdfunding_mission"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('expert_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_crowdfunding_jalon_portal" model="ir.rule">
+        <field name="name">Jalon : périmètre de la mission de l'expert</field>
+        <field name="model_id" ref="model_opex_crowdfunding_jalon"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('mission_id.expert_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_crowdfunding_livrable_portal" model="ir.rule">
+        <field name="name">Livrable : périmètre de la mission de l'expert</field>
+        <field name="model_id" ref="model_opex_crowdfunding_livrable"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('mission_id.expert_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le financement conclu : le porteur lit le sien. Les pièces du dossier
+        de closing (`opex.crowdfunding.closing.document`) n'ont volontairement
+        aucun accès portail : ce sont des documents d'instruction, et le
+        porteur voit ce qui le concerne — l'opération, l'échéancier, ses
+        engagements, le suivi.
+    -->
+    <record id="rule_crowdfunding_closing_portal" model="ir.rule">
+        <field name="name">Closing : le porteur ne voit que son financement</field>
+        <field name="model_id" ref="model_opex_crowdfunding_closing"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_crowdfunding_versement_portal" model="ir.rule">
+        <field name="name">Versement : le porteur ne voit que les siens</field>
+        <field name="model_id" ref="model_opex_crowdfunding_versement"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('closing_id.project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_crowdfunding_suivi_portal" model="ir.rule">
+        <field name="name">Suivi : le porteur ne voit que celui de son projet</field>
+        <field name="model_id" ref="model_opex_crowdfunding_suivi"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('closing_id.project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        L'accompagnement : le porteur lit celui de son projet, et n'y écrit
+        qu'un seul champ — `convention_acceptee` — et seulement tant que la
+        proposition lui est soumise. Le diagnostic du comité, les missions,
+        les contreparties des experts ne lui sont pas ouverts en écriture.
+    -->
+    <record id="rule_crowdfunding_accompagnement_portal" model="ir.rule">
+        <field name="name">Accompagnement : le porteur ne voit que celui de son projet</field>
+        <field name="model_id" ref="model_opex_crowdfunding_accompagnement"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_crowdfunding_accompagnement_portal_convention" model="ir.rule">
+        <field name="name">Accompagnement : le porteur ne répond qu'à une proposition en cours</field>
+        <field name="model_id" ref="model_opex_crowdfunding_accompagnement"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id), ('state', '=', 'propose')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_crowdfunding_clarification_portal_answer" model="ir.rule">
+        <field name="name">Clarification : le porteur ne répond qu'aux questions en attente</field>
+        <field name="model_id" ref="model_opex_crowdfunding_clarification"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('project_id.partner_id', '=', user.partner_id.id), ('state', '=', 'asked')]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+</odoo>
