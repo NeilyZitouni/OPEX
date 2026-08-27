@@ -22,3 +22,6 @@ from . import milestone
 from . import accompagnement
 from . import deliverable
 from . import res_partner
+
+# Point de contrôle de rôle unique du module (règle transversale 2).
+from . import res_users

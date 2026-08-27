@@ -91,6 +91,12 @@
             <field name="name">Demande de profil Expert</field>
             <field name="code">profile_request</field>
             <field name="model_id" ref="model_opex_innovation_expert_profile"/>
+            <!-- Le déposant remplit son propre dossier : l'initiateur *est* le
+                 porteur. Le moteur pose la ligne d'acteur au démarrage, et
+                 c'est elle qui lui donne le rôle — `role_porteur` n'a pas de
+                 groupe et n'est porté par personne en permanence. Sans ce
+                 champ, personne ne peut franchir « Soumettre ma demande ». -->
+            <field name="initiator_role_id" ref="opex_workflow.role_porteur"/>
             <field name="description">Schéma 2 du PDF Module 2. Brouillon, soumission, contrôle du Secrétariat, puis validation, refus, ou demande de complément avec retour au contrôle.</field>
         </record>
 
@@ -227,6 +233,7 @@
             <field name="name">Demande de profil Investisseur</field>
             <field name="code">profile_request_investor</field>
             <field name="model_id" ref="model_opex_innovation_investor_profile"/>
+            <field name="initiator_role_id" ref="opex_workflow.role_porteur"/>
             <field name="description">Même processus que la demande de profil Expert (schéma 2 du PDF), sur le modèle Investisseur.</field>
         </record>
 
@@ -372,6 +379,37 @@
         revalidé à chaque déploiement, et une configuration devenue incohérente
         fait échouer la mise à jour au lieu de se découvrir en démonstration.
     -->
+    <!--
+        ⚠ Le `initiator_role_id` posé dans les `<record>` ci-dessus ne suffit
+        pas, et c'est la même facette du piège `noupdate` que partout ailleurs.
+
+        Les deux définitions ont été créées dans un bloc `noupdate="1"` : leur
+        ligne `ir_model_data` porte le drapeau, et tout `<record>` qui les
+        redéfinit est ignoré lors d'un `-u`. Le champ ne serait donc renseigné
+        que sur une base neuve — les bases déjà installées garderaient des
+        demandes de profil sans acteur, c'est-à-dire le bug qu'on corrige.
+
+        Un `<function>` hors bloc s'exécute à chaque mise à jour. Il est
+        idempotent : réécrire la même valeur ne fait rien.
+    -->
+    <function model="opex.workflow.definition" name="write"
+              eval="[[ref('wf_expert_profile')],
+                     {'initiator_role_id': ref('opex_workflow.role_porteur')}]"/>
+    <function model="opex.workflow.definition" name="write"
+              eval="[[ref('wf_investor_profile')],
+                     {'initiator_role_id': ref('opex_workflow.role_porteur')}]"/>
+
+    <!--
+        Rattrapage des demandes déjà déposées.
+
+        Le champ ne vaut que pour les instances à venir : celles qui existent
+        déjà sont nées sans acteur et le resteraient. Leurs déposants seraient
+        définitivement incapables de soumettre — un bug corrigé qui laisse
+        derrière lui des dossiers morts.
+    -->
+    <function model="opex.workflow.instance"
+              name="_backfill_missing_initiator_actors"/>
+
     <function model="opex.workflow.definition" name="action_publish"
               eval="[[ref('wf_expert_profile')]]"/>
     <function model="opex.workflow.definition" name="action_publish"

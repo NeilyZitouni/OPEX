@@ -263,24 +263,24 @@ class TestExtension3Portail(HttpCase, CrowdfundingCommon):
     def test_le_suivi_propose_le_bouton_repondre(self):
         projet = self._projet_en_clarification(["Quel chiffre d'affaires ?"])
         self._connexion()
-        page = self.url_open('/my/projects/%s' % projet.id)
+        page = self.url_open('/my/crowdfunding/%s' % projet.id)
         texte = self._texte(page)
 
         self.assertIn("Votre prochaine action", texte)
         self.assertIn("Répondre aux questions", texte)
-        self.assertIn('/my/projects/%s/clarifications' % projet.id, page.text)
+        self.assertIn('/my/crowdfunding/%s/clarifications' % projet.id, page.text)
 
     def test_le_porteur_repond_et_le_dossier_repart(self):
         projet = self._projet_en_clarification(
             ["Quel chiffre d'affaires ?", "Combien d'associés ?"])
         self._connexion()
 
-        reponse = self._poster('/my/projects/%s/clarifications' % projet.id, {
+        reponse = self._poster('/my/crowdfunding/%s/clarifications' % projet.id, {
             'reponse_%s' % projet.clarification_ids[0].id: "1,2 MDA en 2025.",
             'reponse_%s' % projet.clarification_ids[1].id: "Trois associés.",
         })
 
-        self.assertTrue(reponse.url.endswith('/my/projects/%s' % projet.id))
+        self.assertTrue(reponse.url.endswith('/my/crowdfunding/%s' % projet.id))
         projet.invalidate_recordset()
         self.assertEqual(projet.state, 'pre_analyse')
         self.assertEqual(set(projet.clarification_ids.mapped('state')), {'answered'})
@@ -294,7 +294,7 @@ class TestExtension3Portail(HttpCase, CrowdfundingCommon):
         self._connexion()
         premiere, seconde = projet.clarification_ids
 
-        reponse = self._poster('/my/projects/%s/clarifications' % projet.id, {
+        reponse = self._poster('/my/crowdfunding/%s/clarifications' % projet.id, {
             'reponse_%s' % premiere.id: "1,2 MDA en 2025.",
         })
 
@@ -318,8 +318,8 @@ class TestExtension3Portail(HttpCase, CrowdfundingCommon):
         })
         self._connexion()
 
-        for url in ('/my/projects/%s' % projet.id,
-                    '/my/projects/%s/clarifications' % projet.id):
+        for url in ('/my/crowdfunding/%s' % projet.id,
+                    '/my/crowdfunding/%s/clarifications' % projet.id):
             page = self.url_open(url)
             self.assertIn("Question envoyée ?", self._texte(page))
             self.assertNotIn("Brouillon interne", page.text,
@@ -333,13 +333,13 @@ class TestExtension3Portail(HttpCase, CrowdfundingCommon):
         projet.partner_id = autre.partner_id
 
         self._connexion()
-        page = self.url_open('/my/projects/%s/clarifications' % projet.id)
-        self.assertTrue(page.url.endswith('/my/projects'))
+        page = self.url_open('/my/crowdfunding/%s/clarifications' % projet.id)
+        self.assertTrue(page.url.endswith('/my/crowdfunding'))
         self.assertNotIn("Question réservée", self._texte(page))
 
     def test_aucun_code_d_etat_sur_l_ecran_de_reponse(self):
         projet = self._projet_en_clarification(["Quel chiffre d'affaires ?"])
         self._connexion()
-        page = self.url_open('/my/projects/%s/clarifications' % projet.id)
+        page = self.url_open('/my/crowdfunding/%s/clarifications' % projet.id)
         for code in ('pre_analyse', 'clarification', 'dossier_progressif'):
             self.assertNotIn(code, self._texte(page))

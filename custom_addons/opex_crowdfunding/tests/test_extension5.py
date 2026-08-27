@@ -351,7 +351,7 @@ class TestExtension5Portail(HttpCase, QualityCommon):
     def test_le_porteur_lit_ce_qu_on_lui_demande(self):
         projet = self._projet_en_complement()
         self._connexion()
-        texte = self._texte(self.url_open('/my/projects/%s' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s' % projet.id))
 
         self.assertIn("Compléments demandés", texte)
         self.assertIn("plan de trésorerie 2027", texte)
@@ -361,8 +361,8 @@ class TestExtension5Portail(HttpCase, QualityCommon):
         """Les anomalies lui sont adressées ; le reste de la fiche, non."""
         projet = self._projet_en_complement()
         self._connexion()
-        for url in ('/my/projects/%s' % projet.id,
-                    '/my/projects/%s/dossier' % projet.id):
+        for url in ('/my/crowdfunding/%s' % projet.id,
+                    '/my/crowdfunding/%s/dossier' % projet.id):
             page = self.url_open(url)
             texte = self._texte(page)
             self.assertNotIn("À compléter", texte)
@@ -375,7 +375,7 @@ class TestExtension5Portail(HttpCase, QualityCommon):
     def test_le_porteur_corrige_et_renvoie(self):
         projet = self._projet_en_complement()
         self._connexion()
-        reponse = self._poster('/my/projects/%s/dossier' % projet.id, {
+        reponse = self._poster('/my/crowdfunding/%s/dossier' % projet.id, {
             'business_model': "Abonnement mensuel, révisé.",
             'marche': DOSSIER_INVESTISSEUR['marche'],
             'traction': DOSSIER_INVESTISSEUR['traction'],
@@ -394,7 +394,7 @@ class TestExtension5Portail(HttpCase, QualityCommon):
     def test_le_porteur_peut_enregistrer_sa_correction_sans_la_renvoyer(self):
         projet = self._projet_en_complement()
         self._connexion()
-        self._poster('/my/projects/%s/dossier' % projet.id, {
+        self._poster('/my/crowdfunding/%s/dossier' % projet.id, {
             'business_model': "Brouillon de correction.",
             'enregistrer': '1',
         })

@@ -90,7 +90,7 @@ class TestExtension2Portail(HttpCase):
         self.assertEqual(page.status_code, 200)
         document = lxml_html.fromstring(page.text)
         cartes = document.xpath(
-            "//div[contains(@class, 'o_portal_index_card')][.//a[@href='/my/projects']]")
+            "//div[contains(@class, 'o_portal_index_card')][.//a[@href='/my/crowdfunding']]")
         self.assertTrue(cartes, "La tuile « Mes projets » est absente de l'accueil du portail.")
         self.assertNotIn(
             'd-none', cartes[0].get('class', ''),
@@ -99,7 +99,7 @@ class TestExtension2Portail(HttpCase):
 
     def test_liste_vide_propose_le_bon_appel_a_l_action(self):
         self._connexion()
-        page = self.url_open('/my/projects')
+        page = self.url_open('/my/crowdfunding')
         self.assertEqual(page.status_code, 200)
         self.assertIn("Présenter mon projet", self._texte(page))
         self.assertNotIn(CTA_INTERDIT, page.text)
@@ -107,10 +107,10 @@ class TestExtension2Portail(HttpCase):
     def test_le_cta_interdit_n_apparait_sur_aucun_ecran(self):
         """Section 5 : le libellé conditionne le taux de dépôt."""
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
         projet = self._mes_projets()
-        for url in ('/my/projects', '/my/projects/new', '/my/projects/new/besoin',
-                    '/my/projects/%s' % projet.id):
+        for url in ('/my/crowdfunding', '/my/crowdfunding/new', '/my/crowdfunding/new/besoin',
+                    '/my/crowdfunding/%s' % projet.id):
             page = self.url_open(url)
             self.assertNotIn(CTA_INTERDIT, page.text, "Libellé interdit sur %s." % url)
 
@@ -119,9 +119,9 @@ class TestExtension2Portail(HttpCase):
     # ------------------------------------------------------------------
     def test_le_projet_est_cree_des_la_premiere_saisie(self):
         self._connexion()
-        reponse = self._poster('/my/projects/new', ECRAN_PROJET)
+        reponse = self._poster('/my/crowdfunding/new', ECRAN_PROJET)
         self.assertEqual(reponse.status_code, 200)
-        self.assertTrue(reponse.url.endswith('/my/projects/new/besoin'))
+        self.assertTrue(reponse.url.endswith('/my/crowdfunding/new/besoin'))
 
         projet = self._mes_projets()
         self.assertEqual(len(projet), 1)
@@ -132,7 +132,7 @@ class TestExtension2Portail(HttpCase):
     def test_sans_titre_rien_n_est_cree_et_la_saisie_est_rendue(self):
         """Un brouillon sans titre serait introuvable dans « Mes projets »."""
         self._connexion()
-        reponse = self._poster('/my/projects/new', dict(ECRAN_PROJET, name=""))
+        reponse = self._poster('/my/crowdfunding/new', dict(ECRAN_PROJET, name=""))
         self.assertEqual(reponse.status_code, 200)
         self.assertFalse(self._mes_projets(), "Un projet sans titre a été créé.")
         # La saisie déjà faite est réaffichée : personne ne retape sa
@@ -141,8 +141,8 @@ class TestExtension2Portail(HttpCase):
 
     def test_ecriture_partielle_le_second_ecran_ne_perd_pas_le_premier(self):
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
-        self._poster('/my/projects/new/besoin', dict(ECRAN_BESOIN, enregistrer='1'))
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new/besoin', dict(ECRAN_BESOIN, enregistrer='1'))
 
         projet = self._mes_projets()
         self.assertEqual(projet.probleme, ECRAN_PROJET['probleme'])
@@ -159,8 +159,8 @@ class TestExtension2Portail(HttpCase):
         contrôleur écrivait le champ sans regarder.
         """
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
-        url = '/my/projects/new/besoin'
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
+        url = '/my/crowdfunding/new/besoin'
 
         self._poster(url, dict(ECRAN_BESOIN, enregistrer='1'))
         self.assertFalse(self._mes_projets().pitch_document)
@@ -182,21 +182,21 @@ class TestExtension2Portail(HttpCase):
 
     def test_message_de_reprise_quand_le_porteur_revient(self):
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
 
-        page = self.url_open('/my/projects/new')
+        page = self.url_open('/my/crowdfunding/new')
         self.assertIn("Votre saisie a été conservée", self._texte(page))
         self.assertIn(ECRAN_PROJET['name'], self._texte(page))
 
         # La liste aussi propose de reprendre plutôt que de recommencer.
-        liste = self.url_open('/my/projects')
+        liste = self.url_open('/my/crowdfunding')
         self.assertIn("Reprendre", self._texte(liste))
 
     def test_une_seule_presentation_en_cours_a_la_fois(self):
         """Repasser par l'écran 1 reprend le brouillon, il ne le duplique pas."""
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
-        self._poster('/my/projects/new', dict(ECRAN_PROJET, name="Titre corrigé"))
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new', dict(ECRAN_PROJET, name="Titre corrigé"))
 
         projets = self._mes_projets()
         self.assertEqual(len(projets), 1)
@@ -207,19 +207,19 @@ class TestExtension2Portail(HttpCase):
     # ------------------------------------------------------------------
     def test_parcours_complet_depuis_le_portail(self):
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
-        reponse = self._poster('/my/projects/new/besoin', ECRAN_BESOIN)
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
+        reponse = self._poster('/my/crowdfunding/new/besoin', ECRAN_BESOIN)
 
         projet = self._mes_projets()
         self.assertEqual(projet.state, 'depot_express')
-        self.assertTrue(reponse.url.endswith('/my/projects/%s' % projet.id))
+        self.assertTrue(reponse.url.endswith('/my/crowdfunding/%s' % projet.id))
         self.assertIn("Votre prochaine action", self._texte(reponse))
 
     def test_depot_incomplet_dit_ce_qui_manque_sans_page_d_erreur(self):
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
         reponse = self._poster(
-            '/my/projects/new/besoin', dict(ECRAN_BESOIN, besoin_type=""))
+            '/my/crowdfunding/new/besoin', dict(ECRAN_BESOIN, besoin_type=""))
 
         self.assertEqual(reponse.status_code, 200)
         self.assertIn("Besoin recherché", self._texte(reponse))
@@ -230,11 +230,11 @@ class TestExtension2Portail(HttpCase):
     # ------------------------------------------------------------------
     def test_la_page_de_suivi_montre_les_jalons_et_la_prochaine_action(self):
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
-        self._poster('/my/projects/new/besoin', ECRAN_BESOIN)
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new/besoin', ECRAN_BESOIN)
         projet = self._mes_projets()
 
-        page = self.url_open('/my/projects/%s' % projet.id)
+        page = self.url_open('/my/crowdfunding/%s' % projet.id)
         self.assertEqual(page.status_code, 200)
         texte = self._texte(page)
         for jalon in ("Demande reçue", "Projet présélectionné", "Dossier complété",
@@ -246,11 +246,11 @@ class TestExtension2Portail(HttpCase):
     def test_aucun_code_d_etat_technique_a_l_ecran(self):
         """Section 16 : le porteur ne pilote pas le workflow, il est guidé."""
         self._connexion()
-        self._poster('/my/projects/new', ECRAN_PROJET)
-        self._poster('/my/projects/new/besoin', ECRAN_BESOIN)
+        self._poster('/my/crowdfunding/new', ECRAN_PROJET)
+        self._poster('/my/crowdfunding/new/besoin', ECRAN_BESOIN)
         projet = self._mes_projets()
 
-        for url in ('/my/projects', '/my/projects/%s' % projet.id):
+        for url in ('/my/crowdfunding', '/my/crowdfunding/%s' % projet.id):
             page = self.url_open(url)
             for code in ('depot_express', 'quality_gate', 'etude_decision',
                          'matching_financier'):
@@ -265,8 +265,8 @@ class TestExtension2Portail(HttpCase):
             'name': "Projet confidentiel d'Amina",
         })
         self._connexion()
-        page = self.url_open('/my/projects/%s' % projet_autre.id)
-        self.assertTrue(page.url.endswith('/my/projects'))
+        page = self.url_open('/my/crowdfunding/%s' % projet_autre.id)
+        self.assertTrue(page.url.endswith('/my/crowdfunding'))
         # Sur le texte rendu : dans le HTML brut, l'apostrophe est échappée et
         # la recherche ne trouverait jamais rien — un vert sans valeur.
         texte = self._texte(page)
@@ -279,7 +279,7 @@ class TestExtension2Portail(HttpCase):
             'name': "Brouillon d'Amina",
         })
         self._connexion()
-        texte = self._texte(self.url_open('/my/projects/new'))
+        texte = self._texte(self.url_open('/my/crowdfunding/new'))
         self.assertNotIn("Brouillon", texte)
         self.assertNotIn("Votre saisie a été conservée", texte)
 
@@ -375,7 +375,7 @@ class TestExtension2Securite(TransactionCase):
         projet = self.Project.create({'partner_id': self.porteur.partner_id.id,
                                       'name': "Prochaine action"})
         action = projet._portal_next_action()
-        self.assertEqual(action['url'], '/my/projects/new')
+        self.assertEqual(action['url'], '/my/crowdfunding/new')
 
         projet.write({'state': 'etude_decision'})
         action = projet._portal_next_action()

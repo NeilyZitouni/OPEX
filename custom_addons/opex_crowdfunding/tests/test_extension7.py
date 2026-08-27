@@ -326,7 +326,7 @@ class TestExtension7Confidentialite(HttpCase, MatchingCommon):
         projet.with_user(self.ceo).action_run_matching()
 
         self.authenticate('cf7_porteur', 'cf7_porteur')
-        page = self.url_open('/my/projects/%s' % projet.id)
+        page = self.url_open('/my/crowdfunding/%s' % projet.id)
         texte = self._texte(page)
         self.assertIn("Nous recherchons les acteurs financiers", texte)
         for nom in ("Fonds Industrie DZ", "Mécénat Culturel"):

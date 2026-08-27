@@ -30,6 +30,37 @@
         </xpath>
     </template>
 
+    <!--
+        Tuile « Espace validation » sur l'accueil du portail.
+
+        Même question que les routes `/staff/…` : `res.users._is_opex_staff()`,
+        et rien d'autre. Le `t-if` ne fait qu'afficher — c'est `_is_staff()`,
+        côté controller, qui refuse réellement l'accès (règle transversale 2 :
+        un contrôle, un seul endroit, appelé par la tuile et par la route).
+
+        `config_card` : sans lui, `portal.portal_docs_entry` rend la carte avec
+        `d-none` et ne la réaffiche que si un compteur asynchrone revient
+        strictement positif. Une file de traitement vide est une information —
+        « rien ne vous attend » — et la tuile ne doit pas disparaître pour
+        autant. Piège déjà payé sur la tuile Vie du Cluster.
+    -->
+    <template id="portal_my_home_staff" name="Portail : espace validation"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="60">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-if="request.env.user._is_opex_staff()">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Espace validation</t>
+                    <t t-set="text">Dossiers d'adhésion à contrôler, à examiner et à valider</t>
+                    <t t-set="url" t-value="'/staff/membership'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
+            </t>
+        </div>
+    </template>
+
     <!-- Pastille d'état, en-tête de page et fil d'Ariane communs aux 2 pages -->
     <template id="staff_page_header" name="Espace validation : en-tête">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">

@@ -29,6 +29,36 @@ class OpexMembershipFile(models.Model):
     )
     REJECTED_STATES = ('rejected_control', 'rejected_committee', 'rejected_copil')
 
+    # États dans lesquels un dossier est déjà engagé dans le parcours de
+    # validation. Un candidat qui en a un n'a plus rien à déposer : l'entrée
+    # « Devenir membre » du menu principal disparaît alors
+    # (`res.partner.opex_can_apply_membership`) et surtout `create()` refuse le
+    # second dossier — le masquage du bouton est un confort d'affichage, c'est
+    # `_check_no_engaged_file()` qui interdit le doublon.
+    #
+    # `draft` en est volontairement absent : un brouillon se reprend, il ne se
+    # double pas — `/my/membership/new` retrouve celui du candidat et continue
+    # dedans. Les états de sortie (`REJECTED_STATES`) en sont absents aussi :
+    # un dossier refusé clôt un parcours, il n'en bloque pas un nouveau.
+    #
+    # `correction_requested` y figure, lui : le dossier est bien engagé, il
+    # attend une correction du candidat. Sans cet état dans la liste, le
+    # candidat à qui le Secrétariat vient de demander une pièce repartirait de
+    # zéro dans un dossier neuf — celui que le Comité attend resterait en
+    # souffrance.
+    ENGAGED_STATES = (
+        'control',
+        'correction_requested',
+        'committee',
+        'copil_pending',
+        'copil_validated',
+        'payment_pending',
+        'payment_verification',
+        'signature_pending',
+        'signature_verification',
+        'active',
+    )
+
     partner_id = fields.Many2one(
         'res.partner',
         string="Membre",
@@ -240,6 +270,63 @@ class OpexMembershipFile(models.Model):
                 'pieces': ', '.join(missing),
             })
 
+    @api.model
+    def _engaged_file(self, partner):
+        """Dossier déjà engagé de ce contact, ou recordset vide.
+
+        Source unique de la règle « un dossier engagé à la fois » : le
+        masquage de l'entrée « Devenir membre »
+        (`res.partner.opex_can_apply_membership`) et le refus de création
+        (`_check_no_engaged_file`) passent tous deux par ici, faute de quoi
+        l'écran et le serveur finiraient par ne plus dire la même chose.
+
+        La recherche porte sur *tous* les dossiers du contact, pas sur le
+        dernier créé : un candidat qui en aurait deux par accident doit être
+        arrêté par le premier engagé, quel que soit son rang.
+
+        `sudo()` : la question se pose aussi pour un candidat portail, qui ne
+        lit pas cette table. Le domaine reste borné à ce contact-ci et seul le
+        dossier trouvé en ressort.
+        """
+        return self.sudo().search([
+            ('partner_id', '=', partner.id),
+            ('state', 'in', self.ENGAGED_STATES),
+        ], order='id asc', limit=1)
+
+    @api.model
+    def _check_no_engaged_file(self, partner):
+        """Refuse un second dossier à un contact qui en a déjà un engagé.
+
+        ⚠ **C'est ici le vrai rempart, pas le `t-if` du menu.** Masquer
+        « Devenir membre » évite le clic malheureux ; ça n'empêche rien —
+        une requête POST forgée sur `/my/membership/new`, un signet gardé
+        d'avant la validation ou un formulaire du backend n'ont jamais vu le
+        gabarit. Le bug est déjà connu du projet (cf. `opex_innovation`, où
+        « Devenir Expert » a la même paire masquage + contrôle serveur).
+
+        Un brouillon ne déclenche rien : il n'y a pas de création en jeu, le
+        parcours reprend celui qui existe.
+        """
+        engaged = self._engaged_file(partner)
+        if not engaged:
+            return
+        if self.env.user._is_portal():
+            raise UserError(_(
+                "Vous avez déjà un dossier d'adhésion en cours : le dossier "
+                "n° %(numero)s, à l'état « %(etat)s ». Il n'y a pas de second "
+                "dossier à déposer — suivez celui-ci depuis « Mes dossiers "
+                "d'adhésion »."
+            ) % {'numero': engaged.id, 'etat': engaged._state_label()})
+        raise UserError(_(
+            "%(candidat)s a déjà un dossier d'adhésion engagé : le dossier "
+            "n° %(numero)s, à l'état « %(etat)s ». Instruisez celui-ci plutôt "
+            "que d'en ouvrir un second."
+        ) % {
+            'candidat': partner.display_name,
+            'numero': engaged.id,
+            'etat': engaged._state_label(),
+        })
+
     def _ensure_state(self, expected, action_label):
         """Refuse une transition demandée depuis un état qui ne la permet pas."""
         self.ensure_one()
@@ -363,12 +450,25 @@ class OpexMembershipFile(models.Model):
         `partner_id` ni `state` ne peuvent en venir. Les réécrire ici, plutôt que
         de se contenter de ne pas les afficher, ferme la porte à une requête
         forgée qui créerait un dossier au nom d'un autre contact — ou déjà validé.
+
+        Même logique pour le doublon : un contact qui a déjà un dossier engagé
+        n'en obtient pas un second, d'où qu'arrive la demande. Le contrôle est
+        ici et non dans le seul controller portail, parce que le formulaire du
+        backend crée par le même chemin — et parce que masquer un bouton
+        n'interdit jamais rien.
         """
         if self.env.user._is_portal():
             partner_id = self.env.user.partner_id.id
             for vals in vals_list:
                 vals['partner_id'] = partner_id
                 vals['state'] = 'draft'
+        # Contacts dédoublonnés : un `create()` multiple ne doit pas interroger
+        # la base une fois par ligne pour le même contact.
+        Partner = self.env['res.partner']
+        for partner_id in dict.fromkeys(
+                vals.get('partner_id') for vals in vals_list):
+            if partner_id:
+                self._check_no_engaged_file(Partner.browse(partner_id))
         records = super().create(vals_list)
         # Un seul abonnement, à la création : le candidat suit son dossier pour
         # toute sa vie. Le refaire à chaque transition dupliquerait l'abonné et

@@ -336,7 +336,7 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
         """« Il ne doit pas avoir à comprendre le workflow interne CEO. »"""
         relation = self._relation()
         self.authenticate('cf10_investisseur', 'cf10_investisseur')
-        page = self.url_open('/my/opportunities/%s' % relation.id)
+        page = self.url_open('/my/crowdfunding/opportunities/%s' % relation.id)
         texte = self._texte(page)
 
         for libelle in ("Intéressé", "Besoin d'informations",
@@ -353,12 +353,12 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
     def test_les_boutons_n_apparaissent_pas_au_teaser(self):
         relation = self._relation(niveau='teaser')
         self.authenticate('cf10_investisseur', 'cf10_investisseur')
-        texte = self._texte(self.url_open('/my/opportunities/%s' % relation.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/opportunities/%s' % relation.id))
         self.assertNotIn("Non intéressé", texte)
 
     def test_l_acteur_se_declare_interesse_depuis_son_ecran(self):
         relation = self._relation()
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
         self.authenticate('cf10_investisseur', 'cf10_investisseur')
 
         self.url_open(url + '/decision', data={
@@ -371,7 +371,7 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
 
     def test_l_acteur_demande_un_accompagnement_depuis_son_ecran(self):
         relation = self._relation()
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
         self.authenticate('cf10_investisseur', 'cf10_investisseur')
 
         self.url_open(url + '/decision', data={
@@ -383,7 +383,7 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
 
     def test_un_choix_inconnu_ne_fait_rien(self):
         relation = self._relation()
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
         self.authenticate('cf10_investisseur', 'cf10_investisseur')
 
         self.url_open(url + '/decision', data={
@@ -400,8 +400,8 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
             groups='base.group_portal', name="Capital Oran")
         self.authenticate('cf10_autre', 'cf10_autre')
 
-        self.url_open('/my/opportunities/%s/decision' % relation.id, data={
-            'choix': 'interesse', 'csrf_token': self._jeton('/my/opportunities')})
+        self.url_open('/my/crowdfunding/opportunities/%s/decision' % relation.id, data={
+            'choix': 'interesse', 'csrf_token': self._jeton('/my/crowdfunding/opportunities')})
 
         relation.invalidate_recordset()
         self.assertFalse(relation.decision)
@@ -422,10 +422,10 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
         projet.with_user(self.ceo).action_close()
 
         self.authenticate('cf10_porteur', 'cf10_porteur')
-        texte = self._texte(self.url_open('/my/projects/%s' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s' % projet.id))
         self.assertIn("Voir mon financement", texte)
 
-        texte = self._texte(self.url_open('/my/projects/%s/financement' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s/financement' % projet.id))
         self.assertIn("Investissement", texte)
         self.assertIn("Première tranche", texte)
         self.assertIn("états financiers annuels", texte)
@@ -440,7 +440,7 @@ class TestExtension10Portail(HttpCase, ClosingCommon):
             groups='base.group_portal', name="Amina Haddad")
 
         self.authenticate('cf10_autre_porteur', 'cf10_autre_porteur')
-        page = self.url_open('/my/projects/%s/financement' % closing.project_id.id)
-        self.assertTrue(page.url.endswith('/my/projects'))
+        page = self.url_open('/my/crowdfunding/%s/financement' % closing.project_id.id)
+        self.assertTrue(page.url.endswith('/my/crowdfunding'))
         with self.assertRaises(AccessError):
             closing.with_user(autre).read(['montant'])

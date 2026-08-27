@@ -232,7 +232,7 @@ class TestExtension6Portail(HttpCase, EtudeCommon):
         projet.with_user(self.ceo).action_route_maturation()
 
         self._connexion()
-        texte = self._texte(self.url_open('/my/projects/%s' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s' % projet.id))
         self.assertIn("Un accompagnement est en cours", texte)
         self.assertNotIn("n'a pas été retenu", texte)
 
@@ -257,6 +257,6 @@ class TestExtension6Portail(HttpCase, EtudeCommon):
         projet.with_user(self.ceo).action_route_rejected()
 
         self._connexion()
-        texte = self._texte(self.url_open('/my/projects/%s' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s' % projet.id))
         self.assertIn("n'a pas été retenu", texte)
         self.assertNotIn("Marché déjà couvert", texte)

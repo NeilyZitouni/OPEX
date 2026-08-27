@@ -78,7 +78,7 @@
     <template id="portal_missions" name="Mes missions">
         <t t-call="portal.portal_layout">
             <div class="container my-4">
-                <h3>Mes missions</h3>
+                <h3>OPEX Innovation — mes missions</h3>
 
                 <!--
                     ⚠ Comme l'espace investisseur : le gabarit itère sur les
@@ -271,14 +271,30 @@
               priority="65">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Mes missions</t>
+                <!-- Le dispositif d'abord : `opex_crowdfunding` a sa propre
+                     tuile « missions », et un expert inscrit aux deux voyait
+                     deux cartes au titre rigoureusement identique. -->
+                <t t-set="title">OPEX Innovation — mes missions</t>
                 <t t-set="url" t-value="'/my/innovation/missions'"/>
-                <t t-set="text">Projets que vous accompagnez</t>
-                <!-- Même compteur que « Mes opportunités » : les deux écrans
-                     lisent les mêmes propositions retenues, sous deux angles.
-                     Un second compteur donnerait deux nombres à tenir d'accord. -->
+                <t t-set="text">Projets d'innovation que vous accompagnez en tant qu'expert.</t>
+                <!--
+                    Compteur **propre** à cette tuile.
+
+                    Elle partageait `innovation_opportunity_count` avec la tuile
+                    « mes opportunités », au motif que les deux écrans lisent
+                    les mêmes propositions. Ça ne marche pas :
+                    `portal_home_counters.js` résout chaque compteur par
+                    `querySelector("[data-placeholder_count='…']")`, qui ne rend
+                    que le **premier** nœud. La seconde tuile n'était jamais
+                    démasquée au premier chargement — seulement au suivant, par
+                    le cache de session. Vu à l'écran le 27/08.
+
+                    Et les deux nombres ne sont pas les mêmes : les missions ne
+                    comptent que les propositions où le contact intervient comme
+                    expert ou mentor.
+                -->
                 <t t-set="placeholder_count"
-                   t-value="'innovation_opportunity_count'"/>
+                   t-value="'innovation_mission_count'"/>
             </t>
         </xpath>
     </template>

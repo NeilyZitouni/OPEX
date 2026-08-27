@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Espace de traitement du Smart Crowdfunding, côté site.
+
+        ⚠ Écran de **démonstration**, pas remplacement du back-office : file de
+        travail et décisions à un bouton. Ce qu'il ne couvre pas — matching,
+        accompagnement, closing, chatter, filtres, saisie riche — est listé dans
+        le CLAUDE.md du module, et chaque fiche porte un lien de sortie.
+
+        Les libellés portent le nom du dispositif : `/staff/innovation` a ses
+        propres écrans « Projets à traiter » et « Espace d'évaluation », et deux
+        files homonymes seraient indistinguables pour qui les ouvre côte à côte
+        (incident du 26/08 sur les tuiles d'accueil).
+    -->
+    <template id="staff_crowdfunding_files" name="Staff : file Smart Crowdfunding">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Smart Crowdfunding — dossiers à traiter</h3>
+
+                <div class="alert alert-light" role="status">
+                    Cette file ne montre que ce qui attend une action de votre
+                    part. Elle suit votre rôle, pas la totalité des dossiers.
+                </div>
+
+                <t t-foreach="files" t-as="file">
+                    <h5 class="mt-4">
+                        <t t-out="file['nom']"/>
+                        <span class="badge text-bg-secondary ms-2"
+                              t-out="len(file['projets'])"/>
+                    </h5>
+                    <p class="text-muted small mb-2" t-out="file['aide']"/>
+
+                    <table t-if="file['projets']" class="table table-sm align-middle">
+                        <thead>
+                            <tr>
+                                <th>Dossier</th>
+                                <th>Porteur</th>
+                                <th>Besoin</th>
+                                <th>Étape</th>
+                                <th class="text-end"/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="file['projets']" t-as="project">
+                                <td t-out="project.name"/>
+                                <td t-out="project.partner_id.display_name"/>
+                                <td t-out="dict(project._fields['besoin_type'].selection).get(project.besoin_type, '')"/>
+                                <!-- Côté personnel, le libellé de l'état : le
+                                     back-office peut être aussi détaillé qu'on
+                                     veut, c'est au porteur qu'on ne montre
+                                     jamais un code technique. -->
+                                <td t-out="project._state_label()"/>
+                                <td class="text-end">
+                                    <a t-attf-href="/staff/crowdfunding/#{project.id}"
+                                       class="btn btn-sm btn-primary">Traiter</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div t-else="" class="alert alert-success" role="status">
+                        Aucun dossier n'attend votre intervention dans cette file.
+                    </div>
+                </t>
+
+                <div t-if="not files" class="alert alert-warning" role="status">
+                    Aucune file ne correspond à votre rôle.
+                </div>
+
+                <!-- Les deux files qui ne portent pas sur des dossiers : leur
+                     traitement est hors de cet écran, le compteur dit
+                     seulement qu'il y a quelque chose à y faire. -->
+                <t t-if="compteurs">
+                    <h5 class="mt-4">Suivi, hors de cet écran</h5>
+                    <ul class="list-unstyled">
+                        <li t-foreach="compteurs" t-as="compteur">
+                            <span t-out="compteur['nom']"/> :
+                            <strong t-out="compteur['nombre']"/>
+                            <span class="text-muted small">
+                                — se traite depuis le back-office
+                            </span>
+                        </li>
+                    </ul>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="staff_crowdfunding_file" name="Staff : dossier Smart Crowdfunding">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h3 t-out="project.name"/>
+                        <p class="text-muted mb-0" t-out="project._state_label()"/>
+                    </div>
+                    <a class="btn btn-secondary" href="/staff/crowdfunding">Retour à la file</a>
+                </div>
+
+                <div t-if="error" class="alert alert-danger mt-3" role="alert"
+                     t-out="error"/>
+
+                <!-- ═══ Le dossier, en lecture seule ═══ -->
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3">Porteur</dt>
+                            <dd class="col-sm-9" t-out="project.partner_id.display_name"/>
+                            <dt class="col-sm-3">Type de porteur</dt>
+                            <dd class="col-sm-9" t-out="dict(project._fields['porteur_type'].selection).get(project.porteur_type, '')"/>
+                            <dt class="col-sm-3">Problème</dt>
+                            <dd class="col-sm-9" t-out="project.probleme"/>
+                            <dt class="col-sm-3">Solution</dt>
+                            <dd class="col-sm-9" t-out="project.solution"/>
+                            <dt class="col-sm-3">Secteur</dt>
+                            <dd class="col-sm-9" t-out="dict(project._fields['secteur'].selection).get(project.secteur, '')"/>
+                            <dt class="col-sm-3">Maturité</dt>
+                            <dd class="col-sm-9" t-out="dict(project._fields['maturite'].selection).get(project.maturite, '')"/>
+                            <dt class="col-sm-3">Besoin</dt>
+                            <dd class="col-sm-9" t-out="dict(project._fields['besoin_type'].selection).get(project.besoin_type, '')"/>
+                            <dt class="col-sm-3">Montant indicatif</dt>
+                            <!-- `t-field` monétaire dans un `<span>`, pas sur le
+                                 `<dd>` : QWeb refuse ses widgets sur `dd` et
+                                 lève « QWeb widgets do not work correctly on
+                                 'dd' elements » — au rendu, pas au chargement. -->
+                            <dd class="col-sm-9">
+                                <span t-field="project.montant_indicatif"/>
+                            </dd>
+                            <dt t-if="project.motif_rejet" class="col-sm-3">Motif du refus</dt>
+                            <dd t-if="project.motif_rejet" class="col-sm-9" t-out="project.motif_rejet"/>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- ═══ Les décisions ouvertes à ce rôle, à cette étape ═══ -->
+                <h5 class="mt-4">Décisions</h5>
+                <div t-if="not actions" class="alert alert-light" role="status">
+                    Aucune action ne vous revient sur ce dossier à son étape
+                    actuelle.
+                </div>
+                <t t-foreach="actions" t-as="action">
+                    <form method="post" class="border rounded p-3 mb-2"
+                          t-attf-action="/staff/crowdfunding/#{project.id}/action">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="action" t-att-value="action['code']"/>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong t-out="action['libelle']"/>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                Confirmer
+                            </button>
+                        </div>
+                        <!-- Le `required` est un confort d'écran ; c'est le
+                             modèle qui refuse réellement un motif vide. -->
+                        <div t-if="action['motif']" class="mt-2">
+                            <label class="form-label">
+                                Motif <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" rows="2" name="motif"
+                                      required="required"
+                                      placeholder="Ex. : marché trop étroit au regard du ticket demandé."/>
+                        </div>
+                    </form>
+                </t>
+
+                <!-- ═══ Historique ═══
+                     Titre explicite plutôt que « Historique » tout court :
+                     d'une part `/staff/innovation` a déjà une section de ce
+                     nom, d'autre part ce n'est PAS le journal d'instruction
+                     complet — `_portal_historique()` ne rend que les
+                     changements d'état et les messages adressés au porteur.
+                     L'audit complet est dans le fil du dossier, au
+                     back-office. Autant que l'écran le dise. -->
+                <h5 class="mt-4">Historique visible par le porteur</h5>
+                <div t-if="not historique" class="alert alert-light" role="status">
+                    Aucun mouvement enregistré sur ce dossier.
+                </div>
+                <ul t-else="" class="list-unstyled">
+                    <li t-foreach="historique" t-as="entree" class="mb-2">
+                        <span class="text-muted small" t-out="entree['date']"/>
+                        —
+                        <span t-out="entree['auteur']"/> :
+                        <strong t-out="entree['libelle']"/>
+                        <div t-if="entree['detail']" class="text-muted small"
+                             t-out="entree['detail']"/>
+                    </li>
+                </ul>
+
+                <!--
+                    La porte de sortie, discrète et assumée : matching,
+                    accompagnement, closing, pièces jointes, chatter et saisie
+                    des fiches (préqualification, contrôle qualité) ne sont pas
+                    sur cet écran. Mieux vaut un lien que de laisser quelqu'un
+                    chercher.
+                -->
+                <p class="mt-4 mb-0">
+                    <a t-attf-href="/odoo/action-opex_crowdfunding.action_crowdfunding_project/#{project.id}"
+                       class="small text-muted">
+                        Ouvrir dans le back-office — matching, accompagnement,
+                        closing, pièces et fiches de contrôle
+                    </a>
+                </p>
+            </div>
+        </t>
+    </template>
+
+</odoo>

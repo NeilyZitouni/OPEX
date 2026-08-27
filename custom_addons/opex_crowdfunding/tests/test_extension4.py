@@ -198,11 +198,11 @@ class TestExtension4Portail(HttpCase, DossierCommon):
     def test_le_suivi_propose_le_bouton_completer(self):
         projet = self._projet('investisseur')
         self._connexion()
-        page = self.url_open('/my/projects/%s' % projet.id)
+        page = self.url_open('/my/crowdfunding/%s' % projet.id)
         texte = self._texte(page)
 
         self.assertIn("Compléter mon dossier", texte)
-        self.assertIn('/my/projects/%s/dossier' % projet.id, page.text)
+        self.assertIn('/my/crowdfunding/%s/dossier' % projet.id, page.text)
 
     def test_chaque_besoin_voit_son_questionnaire_et_pas_les_autres(self):
         """La condition `t-if` sur `besoin_type`, vérifiée à l'écran."""
@@ -214,7 +214,7 @@ class TestExtension4Portail(HttpCase, DossierCommon):
         self._connexion()
         for besoin_type, libelle in attendu.items():
             projet = self._projet(besoin_type)
-            texte = self._texte(self.url_open('/my/projects/%s/dossier' % projet.id))
+            texte = self._texte(self.url_open('/my/crowdfunding/%s/dossier' % projet.id))
             self.assertIn(libelle, texte)
             for autre, libelle_autre in attendu.items():
                 if autre != besoin_type:
@@ -225,14 +225,14 @@ class TestExtension4Portail(HttpCase, DossierCommon):
     def test_parcours_complet_investisseur(self):
         projet = self._projet('investisseur')
         self._connexion()
-        reponse = self._poster('/my/projects/%s/dossier' % projet.id,
+        reponse = self._poster('/my/crowdfunding/%s/dossier' % projet.id,
                                DOSSIERS['investisseur'])
 
         projet.invalidate_recordset()
         self.assertEqual(projet.state, 'quality_gate')
         self.assertEqual(projet.business_model, DOSSIERS['investisseur']['business_model'])
         self.assertEqual(projet.besoin_financier, 8000000.0)
-        self.assertTrue(reponse.url.endswith('/my/projects/%s' % projet.id))
+        self.assertTrue(reponse.url.endswith('/my/crowdfunding/%s' % projet.id))
 
     def test_enregistrer_et_revenir_plus_tard(self):
         projet = self._projet('sponsor')
@@ -240,14 +240,14 @@ class TestExtension4Portail(HttpCase, DossierCommon):
         partiel = dict(DOSSIERS['sponsor'])
         partiel.pop('sponsor_calendrier')
 
-        self._poster('/my/projects/%s/dossier' % projet.id,
+        self._poster('/my/crowdfunding/%s/dossier' % projet.id,
                      dict(partiel, enregistrer='1'))
 
         projet.invalidate_recordset()
         self.assertEqual(projet.state, 'dossier_progressif')
         self.assertEqual(projet.sponsor_objectif, DOSSIERS['sponsor']['sponsor_objectif'])
         # Et le porteur retrouve sa saisie en revenant sur l'écran.
-        texte = self._texte(self.url_open('/my/projects/%s/dossier' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s/dossier' % projet.id))
         self.assertIn(DOSSIERS['sponsor']['sponsor_objectif'], texte)
 
     def test_envoi_incomplet_dit_ce_qui_manque_et_conserve_la_saisie(self):
@@ -256,7 +256,7 @@ class TestExtension4Portail(HttpCase, DossierCommon):
         partiel = dict(DOSSIERS['financement_public'])
         partiel.pop('public_impact')
 
-        reponse = self._poster('/my/projects/%s/dossier' % projet.id, partiel)
+        reponse = self._poster('/my/crowdfunding/%s/dossier' % projet.id, partiel)
 
         projet.invalidate_recordset()
         self.assertEqual(projet.state, 'dossier_progressif')
@@ -267,7 +267,7 @@ class TestExtension4Portail(HttpCase, DossierCommon):
     def test_le_document_du_questionnaire_ne_s_efface_pas_tout_seul(self):
         projet = self._projet('investisseur')
         self._connexion()
-        url = '/my/projects/%s/dossier' % projet.id
+        url = '/my/crowdfunding/%s/dossier' % projet.id
 
         page = self.url_open(url)
         jeton = CSRF_TOKEN.search(page.text).group(1)
@@ -285,8 +285,8 @@ class TestExtension4Portail(HttpCase, DossierCommon):
     def test_l_ecran_est_ferme_hors_du_bon_etat(self):
         projet = self._projet('investisseur', state='quality_gate')
         self._connexion()
-        page = self.url_open('/my/projects/%s/dossier' % projet.id)
-        self.assertTrue(page.url.endswith('/my/projects/%s' % projet.id))
+        page = self.url_open('/my/crowdfunding/%s/dossier' % projet.id)
+        self.assertTrue(page.url.endswith('/my/crowdfunding/%s' % projet.id))
         self.assertNotIn("Business model", self._texte(page))
 
     def test_un_porteur_ne_remplit_pas_le_dossier_d_un_autre(self):
@@ -297,13 +297,13 @@ class TestExtension4Portail(HttpCase, DossierCommon):
         projet.partner_id = autre.partner_id
 
         self._connexion()
-        page = self.url_open('/my/projects/%s/dossier' % projet.id)
-        self.assertTrue(page.url.endswith('/my/projects'))
+        page = self.url_open('/my/crowdfunding/%s/dossier' % projet.id)
+        self.assertTrue(page.url.endswith('/my/crowdfunding'))
 
     def test_aucun_code_d_etat_sur_l_ecran_du_dossier(self):
         projet = self._projet('investisseur')
         self._connexion()
-        texte = self._texte(self.url_open('/my/projects/%s/dossier' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s/dossier' % projet.id))
         for code in ('dossier_progressif', 'quality_gate', 'investisseur'):
             self.assertNotIn(code, texte)
 

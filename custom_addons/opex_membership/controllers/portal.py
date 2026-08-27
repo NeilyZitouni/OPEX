@@ -110,6 +110,16 @@ class MembershipCustomerPortal(CustomerPortal):
             # sélectionnés sous l'identité du candidat, donc filtrés par la
             # règle d'enregistrement.
             'membership_files': membership_files.sudo(),
+            # Motif du refus renvoyé par `/my/membership/new` quand le candidat
+            # a déjà un dossier engagé : sans ce texte, il serait ramené ici
+            # sans savoir ce qu'il vient de se passer.
+            'error': kw.get('error'),
+            # Second point d'entrée du dépôt, après l'entrée « Devenir membre »
+            # du menu : masqué par la même règle, sans quoi il ne mènerait
+            # qu'au refus ci-dessus. Le brouillon fait exception — le bouton
+            # est alors le seul chemin pour le reprendre depuis cette page.
+            'can_deposit': (request.env.user.partner_id.opex_can_apply_membership()
+                            or bool(self._current_draft())),
             'page_name': 'membership',
             'pager': pager_values,
             'default_url': '/my/membership',
@@ -333,6 +343,10 @@ class MembershipCustomerPortal(CustomerPortal):
         d'abord, et l'écran ne propose ensuite que les sous-catégories qui en
         dépendent. Le passage de l'une à l'autre se fait par un paramètre
         d'URL, ce qui laisse le candidat revenir en arrière.
+
+        Le candidat dont le dossier est déjà engagé n'entre pas ici : c'est
+        `create()` qui le lui interdit, cet écran ne fait que lui épargner un
+        formulaire qui finirait en erreur, et lui dire pourquoi.
         """
         MembershipFile = request.env['opex.membership.file']
         if not MembershipFile.has_access('create'):
@@ -341,6 +355,15 @@ class MembershipCustomerPortal(CustomerPortal):
         Category = request.env['opex.membership.category']
         categories = Category.sudo().search([('subcategory_ids', '!=', False)])
         draft = self._current_draft()
+
+        # Un brouillon se reprend : rien ne sera créé, le garde-fou ne
+        # s'applique pas. Sans brouillon, cet écran mène droit à un `create()`.
+        if not draft:
+            try:
+                MembershipFile._check_no_engaged_file(request.env.user.partner_id)
+            except UserError as error:
+                return request.redirect(
+                    '/my/membership?error=%s' % quote(error.args[0]))
 
         if request.httprequest.method == 'POST':
             subcategory = self._selected_subcategory(post.get('subcategory_id'))

@@ -51,6 +51,31 @@ class ResPartner(models.Model):
     )
 
     # ------------------------------------------------------------
+    # Entrée « Devenir membre » du menu principal
+    # ------------------------------------------------------------
+
+    def opex_can_apply_membership(self):
+        """Ce contact a-t-il encore quelque chose à faire de « Devenir membre » ?
+
+        Faux dès qu'**un seul** de ses dossiers est engagé dans le parcours de
+        validation. La question se pose sur l'ensemble des dossiers du contact,
+        pas sur le dernier créé : un candidat qui en a déjà deux par accident
+        doit voir l'entrée disparaître au premier engagé, pas selon l'ordre de
+        création.
+
+        Un brouillon ne compte pas : `/my/membership/new` le retrouve et le
+        reprend, l'entrée reste donc utile. Un dossier refusé non plus — il
+        ferme un parcours, il n'interdit pas d'en ouvrir un autre.
+
+        Ce booléen ne décide que d'un affichage. Ce qui interdit réellement le
+        doublon, c'est `opex.membership.file._check_no_engaged_file()`, appelé
+        au `create()` — et c'est lui que cette méthode interroge, pour que le
+        menu ne puisse pas promettre autre chose que ce que le serveur accepte.
+        """
+        self.ensure_one()
+        return not self.env['opex.membership.file']._engaged_file(self)
+
+    # ------------------------------------------------------------
     # Cloche de notification du portail candidat
     # ------------------------------------------------------------
 

@@ -58,9 +58,21 @@
               priority="50">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Mes projets d'innovation</t>
+                <!--
+                    Le libellé nomme le **dispositif métier** et l'instance qui
+                    décide. « Mes projets d'innovation » ne se distinguait pas
+                    de « Mes projets » du dispositif Smart Crowdfunding : un
+                    porteur a déposé dans l'un en attendant son dossier dans la
+                    file de l'autre (26/08). Les deux parcours sont désormais
+                    nommés sur l'accueil.
+
+                    ⚠ Aucun vocabulaire d'architecture ici — ni « moteur de
+                    workflow », ni « configuration » : ce qui distingue les deux
+                    modules relève de la soutenance, pas de l'écran du porteur.
+                -->
+                <t t-set="title">OPEX Innovation — déposer un projet</t>
                 <t t-set="url" t-value="'/my/innovation'"/>
-                <t t-set="text">Déposer et suivre un projet</t>
+                <t t-set="text">Projet d'innovation du cluster, évalué par le Comité d'évaluation puis accompagné jusqu'à l'industrialisation.</t>
                 <t t-set="placeholder_count" t-value="'innovation_project_count'"/>
                 <!--
                     ⚠ `config_card` : sans lui, `portal.portal_docs_entry`
@@ -104,7 +116,10 @@
         <t t-call="portal.portal_layout">
             <div class="container my-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3 class="mb-0">Mes projets</h3>
+                    <!-- Aligné sur la tuile d'accueil : le porteur qui clique
+                         « OPEX Innovation » ne doit pas atterrir sur un titre
+                         générique, identique à celui de l'autre dispositif. -->
+                    <h3 class="mb-0">OPEX Innovation — mes projets</h3>
                     <a class="btn btn-primary" href="/my/innovation/new">
                         + Déposer un nouveau projet
                     </a>

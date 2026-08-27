@@ -467,10 +467,10 @@ class TestExtension8Portail(HttpCase, AccompagnementCommon):
         projet = self._projet(state='quality_gate')
         self._connexion()
 
-        texte = self._texte(self.url_open('/my/projects/%s' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s' % projet.id))
         self.assertIn("Être accompagné par CEO", texte)
 
-        self._poster('/my/projects/%s/accompagnement/demander' % projet.id,
+        self._poster('/my/crowdfunding/%s/accompagnement/demander' % projet.id,
                      {'demande': "Je cale sur mon business model."})
 
         projet.invalidate_recordset()
@@ -482,7 +482,7 @@ class TestExtension8Portail(HttpCase, AccompagnementCommon):
     def test_le_bouton_disparait_quand_la_demande_n_a_pas_de_sens(self):
         projet = self._projet(state='draft')
         self._connexion()
-        texte = self._texte(self.url_open('/my/projects/%s' % projet.id))
+        texte = self._texte(self.url_open('/my/crowdfunding/%s' % projet.id))
         self.assertNotIn("Être accompagné par CEO", texte)
 
     def test_le_porteur_lit_la_proposition_et_sa_contrepartie(self):
@@ -500,7 +500,7 @@ class TestExtension8Portail(HttpCase, AccompagnementCommon):
 
         self._connexion()
         texte = self._texte(
-            self.url_open('/my/projects/%s/accompagnement' % projet.id))
+            self.url_open('/my/crowdfunding/%s/accompagnement' % projet.id))
         self.assertIn("Deux mois d'accompagnement", texte)
         self.assertIn("Forfait", texte)
         self.assertIn("150 000 DA", texte)
@@ -517,7 +517,7 @@ class TestExtension8Portail(HttpCase, AccompagnementCommon):
         accompagnement.with_user(self.ceo).action_propose()
 
         self._connexion()
-        self._poster('/my/projects/%s/accompagnement' % projet.id)
+        self._poster('/my/crowdfunding/%s/accompagnement' % projet.id)
 
         accompagnement.invalidate_recordset()
         self.assertTrue(accompagnement.convention_acceptee)
@@ -533,7 +533,7 @@ class TestExtension8Portail(HttpCase, AccompagnementCommon):
         accompagnement.with_user(self.ceo).action_propose()
 
         self._connexion()
-        self._poster('/my/projects/%s/accompagnement' % projet.id, {'refuser': '1'})
+        self._poster('/my/crowdfunding/%s/accompagnement' % projet.id, {'refuser': '1'})
 
         accompagnement.invalidate_recordset()
         self.assertEqual(accompagnement.state, 'refuse')
@@ -549,7 +549,7 @@ class TestExtension8Portail(HttpCase, AccompagnementCommon):
         accompagnement = projet._accompagnement_en_cours()
 
         self._connexion()
-        page = self.url_open('/my/projects/%s/accompagnement' % projet.id)
-        self.assertTrue(page.url.endswith('/my/projects'))
+        page = self.url_open('/my/crowdfunding/%s/accompagnement' % projet.id)
+        self.assertTrue(page.url.endswith('/my/crowdfunding'))
         with self.assertRaises(AccessError):
             accompagnement.with_user(self.porteur).read(['diagnostic'])

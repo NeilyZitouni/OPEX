@@ -289,7 +289,7 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
         """
         relation = self._relation()
         self.authenticate('cf9_investisseur', 'cf9_investisseur')
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
         page = self.url_open(url)
 
         self.assertEqual(page.status_code, 200)
@@ -308,7 +308,7 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
         self.authenticate('cf9_investisseur', 'cf9_investisseur')
 
         for suffixe in ('', '?niveau=full', '?niveau_acces=full', '#full'):
-            url = '/my/opportunities/%s%s' % (relation.id, suffixe)
+            url = '/my/crowdfunding/opportunities/%s%s' % (relation.id, suffixe)
             page = self.url_open(url)
             self.assertIn("Teaser anonymisé", self._texte(page))
             self._assert_aucun_secret(page, url)
@@ -316,15 +316,15 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
     def test_la_liste_des_opportunites_reste_au_teaser(self):
         relation = self._relation()
         self.authenticate('cf9_investisseur', 'cf9_investisseur')
-        page = self.url_open('/my/opportunities')
+        page = self.url_open('/my/crowdfunding/opportunities')
 
         self.assertIn(relation.project_id._portal_reference(), self._texte(page))
-        self._assert_aucun_secret(page, '/my/opportunities')
+        self._assert_aucun_secret(page, '/my/crowdfunding/opportunities')
 
     def test_l_acteur_exprime_son_interet_sans_rien_gagner(self):
         relation = self._relation()
         self.authenticate('cf9_investisseur', 'cf9_investisseur')
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
 
         reponse = self._poster(url + '/interet', jeton_depuis=url)
         relation.invalidate_recordset()
@@ -338,7 +338,7 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
         relation.with_user(self.porteur).sudo().action_autoriser_partage()
 
         self.authenticate('cf9_investisseur', 'cf9_investisseur')
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
         page = self.url_open(url)
         texte = self._texte(page)
 
@@ -355,7 +355,7 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
 
         self.authenticate('cf9_investisseur', 'cf9_investisseur')
         texte = self._texte(
-            self.url_open('/my/opportunities/%s' % relation.id))
+            self.url_open('/my/crowdfunding/opportunities/%s' % relation.id))
         self.assertIn(SECRETS['porteur'], texte)
         self.assertIn(SECRETS['business_model'], texte)
 
@@ -366,9 +366,9 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
         relation.with_user(self.ceo).action_ouvrir_dossier_complet()
 
         self.authenticate('cf9_autre', 'cf9_autre')
-        url = '/my/opportunities/%s' % relation.id
+        url = '/my/crowdfunding/opportunities/%s' % relation.id
         page = self.url_open(url)
-        self.assertTrue(page.url.endswith('/my/opportunities'))
+        self.assertTrue(page.url.endswith('/my/crowdfunding/opportunities'))
         self._assert_aucun_secret(page, url)
 
     def test_un_acteur_forge_l_url_d_autorisation_du_porteur(self):
@@ -381,8 +381,8 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
         # Jeton CSRF valide, pris sur sa propre page : ce n'est pas le jeton
         # qui doit l'arrêter, c'est le contrôle d'appartenance du dossier.
         self.url_open(
-            '/my/projects/%s/relations/%s/autoriser' % (projet.id, relation.id),
-            data={'csrf_token': self._jeton('/my/opportunities')})
+            '/my/crowdfunding/%s/relations/%s/autoriser' % (projet.id, relation.id),
+            data={'csrf_token': self._jeton('/my/crowdfunding/opportunities')})
 
         relation.invalidate_recordset()
         self.assertEqual(relation.niveau_acces, 'teaser',
@@ -394,12 +394,12 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
         projet = relation.project_id
 
         self.authenticate('cf9_porteur', 'cf9_porteur')
-        url = '/my/projects/%s/relations' % projet.id
+        url = '/my/crowdfunding/%s/relations' % projet.id
         texte = self._texte(self.url_open(url))
         self.assertIn("Fonds Industrie DZ", texte)
         self.assertIn("résumé anonymisé", texte)
 
-        self._poster('/my/projects/%s/relations/%s/autoriser' % (projet.id, relation.id),
+        self._poster('/my/crowdfunding/%s/relations/%s/autoriser' % (projet.id, relation.id),
                      jeton_depuis=url)
         relation.invalidate_recordset()
         self.assertEqual(relation.niveau_acces, 'limited')

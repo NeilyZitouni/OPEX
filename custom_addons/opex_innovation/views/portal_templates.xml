@@ -198,6 +198,144 @@
                     <span t-esc="profile.motif_complement"/>
                 </div>
 
+                <div t-if="error" class="alert alert-danger mt-3" role="alert">
+                    <span t-esc="error" style="white-space: pre-line;"/>
+                </div>
+
+                <!--
+                    ══════════════════════════════════════════════════════
+                    LES ACTIONS DU PORTEUR
+                    ══════════════════════════════════════════════════════
+
+                    Un bouton par transition que le moteur propose, libellé
+                    par la transition elle-même : « Soumettre ma demande »,
+                    « Renvoyer ma demande ». Rien n'est écrit en dur — ajouter
+                    une transition à la configuration ajoute son bouton.
+
+                    ⚠ Les transitions bloquées restent **affichées**,
+                    désactivées, avec le motif de la règle qui les retient. Les
+                    masquer laisserait le porteur devant un écran sans action
+                    et sans explication — précisément ce que
+                    `available_transitions()` refuse de faire côté moteur.
+                -->
+                <div t-if="transition_options" class="mt-4">
+                    <h5>Que puis-je faire ?</h5>
+                    <t t-foreach="transition_options" t-as="option">
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <form method="post" class="mb-0"
+                                      t-att-action="'/my/innovation/profiles/%s/transition' % profile_type">
+                                    <input type="hidden" name="csrf_token"
+                                           t-att-value="request.csrf_token()"/>
+                                    <input type="hidden" name="transition_id"
+                                           t-att-value="option['transition'].id"/>
+
+                                    <!--
+                                        Le commentaire n'est demandé que si la
+                                        transition l'exige. `requires_comment`
+                                        est une donnée de configuration : le
+                                        gabarit ne sait pas lesquelles, il lit.
+                                    -->
+                                    <div t-if="option['transition'].requires_comment"
+                                         class="mb-3">
+                                        <label class="form-label"
+                                               t-att-for="'comment_%s' % option['transition'].id">
+                                            Motif <span class="text-danger">*</span>
+                                        </label>
+                                        <textarea class="form-control" rows="3"
+                                                  name="comment"
+                                                  t-att-id="'comment_%s' % option['transition'].id"
+                                                  t-att-required="'required' if option['available'] else None"/>
+                                    </div>
+
+                                    <t t-if="option['available']">
+                                        <button type="submit" class="btn btn-primary">
+                                            <span t-esc="option['transition'].name"/>
+                                        </button>
+                                    </t>
+                                    <t t-else="">
+                                        <button type="submit" class="btn btn-primary"
+                                                disabled="disabled">
+                                            <span t-esc="option['transition'].name"/>
+                                        </button>
+                                        <div class="text-muted small mt-2">
+                                            <i class="fa fa-lock me-1"/>
+                                            <span t-esc="option['reason']"/>
+                                        </div>
+                                    </t>
+                                </form>
+                            </div>
+                        </div>
+                    </t>
+                </div>
+
+                <!--
+                    ══════════════════════════════════════════════════════
+                    LES JUSTIFICATIFS
+                    ══════════════════════════════════════════════════════
+
+                    C'est ce dépôt qui débloque `has_document('cv')` : le
+                    `document_type` choisi ici est exactement celui que la
+                    condition de la transition interroge. Les deux se
+                    rejoignent par la convention du moteur, sans une ligne de
+                    Python de part ni d'autre.
+                -->
+                <div class="mt-4">
+                    <h5>Mes justificatifs</h5>
+
+                    <p t-if="not profile.document_ids" class="text-muted">
+                        Aucune pièce jointe pour le moment.
+                    </p>
+                    <table t-else="" class="table table-sm">
+                        <thead><tr><th>Type</th><th>Libellé</th><th>Fichier</th></tr></thead>
+                        <tbody>
+                            <t t-foreach="profile.document_ids" t-as="document">
+                                <tr>
+                                    <td t-esc="dict(document._fields['document_type'].selection).get(document.document_type)"/>
+                                    <td t-esc="document.name"/>
+                                    <td t-esc="document.filename or ''"/>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+
+                    <form t-if="can_upload" method="post" enctype="multipart/form-data"
+                          t-att-action="'/my/innovation/profiles/%s/document' % profile_type"
+                          class="row g-2 align-items-end">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <div class="col-md-3">
+                            <label class="form-label" for="document_type">Type</label>
+                            <select class="form-select" name="document_type"
+                                    id="document_type">
+                                <t t-foreach="document_types" t-as="choice">
+                                    <option t-att-value="choice[0]" t-esc="choice[1]"/>
+                                </t>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" for="document_name">Libellé</label>
+                            <input type="text" class="form-control" name="name"
+                                   id="document_name"
+                                   placeholder="À défaut, le nom du fichier"/>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label" for="document_file">Fichier</label>
+                            <input type="file" class="form-control" name="file"
+                                   id="document_file" required="required"/>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-secondary w-100">
+                                Joindre
+                            </button>
+                        </div>
+                    </form>
+                    <p t-else="" class="text-muted small">
+                        Votre demande est en cours d'examen : les pièces ne sont
+                        plus modifiables à cette étape.
+                    </p>
+                </div>
+
                 <div class="mt-4">
                     <h5>Historique</h5>
                     <table class="table table-sm">

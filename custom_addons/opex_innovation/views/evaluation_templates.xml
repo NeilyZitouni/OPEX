@@ -10,10 +10,23 @@
                 <t t-set="url" t-value="'/my/innovation/evaluations'"/>
                 <t t-set="text">Avis qui vous sont demandés</t>
                 <!-- Le compteur ne porte que les avis **non rendus** : une fois
-                     son travail fait, l'évaluateur n'a plus rien à ouvrir et la
-                     tuile s'efface. Voir la note de « Mes opportunités ». -->
+                     son travail fait, l'évaluateur n'a plus rien à ouvrir. -->
                 <t t-set="placeholder_count"
                    t-value="'innovation_evaluation_count'"/>
+                <!--
+                    `config_card` : la tuile reste visible **même à zéro**.
+
+                    Sans lui, `portal.portal_docs_entry` la rend en `d-none` et
+                    seul un compteur strictement positif la démasque : un
+                    évaluateur à qui aucun avis n'est encore demandé ne voyait
+                    rien, et n'avait donc aucun moyen d'apprendre que l'écran
+                    existe. Constaté le 26/08 sur une base sans projet.
+
+                    L'état vide est dit, pas masqué : la page d'arrivée affiche
+                    « Aucun avis ne vous est demandé pour le moment. » C'est la
+                    règle transversale 3 appliquée à l'accueil.
+                -->
+                <t t-set="config_card" t-value="True"/>
             </t>
         </xpath>
     </template>

@@ -1,6 +1,258 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
+    <!--
+        Tuile « Espace d'évaluation » sur l'accueil du portail.
+
+        La condition est `res.users._is_innovation_staff()` — exactement ce que
+        `InnovationStaffPortal._staff_user()` interroge pour laisser passer une
+        route `/staff/innovation/…`. Un seul endroit décide, la tuile et la
+        route ne peuvent pas diverger (règle transversale 2). Le `t-if` affiche ;
+        il n'autorise rien : la route refuse et redirige de son côté.
+
+        `config_card` : sinon la carte sort en `d-none` et n'apparaît que si un
+        compteur asynchrone est strictement positif. Un comité dont la file est
+        vide doit quand même voir son espace.
+    -->
+    <template id="portal_my_home_innovation_staff" name="Portail : espace d'évaluation"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="60">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-if="request.env.user._is_innovation_staff()">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Espace d'évaluation</t>
+                    <t t-set="text">Projets d'innovation à contrôler, évaluer et décider</t>
+                    <t t-set="url" t-value="'/staff/innovation'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
+            </t>
+        </div>
+    </template>
+
+    <!--
+        Tuile « Demandes de profil ».
+
+        Même condition que la tuile voisine, et pour la même raison : c'est
+        `_is_innovation_staff()` que la route interrogera. Une tuile qui
+        poserait sa propre question finirait par s'afficher pour un rôle que
+        la route refuse.
+
+        Pas de `placeholder_count` : un compteur se déclare des deux côtés —
+        gabarit **et** controller — et une clé sans nœud fait tomber tout le
+        JavaScript de l'accueil. `config_card` suffit à démasquer la tuile.
+    -->
+    <template id="portal_my_home_innovation_profiles" name="Portail : demandes de profil"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="61">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-if="request.env.user._is_innovation_staff()">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Demandes de profil</t>
+                    <t t-set="text">Demandes Expert et Investisseur à contrôler</t>
+                    <t t-set="url" t-value="'/staff/innovation/profiles'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
+            </t>
+        </div>
+    </template>
+
+    <!-- ══════════ La file des demandes de profil ══════════ -->
+
+    <template id="staff_profile_queue" name="Staff : demandes de profil à traiter">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Demandes de profil</h3>
+
+                <div class="alert alert-light" role="status">
+                    Cette liste ne montre que ce qui relève de votre rôle, et
+                    les demandes en attente de complément que vous avez
+                    vous-même renvoyées.
+                </div>
+
+                <table t-if="demandes" class="table">
+                    <thead>
+                        <tr>
+                            <th>Profil</th>
+                            <th>Demandeur</th>
+                            <th>Étape</th>
+                            <th>Pièces</th>
+                            <th>Déposée le</th>
+                            <th/>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <t t-foreach="demandes" t-as="demande">
+                            <tr>
+                                <td t-esc="demande['label']"/>
+                                <td t-esc="demande['profile'].partner_id.display_name"/>
+                                <!-- Côté personnel, le nom système de l'étape :
+                                     le libellé porteur sert au porteur. -->
+                                <td t-esc="demande['profile'].workflow_stage_id.name"/>
+                                <td t-esc="len(demande['profile'].document_ids)"/>
+                                <td t-esc="demande['profile'].create_date"/>
+                                <td>
+                                    <a class="btn btn-sm btn-primary"
+                                       t-att-href="'/staff/innovation/profiles/%s/%s' % (demande['type'], demande['profile'].id)">
+                                        Contrôler
+                                    </a>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+
+                <div t-if="not demandes" class="alert alert-success" role="status">
+                    Aucune demande n'attend votre intervention.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- ══════════ Le détail d'une demande de profil ══════════ -->
+
+    <template id="staff_profile_detail" name="Staff : contrôle d'une demande de profil">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h3 t-esc="profile.display_name"/>
+                        <p class="text-muted mb-0"
+                           t-esc="profile.workflow_stage_id.name"/>
+                    </div>
+                    <a class="btn btn-secondary"
+                       href="/staff/innovation/profiles">Retour</a>
+                </div>
+
+                <div t-if="error" class="alert alert-danger mt-3" role="alert">
+                    <span t-esc="error" style="white-space: pre-line;"/>
+                </div>
+
+                <h5 class="mt-4">Demandeur</h5>
+                <table class="table table-sm">
+                    <tr><th style="width: 30%">Contact</th>
+                        <td t-esc="profile.partner_id.display_name"/></tr>
+                    <tr><th>Courriel</th>
+                        <td t-esc="profile.partner_id.email or '—'"/></tr>
+                    <tr><th>Membre du cluster</th>
+                        <td t-esc="'oui' if profile.partner_id.is_member else 'non'"/></tr>
+                </table>
+
+                <h5 class="mt-4">La demande</h5>
+                <table class="table table-sm">
+                    <t t-if="profile_type == 'expert'">
+                        <tr><th style="width: 30%">Domaine d'expertise</th>
+                            <td t-esc="profile.domaine_expertise or '—'"/></tr>
+                        <tr><th>Spécialités</th>
+                            <td t-esc="profile.specialites or '—'"/></tr>
+                        <tr><th>Fonction</th>
+                            <td t-esc="profile.fonction or '—'"/></tr>
+                        <tr><th>Description de l'expertise</th>
+                            <td t-esc="profile.description_expertise or '—'"/></tr>
+                    </t>
+                    <t t-else="">
+                        <tr><th style="width: 30%">Type d'investisseur</th>
+                            <td t-esc="dict(profile._fields['type_investisseur'].selection).get(profile.type_investisseur, '—')"/></tr>
+                        <tr><th>Domaines d'investissement</th>
+                            <td t-esc="profile.domaines_investissement or '—'"/></tr>
+                        <tr><th>Zone géographique</th>
+                            <td t-esc="profile.zone_geographique or '—'"/></tr>
+                        <tr><th>Présentation</th>
+                            <td t-esc="profile.presentation or '—'"/></tr>
+                    </t>
+                </table>
+
+                <!-- ═══ Les pièces, consultables ═══
+                     Le lien passe par une route du staff plutôt que par
+                     `/web/content` : la pièce y est résolue à travers la
+                     demande, donc bornée au périmètre du contrôleur. -->
+                <h5 class="mt-4">Pièces jointes</h5>
+                <p t-if="not profile.document_ids" class="text-muted">
+                    Aucune pièce jointe. Une demande sans justificatif ne peut
+                    pas être validée : les conditions du processus s'y opposent.
+                </p>
+                <table t-else="" class="table table-sm">
+                    <thead><tr><th>Type</th><th>Libellé</th><th>Fichier</th><th/></tr></thead>
+                    <tbody>
+                        <t t-foreach="profile.document_ids" t-as="document">
+                            <tr>
+                                <td t-esc="dict(document._fields['document_type'].selection).get(document.document_type)"/>
+                                <td t-esc="document.name"/>
+                                <td t-esc="document.filename or '—'"/>
+                                <td>
+                                    <a class="btn btn-sm btn-secondary"
+                                       t-att-href="'/staff/innovation/profiles/%s/%s/document/%s' % (profile_type, profile.id, document.id)">
+                                        Consulter
+                                    </a>
+                                </td>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+
+                <!-- ═══ Les décisions ═══
+                     Cet écran ne connaît ni « valider » ni « refuser » : il
+                     affiche ce que la configuration ouvre à cette étape, pour
+                     ce rôle. Ajouter une issue au processus l'ajoute ici. -->
+                <h5 class="mt-4">Décision</h5>
+                <div t-if="not options" class="alert alert-light" role="status">
+                    Aucune action ne vous est ouverte à cette étape.
+                </div>
+                <t t-foreach="options" t-as="option">
+                    <form method="post" class="border rounded p-3 mb-2"
+                          t-att-action="'/staff/innovation/profiles/%s/%s/transition' % (profile_type, profile.id)">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="transition_id"
+                               t-att-value="option['transition'].id"/>
+
+                        <div class="d-flex justify-content-between align-items-center">
+                            <strong t-esc="option['transition'].name"/>
+                            <button type="submit" class="btn btn-sm btn-primary"
+                                    t-att-disabled="'disabled' if not option['available'] else None">
+                                Confirmer
+                            </button>
+                        </div>
+
+                        <!-- Une transition bloquée reste visible, avec son
+                             motif : la masquer laisserait le contrôleur sans
+                             savoir ce qui manque. -->
+                        <div t-if="not option['available']"
+                             class="alert alert-warning mt-2 mb-0" role="alert"
+                             t-esc="option['reason']"/>
+
+                        <div t-if="option['transition'].requires_comment" class="mt-2">
+                            <label class="form-label">
+                                Motif <span class="text-danger">*</span>
+                            </label>
+                            <textarea class="form-control" rows="2" name="comment"
+                                      t-att-required="'required' if option['available'] else None"
+                                      placeholder="Ex. : merci de joindre une attestation de vos références."/>
+                        </div>
+                    </form>
+                </t>
+
+                <h5 class="mt-4">Historique</h5>
+                <table class="table table-sm">
+                    <thead><tr><th>Date</th><th>Auteur</th><th>Étape</th><th>Commentaire</th></tr></thead>
+                    <tbody>
+                        <t t-foreach="instance.history_ids.sorted('date')" t-as="entry">
+                            <tr>
+                                <td t-esc="entry.date"/>
+                                <td t-esc="entry.user_id.name"/>
+                                <td t-esc="entry.to_stage_id.name"/>
+                                <td t-esc="entry.comment or ''"/>
+                            </tr>
+                        </t>
+                    </tbody>
+                </table>
+            </div>
+        </t>
+    </template>
+
     <!-- ══════════ Section 13 — La file de contrôle ══════════ -->
 
     <template id="staff_projects" name="Staff : projets à traiter">

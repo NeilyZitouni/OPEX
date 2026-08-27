@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Visibilité conditionnelle de l'entrée « Devenir membre » du menu
+        principal.
+
+        Le lien pointe sur `/web/signup?redirect=/my/membership/new`, c'est-à-dire
+        sur le début du parcours de dépôt. Laissé visible en permanence, il
+        s'adressait aussi à un candidat dont le dossier est déjà en contrôle, au
+        comité, en paiement ou même actif — et un clic de sa part créait alors un
+        **second dossier en doublon** au lieu de rouvrir le premier
+        (`/my/membership/new` ne reprend que les brouillons).
+
+        Même mécanisme que « Vie du Cluster » (voir
+        `cluster_portal_templates.xml`, dont le commentaire détaille le choix) :
+        l'entrée reste un `website.menu` ordinaire de `data/website_menu.xml` —
+        c'est ce qui la place dans le menu de gauche et la laisse éditable depuis
+        l'éditeur de site — et c'est ce greffon sur `website.submenu`, gabarit
+        unique par lequel passent toutes les variantes d'en-tête, qui porte la
+        condition. Le champ natif `group_ids` d'un `website.menu` n'aurait pas
+        pu : notre règle porte sur l'état des dossiers du contact, qu'aucun
+        groupe n'exprime.
+
+        `priority="21"` : ce greffon s'applique après celui de « Vie du
+        Cluster » (priorité 20), qui vise les deux mêmes `<li>`. Les deux
+        n'écrasent rien — chacun *ajoute* son terme au `t-if` et sa classe au
+        `t-attf-class` — mais fixer l'ordre évite d'avoir à s'en remettre au
+        hasard des priorités par défaut.
+
+        `o_no_autohide_item` : même protection que sur les autres entrées
+        conditionnelles. Sans cette classe, `autoHideMenu` replie l'entrée dans
+        le « + » de débordement dès le chargement de l'en-tête — présente dans
+        le HTML, invisible à l'écran.
+
+        Repérage par URL, comme pour « Vie du Cluster » : si l'utilisateur
+        change l'URL de l'entrée depuis l'éditeur, le garde-fou cesse de
+        s'appliquer et le lien redevient visible. Ce n'est qu'un confort
+        d'affichage — rien ici ne remplace un contrôle serveur sur la route de
+        création.
+    -->
+    <template id="website_submenu_become_member_visibility"
+              name="Menu principal : visibilité de « Devenir membre »"
+              inherit_id="website.submenu" priority="21">
+        <xpath expr="//t[@t-set='show_dropdown']" position="before">
+            <t t-set="opex_is_become_member_menu"
+               t-value="submenu.url == '/web/signup?redirect=/my/membership/new'"/>
+            <!-- Le coût ne pèse que sur notre entrée : partout ailleurs
+                 `opex_is_become_member_menu` est faux et Python court-circuite
+                 avant la moindre lecture en base. -->
+            <t t-set="opex_become_member_denied"
+               t-value="opex_is_become_member_menu
+                        and not request.env.user.partner_id.sudo().opex_can_apply_membership()"/>
+        </xpath>
+        <xpath expr="//li[@t-if]" position="attributes">
+            <attribute name="t-if" add="not opex_become_member_denied" separator="and"/>
+            <attribute name="t-attf-class" separator=" "
+                       add="#{opex_is_become_member_menu and 'o_no_autohide_item' or ''}"/>
+        </xpath>
+        <!-- Même garde si l'utilisateur ajoute un sous-menu sous l'entrée
+             depuis l'éditeur : elle bascule alors sur la branche « dropdown ». -->
+        <xpath expr="//li[@t-elif]" position="attributes">
+            <attribute name="t-elif" add="not opex_become_member_denied" separator="and"/>
+            <attribute name="t-attf-class" separator=" "
+                       add="#{opex_is_become_member_menu and 'o_no_autohide_item' or ''}"/>
+        </xpath>
+    </template>
+
+</odoo>

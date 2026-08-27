@@ -11,9 +11,22 @@
         </xpath>
         <div id="portal_client_category" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Mes projets</t>
-                <t t-set="text">Présenter un projet au comité CEO et suivre son avancement</t>
-                <t t-set="url" t-value="'/my/projects'"/>
+                <!--
+                    Le libellé nomme le **dispositif métier**, pas le module ni
+                    son implémentation : « Mes projets » et « Mes projets
+                    d'innovation » étaient indistinguables sur l'accueil, et un
+                    porteur a déposé ici un dossier qu'il attendait dans la file
+                    de l'Innovation (26/08). Les deux tuiles disent maintenant
+                    de quel parcours il s'agit et qui l'instruit.
+
+                    ⚠ Ne jamais faire apparaître ici le vocabulaire de
+                    l'architecture — « workflow en dur », « moteur générique »,
+                    « module texto ». La comparaison des deux approches est un
+                    sujet de soutenance, pas une information pour le porteur.
+                -->
+                <t t-set="title">Smart Crowdfunding — financer mon projet</t>
+                <t t-set="text">Recherche de financement, de partenariat ou de sponsoring. Dossier présenté au Comité CEO.</t>
+                <t t-set="url" t-value="'/my/crowdfunding'"/>
                 <!--
                     Pas de `placeholder_count` ici, et c'est délibéré.
                     `portal.portal_docs_entry` rend la tuile avec la classe
@@ -26,9 +39,69 @@
                     vide à zéro pour ne pas afficher « 0 Mes projets ».
                 -->
                 <t t-set="config_card" t-value="True"/>
-                <t t-set="count"
-                   t-value="request.env['opex.crowdfunding.project'].search_count(
-                                [('partner_id', '=', request.env.user.partner_id.id)]) or ''"/>
+                <!--
+                    Mécanisme natif, dans les deux sens :
+
+                    `placeholder_count` pose le nœud `[data-placeholder_count]`
+                    que `portal_home_counters.js` vient remplir, et c'est lui
+                    qui déclenche la demande du compteur. Sans ce nœud, le
+                    compteur renvoyé par `/my/counters` n'a rien à remplir et
+                    fait tomber tout le JS de l'accueil (26/08).
+
+                    `config_card` garde la carte visible même à zéro : le
+                    porteur qui n'a encore aucun projet est précisément celui
+                    qu'on attend ici.
+
+                    Plus de `search_count()` en QWeb : il s'exécutait sous
+                    l'identité du visiteur et emportait tout `/my` en 403 pour
+                    les rôles sans ACL sur le modèle. Le compte se fait dans le
+                    controller, gardé par `has_access()`.
+                -->
+                <t t-set="placeholder_count" t-value="'crowdfunding_project_count'"/>
+            </t>
+        </div>
+    </template>
+
+    <!--
+        Tuile « Espace de traitement » sur l'accueil du portail, pour les rôles
+        qui instruisent : Comité CEO et Contrôle Qualité.
+
+        **Elle pointe sur le back-office, pas sur un `/staff/crowdfunding`**, et
+        c'est délibéré. La file de traitement de ces deux rôles existe déjà —
+        `opex.crowdfunding.work.queue`, ses six compteurs et les vues
+        liste/formulaire/recherche de l'Extension 11. La réécrire en QWeb
+        dupliquerait un jeu de contrôles d'accès à maintenir en double, pour un
+        écran moins riche. Les deux rôles sont des utilisateurs internes
+        (`group_ceo` et `group_quality_control` impliquent `base.group_user`) :
+        le back-office leur est ouvert.
+
+        Le refus côté serveur ne dépend donc pas de cette tuile : l'action est
+        protégée par les ACL du modèle et par les groupes du menu, et `/odoo`
+        est fermé aux utilisateurs portail par Odoo lui-même. Un porteur qui
+        force l'URL est refusé sans que ce gabarit ait son mot à dire.
+
+        `config_card` : sinon la carte est rendue en `d-none` et n'apparaît que
+        si un compteur asynchrone est strictement positif — une file vide
+        rendrait l'entrée invisible.
+    -->
+    <template id="portal_my_home_crowdfunding_staff" name="Portail : smart work queue"
+              customize_show="True" inherit_id="portal.portal_my_home" priority="60">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-if="request.env.user._is_crowdfunding_staff()">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Espace de traitement</t>
+                    <t t-set="text">Dossiers Smart Crowdfunding à qualifier, contrôler et décider</t>
+                    <!-- Depuis le 27/08, l'espace de traitement est une page du
+                         site (`/staff/crowdfunding`) et non plus une action du
+                         back-office : la démonstration ne quitte pas le site.
+                         La destination est la même pour les deux rôles, c'est
+                         la file qui les distingue. -->
+                    <t t-set="url" t-value="'/staff/crowdfunding'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
             </t>
         </div>
     </template>
@@ -38,8 +111,15 @@
         <xpath expr="//ol[hasclass('o_portal_submenu')]" position="inside">
             <li t-if="page_name in ('crowdfunding', 'crowdfunding_new')"
                 t-attf-class="breadcrumb-item #{'active ' if not project and page_name != 'crowdfunding_new' else ''}">
-                <a t-if="project or page_name == 'crowdfunding_new'" href="/my/projects">Mes projets</a>
-                <t t-else="">Mes projets</t>
+                <!--
+                    C'est ce fil d'Ariane qui sert de titre à la page, pas le
+                    `t-set="title"` de la searchbar : `portal.portal_searchbar`
+                    ne rend ce titre que dans sa branche `t-else`, quand
+                    `breadcrumbs_searchbar` est faux — ce qui n'est pas notre
+                    cas. Le libellé du dispositif doit donc être ici.
+                -->
+                <a t-if="project or page_name == 'crowdfunding_new'" href="/my/crowdfunding">Smart Crowdfunding — mes projets</a>
+                <t t-else="">Smart Crowdfunding — mes projets</t>
             </li>
             <li t-if="page_name == 'crowdfunding_new'" class="breadcrumb-item active">
                 Présenter mon projet
@@ -51,14 +131,17 @@
     </template>
 
     <!-- ============================================================
-         Liste — /my/projects
+         Liste — /my/crowdfunding
          ============================================================ -->
     <template id="portal_my_projects" name="Portail : mes projets">
         <t t-call="portal.portal_layout">
             <t t-set="breadcrumbs_searchbar" t-value="True"/>
 
             <t t-call="portal.portal_searchbar">
-                <t t-set="title">Mes projets</t>
+                <!-- Aligné sur la tuile d'accueil : le porteur qui clique
+                     « Smart Crowdfunding » ne doit pas atterrir sur un titre
+                     générique, identique à celui de l'autre dispositif. -->
+                <t t-set="title">Smart Crowdfunding — mes projets</t>
             </t>
 
             <div t-if="draft" class="alert alert-info d-flex justify-content-between align-items-center" role="alert">
@@ -66,7 +149,7 @@
                     Vous avez une présentation en cours :
                     <strong t-out="draft.name"/>. Nous avons conservé votre saisie.
                 </span>
-                <a href="/my/projects/new" class="btn btn-primary btn-sm">Reprendre</a>
+                <a href="/my/crowdfunding/new" class="btn btn-primary btn-sm">Reprendre</a>
             </div>
 
             <div t-if="not projects" class="text-center py-5">
@@ -77,13 +160,13 @@
                     Quelques minutes suffisent : décrivez votre projet en quelques
                     lignes, le comité CEO vous dira s'il peut vous accompagner.
                 </p>
-                <a href="/my/projects/new" class="btn btn-primary btn-lg">
+                <a href="/my/crowdfunding/new" class="btn btn-primary btn-lg">
                     Présenter mon projet
                 </a>
             </div>
 
             <div t-if="projects and not draft" class="mb-4">
-                <a href="/my/projects/new" class="btn btn-primary">
+                <a href="/my/crowdfunding/new" class="btn btn-primary">
                     <i class="fa fa-plus me-1"/>Présenter mon projet
                 </a>
             </div>
@@ -100,7 +183,7 @@
                 <tbody>
                     <tr t-foreach="projects" t-as="project">
                         <td>
-                            <a t-attf-href="/my/projects/#{project.id}"><span t-out="project.name"/></a>
+                            <a t-attf-href="/my/crowdfunding/#{project.id}"><span t-out="project.name"/></a>
                         </td>
                         <td><span t-field="project.besoin_type"/></td>
                         <td class="text-end">
@@ -122,7 +205,7 @@
     </template>
 
     <!-- ============================================================
-         Dépôt — /my/projects/new (deux écrans)
+         Dépôt — /my/crowdfunding/new (deux écrans)
          ============================================================ -->
     <template id="portal_project_form" name="Portail : présenter mon projet">
         <t t-call="portal.portal_layout">
@@ -150,7 +233,7 @@
                     </div>
 
                     <!-- Écran 1 : le projet -->
-                    <form t-if="step == 'projet'" action="/my/projects/new" method="post">
+                    <form t-if="step == 'projet'" action="/my/crowdfunding/new" method="post">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                         <div class="mb-3">
@@ -187,13 +270,13 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center">
-                            <a href="/my/projects" class="btn btn-link ps-0">Retour à mes projets</a>
+                            <a href="/my/crowdfunding" class="btn btn-link ps-0">Retour à mes projets</a>
                             <button type="submit" class="btn btn-primary">Continuer</button>
                         </div>
                     </form>
 
                     <!-- Écran 2 : le besoin -->
-                    <form t-if="step == 'besoin'" action="/my/projects/new/besoin"
+                    <form t-if="step == 'besoin'" action="/my/crowdfunding/new/besoin"
                           method="post" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
@@ -259,7 +342,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center">
-                            <a href="/my/projects/new" class="btn btn-link ps-0">Revenir à l'étape précédente</a>
+                            <a href="/my/crowdfunding/new" class="btn btn-link ps-0">Revenir à l'étape précédente</a>
                             <div class="d-flex gap-2">
                                 <button type="submit" name="enregistrer" value="1"
                                         class="btn btn-outline-secondary">
@@ -276,7 +359,7 @@
     </template>
 
     <!-- ============================================================
-         Suivi — /my/projects/<id> : la vue « Mon projet » de la section 16
+         Suivi — /my/crowdfunding/<id> : la vue « Mon projet » de la section 16
          ============================================================ -->
     <template id="portal_project_page" name="Portail : mon projet">
         <t t-call="portal.portal_layout">
@@ -355,7 +438,7 @@
                                 L'accompagnement est terminé : les livrables ont été validés.
                             </p>
                             <a t-if="accompagnement.state == 'propose'"
-                               t-attf-href="/my/projects/#{project.id}/accompagnement"
+                               t-attf-href="/my/crowdfunding/#{project.id}/accompagnement"
                                class="btn btn-primary">
                                 Voir la proposition
                             </a>
@@ -363,21 +446,21 @@
                     </div>
 
                     <div class="mb-4">
-                        <a t-attf-href="/my/projects/#{project.id}/historique"
+                        <a t-attf-href="/my/crowdfunding/#{project.id}/historique"
                            class="btn btn-link ps-0">
                             Voir l'historique de mon projet
                         </a>
                     </div>
 
                     <div t-if="project.relation_ids" class="mb-4">
-                        <a t-attf-href="/my/projects/#{project.id}/relations"
+                        <a t-attf-href="/my/crowdfunding/#{project.id}/relations"
                            class="btn btn-outline-primary">
                             Qui s'intéresse à mon projet
                         </a>
                     </div>
 
                     <div t-if="peut_demander_accompagnement" class="mb-4">
-                        <a t-attf-href="/my/projects/#{project.id}/accompagnement/demander"
+                        <a t-attf-href="/my/crowdfunding/#{project.id}/accompagnement/demander"
                            class="btn btn-outline-primary">
                             Être accompagné par CEO
                         </a>
@@ -438,14 +521,14 @@
                         <div t-out="project.solution"/>
                     </div>
 
-                    <a href="/my/projects" class="btn btn-link ps-0">Retour à mes projets</a>
+                    <a href="/my/crowdfunding" class="btn btn-link ps-0">Retour à mes projets</a>
                 </div>
             </div>
         </t>
     </template>
 
     <!-- ============================================================
-         Dossier complémentaire — /my/projects/<id>/dossier
+         Dossier complémentaire — /my/crowdfunding/<id>/dossier
          ============================================================ -->
     <template id="portal_project_dossier" name="Portail : compléter mon dossier">
         <t t-call="portal.portal_layout">
@@ -483,7 +566,7 @@
                         tard : rien n'est perdu.
                     </p>
 
-                    <form t-attf-action="/my/projects/#{project.id}/dossier"
+                    <form t-attf-action="/my/crowdfunding/#{project.id}/dossier"
                           method="post" enctype="multipart/form-data">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
@@ -504,7 +587,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center mt-4">
-                            <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                            <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                                 Retour au suivi de mon projet
                             </a>
                             <div class="d-flex gap-2">
@@ -701,15 +784,20 @@
         </xpath>
         <div id="portal_client_category" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Mes opportunités</t>
-                <t t-set="text">Les dossiers qui vous sont soumis</t>
-                <t t-set="url" t-value="'/my/opportunities'"/>
+                <!-- Le dispositif d'abord : `opex_innovation` a sa propre
+                     tuile « opportunités ». Un investisseur inscrit aux deux
+                     voyait deux cartes au titre rigoureusement identique. -->
+                <t t-set="title">Smart Crowdfunding — mes opportunités</t>
+                <t t-set="text">Dossiers de financement soumis à votre décision d'acteur financier.</t>
+                <t t-set="url" t-value="'/my/crowdfunding/opportunities'"/>
                 <!-- Même piège que la tuile « Mes projets » : sans
                      `config_card`, la carte reste en `d-none`. -->
                 <t t-set="config_card" t-value="True"/>
-                <t t-set="count"
-                   t-value="request.env['opex.crowdfunding.relation'].sudo().search_count(
-                                [('partner_id', '=', request.env.user.partner_id.id)]) or ''"/>
+                <!-- Compté dans le controller, sans `sudo()` : les ACL portail
+                     et les `ir.rule` bornent déjà la relation à son contact.
+                     `placeholder_count` pose le nœud que le JS remplit — une
+                     clé renvoyée sans son nœud casse tout l'accueil. -->
+                <t t-set="placeholder_count" t-value="'crowdfunding_relation_count'"/>
             </t>
         </div>
     </template>
@@ -725,12 +813,16 @@
                 <div class="col-12">
                     <h3 class="mb-4">
                         <t t-if="opportunites">
+                            Smart Crowdfunding —
                             <span t-out="len(opportunites)"/>
                             projet<t t-if="len(opportunites) &gt; 1">s</t>
                             correspond<t t-if="len(opportunites) &gt; 1">ent</t>
                             à vos critères
                         </t>
-                        <t t-else="">Mes opportunités</t>
+                        <!-- Le dispositif nommé jusque dans l'état vide :
+                             « Mes opportunités » seul ne se distinguait pas de
+                             l'écran homonyme d'OPEX Innovation. -->
+                        <t t-else="">Smart Crowdfunding — mes opportunités</t>
                     </h3>
 
                     <div t-if="not opportunites" class="alert alert-info" role="alert">
@@ -755,7 +847,7 @@
                                 <div t-if="opportunite['score']" class="fs-4 fw-bold text-primary">
                                     <span t-out="'%.0f' % opportunite['score']"/> %
                                 </div>
-                                <a t-attf-href="/my/opportunities/#{opportunite['relation_id']}"
+                                <a t-attf-href="/my/crowdfunding/opportunities/#{opportunite['relation_id']}"
                                    class="btn btn-primary btn-sm mt-1">Découvrir</a>
                             </div>
                         </div>
@@ -802,7 +894,7 @@
                     </table>
 
                     <form t-if="not interet_exprime"
-                          t-attf-action="/my/opportunities/#{relation_id}/interet"
+                          t-attf-action="/my/crowdfunding/opportunities/#{relation_id}/interet"
                           method="post">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                         <button type="submit" class="btn btn-primary">
@@ -814,7 +906,7 @@
                         ouvre son dossier.
                     </div>
 
-                    <a href="/my/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
+                    <a href="/my/crowdfunding/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
                 </div>
             </div>
         </t>
@@ -869,7 +961,7 @@
 
                     <t t-call="opex_crowdfunding.portal_relation_decision"/>
 
-                    <a href="/my/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
+                    <a href="/my/crowdfunding/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
                 </div>
             </div>
         </t>
@@ -933,7 +1025,7 @@
 
                     <t t-call="opex_crowdfunding.portal_relation_decision"/>
 
-                    <a href="/my/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
+                    <a href="/my/crowdfunding/opportunities" class="btn btn-link ps-0">Retour à mes opportunités</a>
                 </div>
             </div>
         </t>
@@ -953,7 +1045,7 @@
             <div class="card-body">
                 <h5 class="card-title">Votre réponse</h5>
 
-                <form t-attf-action="/my/opportunities/#{relation_id}/decision"
+                <form t-attf-action="/my/crowdfunding/opportunities/#{relation_id}/decision"
                       method="post" class="mb-3">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                     <div class="d-flex flex-wrap gap-2">
@@ -968,7 +1060,7 @@
                     </div>
                 </form>
 
-                <form t-attf-action="/my/opportunities/#{relation_id}/decision"
+                <form t-attf-action="/my/crowdfunding/opportunities/#{relation_id}/decision"
                       method="post" class="mb-3">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                     <div class="mb-2">
@@ -982,7 +1074,7 @@
                             class="btn btn-outline-primary">Envoyer ma question</button>
                 </form>
 
-                <form t-attf-action="/my/opportunities/#{relation_id}/decision"
+                <form t-attf-action="/my/crowdfunding/opportunities/#{relation_id}/decision"
                       method="post">
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                     <div class="mb-2">
@@ -1086,7 +1178,7 @@
                         </div>
                     </div>
 
-                    <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                    <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                         Retour au suivi de mon projet
                     </a>
                 </div>
@@ -1104,13 +1196,17 @@
         </xpath>
         <div id="portal_client_category" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Mes missions</t>
-                <t t-set="text">Les missions d'expertise qui vous sont confiées</t>
-                <t t-set="url" t-value="'/my/missions'"/>
+                <!-- Le dispositif d'abord : `opex_innovation` a sa propre
+                     tuile « missions », et un expert inscrit aux deux voyait
+                     deux cartes au titre rigoureusement identique. -->
+                <t t-set="title">Smart Crowdfunding — mes missions</t>
+                <t t-set="text">Missions d'expertise que le Comité CEO vous confie sur un dossier.</t>
+                <t t-set="url" t-value="'/my/crowdfunding/missions'"/>
                 <t t-set="config_card" t-value="True"/>
-                <t t-set="count"
-                   t-value="request.env['opex.crowdfunding.mission'].sudo().search_count(
-                                [('expert_id', '=', request.env.user.partner_id.id)]) or ''"/>
+                <!-- Idem : compté dans le controller, sans `sudo()`, et le
+                     nœud `placeholder_count` est ce qui autorise le JS à
+                     demander puis afficher ce compteur. -->
+                <t t-set="placeholder_count" t-value="'crowdfunding_mission_count'"/>
             </t>
         </div>
     </template>
@@ -1119,7 +1215,7 @@
         <t t-call="portal.portal_layout">
             <div class="row">
                 <div class="col-12 col-lg-9">
-                    <h3 class="mb-4">Mes missions</h3>
+                    <h3 class="mb-4">Smart Crowdfunding — mes missions</h3>
 
                     <div t-if="not missions" class="alert alert-info" role="alert">
                         Aucune mission ne vous est confiée pour l'instant.
@@ -1190,7 +1286,7 @@
                             </div>
 
                             <form t-if="mission['a_repondre']"
-                                  t-attf-action="/my/missions/#{mission['mission_id']}/reponse"
+                                  t-attf-action="/my/crowdfunding/missions/#{mission['mission_id']}/reponse"
                                   method="post" class="mt-3">
                                 <input type="hidden" name="csrf_token"
                                        t-att-value="request.csrf_token()"/>
@@ -1246,7 +1342,7 @@
                         </tbody>
                     </table>
 
-                    <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                    <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                         Retour au suivi de mon projet
                     </a>
                 </div>
@@ -1286,7 +1382,7 @@
                                 Cet acteur s'est déclaré intéressé.
                             </p>
                             <form t-if="relation.interet_exprime and relation.niveau_acces == 'teaser'"
-                                  t-attf-action="/my/projects/#{project.id}/relations/#{relation.id}/autoriser"
+                                  t-attf-action="/my/crowdfunding/#{project.id}/relations/#{relation.id}/autoriser"
                                   method="post">
                                 <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                                 <button type="submit" class="btn btn-primary">
@@ -1296,7 +1392,7 @@
                         </div>
                     </div>
 
-                    <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                    <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                         Retour au suivi de mon projet
                     </a>
                 </div>
@@ -1326,7 +1422,7 @@
                         Décrivez ce dont vous auriez besoin.
                     </p>
 
-                    <form t-attf-action="/my/projects/#{project.id}/accompagnement/demander"
+                    <form t-attf-action="/my/crowdfunding/#{project.id}/accompagnement/demander"
                           method="post">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                         <div class="mb-3">
@@ -1335,7 +1431,7 @@
                                       placeholder="Sur quoi souhaitez-vous être aidé ?"/>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                            <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                                 Retour au suivi de mon projet
                             </a>
                             <button type="submit" class="btn btn-primary">
@@ -1388,11 +1484,11 @@
                             </div>
                         </div>
 
-                        <form t-attf-action="/my/projects/#{project.id}/accompagnement"
+                        <form t-attf-action="/my/crowdfunding/#{project.id}/accompagnement"
                               method="post">
                             <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                             <div class="d-flex justify-content-between align-items-center">
-                                <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                                <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                                     Décider plus tard
                                 </a>
                                 <div class="d-flex gap-2">
@@ -1412,7 +1508,7 @@
                         <div class="alert alert-info" role="alert">
                             Aucune proposition n'attend votre réponse pour l'instant.
                         </div>
-                        <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                        <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                             Retour au suivi de mon projet
                         </a>
                     </t>
@@ -1423,7 +1519,7 @@
     </template>
 
     <!-- ============================================================
-         Répondre au comité — /my/projects/<id>/clarifications
+         Répondre au comité — /my/crowdfunding/<id>/clarifications
          ============================================================ -->
     <template id="portal_project_clarifications" name="Portail : répondre au comité">
         <t t-call="portal.portal_layout">
@@ -1445,7 +1541,7 @@
                         mesure : vous pouvez revenir les compléter.
                     </p>
 
-                    <form t-attf-action="/my/projects/#{project.id}/clarifications" method="post">
+                    <form t-attf-action="/my/crowdfunding/#{project.id}/clarifications" method="post">
                         <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
 
                         <div t-foreach="clarifications" t-as="clarification" class="mb-4">
@@ -1464,7 +1560,7 @@
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center">
-                            <a t-attf-href="/my/projects/#{project.id}" class="btn btn-link ps-0">
+                            <a t-attf-href="/my/crowdfunding/#{project.id}" class="btn btn-link ps-0">
                                 Retour au suivi de mon projet
                             </a>
                             <button type="submit" class="btn btn-primary">

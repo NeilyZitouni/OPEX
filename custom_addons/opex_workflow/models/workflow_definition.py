@@ -70,6 +70,44 @@ class WorkflowDefinition(models.Model):
     )
     active = fields.Boolean(string="Actif", default=True)
 
+    # ⚠ Le champ qui ferme un trou de sécurité par configuration.
+    #
+    # Un rôle sans `group_id` — Porteur en tête — n'est porté par personne en
+    # permanence : il s'attribue dossier par dossier, par une ligne
+    # `instance.actor`. Tant que cette ligne relevait du module métier, chaque
+    # `create()` devait penser à la poser, et l'oubli ne se voyait nulle part :
+    # ni erreur au chargement, ni erreur au runtime — seulement un déposant qui
+    # ne peut pas soumettre son propre dossier, et une transition qui
+    # n'apparaît jamais. Les demandes de profil Expert et Investisseur l'ont
+    # oublié pendant toute l'Extension 9, et leurs tests étaient au vert parce
+    # qu'ils posaient l'acteur eux-mêmes.
+    #
+    # Le rattachement descend donc dans le moteur : la définition déclare le
+    # rôle que porte celui qui démarre l'instance, et `_start_for()` le pose.
+    # Un module métier ne peut plus l'oublier — il n'a plus rien à écrire.
+    #
+    # ⚠ Ce rôle va à l'**initiateur** (`instance.initiator_id`), c'est-à-dire à
+    # l'utilisateur qui exécute la création. C'est le bon titulaire quand le
+    # déposant remplit son propre dossier — les demandes de profil, le dépôt
+    # d'un projet au portail. Ce n'est **pas** le bon quand le dossier est
+    # ouvert par un tiers pour le compte d'un autre : le suivi
+    # d'industrialisation est ouvert par le CEO et le porteur est celui du
+    # projet, pas lui. Ces cas-là continuent d'appeler `add_actor()`
+    # explicitement, et c'est volontaire : y poser l'initiateur donnerait un
+    # accès `full` au dossier à la personne qui l'a ouvert.
+    initiator_role_id = fields.Many2one(
+        'opex.workflow.role',
+        string="Rôle de l'initiateur",
+        ondelete='restrict',
+        help="Rôle attribué automatiquement, sur chaque nouvelle instance, à "
+             "l'utilisateur qui la démarre — avec un accès complet au dossier. "
+             "À renseigner lorsque celui qui ouvre le dossier est aussi celui "
+             "qui le porte (Porteur, dans la plupart des processus de dépôt). "
+             "À laisser vide lorsque le dossier est ouvert par un tiers pour "
+             "le compte d'un autre : le module métier désigne alors lui-même "
+             "les acteurs.",
+    )
+
     # `copy=False` : `action_new_version()` recopie étapes et transitions
     # lui-même, parce qu'une copie naïve laisserait les transitions de la
     # nouvelle version pointer vers les étapes de l'ancienne.

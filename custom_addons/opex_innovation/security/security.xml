@@ -21,4 +21,48 @@
         <field name="comment">Évalue les projets d'innovation et rend la décision : accepté, ajourné ou refusé. Instance décisionnelle finale.</field>
     </record>
 
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        UN GROUPE VIDE BLOQUE LE PROCESSUS SANS RIEN DIRE
+        ═══════════════════════════════════════════════════════════════
+
+        Rattacher un rôle à un groupe ne suffit pas : encore faut-il que
+        quelqu'un soit dans ce groupe. `role_ceo` pointe bien vers
+        `group_innovation_manager`, et `role_comite` vers
+        `group_comite_evaluation` — mais à l'installation, ces deux groupes
+        sont **vides**. Personne ne porte le rôle, donc
+        `_check_transition_allowed()` refuse la transition à tout le monde, et
+        `available_transitions()` ne la propose à personne.
+
+        Le symptôme est muet et tardif : le dépôt marche, le contrôle marche,
+        l'évaluation marche — et le dossier s'arrête net à l'étape que garde le
+        rôle vacant. Sur une base neuve (`opex_docker_check`), les quatre
+        transitions du CEO — `start_matching`, `start_accompagnement`,
+        `start_financement`, `start_industrialisation` — sont infranchissables,
+        et un projet accepté ne va nulle part. Aucune erreur nulle part : la
+        configuration est *correcte*, elle n'est simplement portée par
+        personne.
+
+        L'administrateur est donc membre des deux dès l'installation. Il ne
+        s'agit pas de lui donner un pouvoir métier mais d'éviter un processus
+        sans issue à la première mise en service ; le gestionnaire réel prend
+        ensuite le relais, et l'administrateur peut se retirer du groupe une
+        fois quelqu'un nommé.
+
+        ⚠ `<function>` et non `<record>`, pour la raison habituelle : la ligne
+        `ir_model_data` de `base.user_admin` appartient au module `base` et
+        porte `noupdate=1`. Un `<record id="base.user_admin">` serait créé à
+        l'installation puis ignoré à toute mise à jour — le rattachement ne
+        serait jamais rejoué sur une base existante, c'est-à-dire précisément
+        sur celles qui sont déjà bloquées.
+
+        `Command.link` et non `Command.set` : on **ajoute** à ses groupes, on ne
+        remplace pas la liste. Un `set` retirerait l'administrateur de tous ses
+        autres groupes, y compris `base.group_system`.
+    -->
+    <function model="res.users" name="write"
+              eval="[[ref('base.user_admin')],
+                     {'group_ids': [Command.link(ref('group_innovation_manager')),
+                                    Command.link(ref('group_comite_evaluation'))]}]"/>
+
 </odoo>

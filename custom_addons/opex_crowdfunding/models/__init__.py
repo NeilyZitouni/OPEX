@@ -17,3 +17,6 @@ from . import crowdfunding_versement
 from . import crowdfunding_suivi
 from . import crowdfunding_project
 from . import crowdfunding_work_queue
+
+# Point de contrôle de rôle unique du module (règle transversale 2).
+from . import res_users

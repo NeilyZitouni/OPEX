@@ -88,9 +88,12 @@
               priority="70">
         <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
             <t t-call="portal.portal_docs_entry">
-                <t t-set="title">Mes opportunités</t>
+                <!-- Le dispositif d'abord : `opex_crowdfunding` a sa propre
+                     tuile « opportunités ». Un investisseur inscrit aux deux
+                     voyait deux cartes au titre rigoureusement identique. -->
+                <t t-set="title">OPEX Innovation — mes opportunités</t>
                 <t t-set="url" t-value="'/my/innovation/opportunities'"/>
-                <t t-set="text">Projets qui vous sont proposés</t>
+                <t t-set="text">Projets d'innovation proposés à votre expertise ou à votre investissement.</t>
                 <!--
                     ⚠ Sans `placeholder_count`, `portal.portal_docs_entry`
                     rendait cette tuile avec `d-none` : présente dans le HTML,
@@ -111,7 +114,7 @@
     <template id="portal_opportunities" name="Mes opportunités">
         <t t-call="portal.portal_layout">
             <div class="container my-4">
-                <h3>Mes opportunités</h3>
+                <h3>OPEX Innovation — mes opportunités</h3>
 
                 <!--
                     ⚠ Le gabarit itère sur des **dictionnaires** construits par

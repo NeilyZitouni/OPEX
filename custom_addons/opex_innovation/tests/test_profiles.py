@@ -81,18 +81,42 @@ class TestProfiles(TransactionCase):
     # ------------------------------------------------------------
 
     def _expert_request(self):
-        profile = self.Expert.create({
-            'partner_id': self.member.id,
+        """La demande est créée **par le membre**, comme au portail.
+
+        ⚠ Ce test posait ici la ligne d'acteur à la main, et c'est ce geste qui
+        a masqué le bug pendant toute l'Extension 9 : `create()` ne la posait
+        pas, le portail non plus, et le déposant réel ne pouvait pas soumettre
+        sa propre demande. Le test, lui, était vert.
+
+        Deux corrections, indissociables : la création passe par
+        `with_user(member_user)` — le `create()` en `self.env` s'exécutait en
+        administrateur, ce qui n'est le parcours de personne — et plus rien
+        n'est posé à la main. L'acteur doit venir du moteur, via
+        `definition.initiator_role_id`. S'il n'en vient pas, ce test échoue,
+        et c'est exactement ce qu'on lui demande.
+        """
+        return self.Expert.with_user(self.member_user).create({
             'domaine_expertise': "Industrie 4.0",
         })
-        # Le déposant est acteur de son dossier : c'est la ligne d'acteur qui
-        # lui donne accès et le rôle Porteur, pas son profil de compte.
-        profile.workflow_instance_id.add_actor(
-            self.env.ref('opex_workflow.role_porteur'), self.member_user, 'full')
-        return profile
 
     def _transition(self, profile, code):
-        return profile.workflow_definition_id.transition_ids.filtered(
+        """Retrouve une transition par son code, **en lisant la configuration
+        sous `sudo()`**.
+
+        Depuis que les demandes sont créées par le membre — et non plus en
+        administrateur —, `profile` est lié à un environnement portail. Or un
+        compte portail n'a aucun droit de lecture sur
+        `opex.workflow.transition` : le graphe est du paramétrage moteur, pas
+        une donnée d'utilisateur.
+
+        Ce n'est pas un manque de droits à corriger. Le portail réel ne lit
+        jamais la configuration lui-même : il passe par
+        `available_transitions()`, qui la lit sous `sudo()` et ne lui rend que
+        le résultat (`workflow_instance.py`, la note sur `sudo()` de la
+        configuration). Seul ce helper de test y accède directement, et c'est
+        à lui de se placer au bon niveau.
+        """
+        return profile.sudo().workflow_definition_id.transition_ids.filtered(
             lambda t: t.code == code)
 
     def _do(self, profile, code, user, comment=False):
@@ -116,6 +140,46 @@ class TestProfiles(TransactionCase):
         self.assertEqual(self._stage_code(profile), 'draft')
         self.assertEqual(profile.workflow_state, 'running')
         self.assertEqual(profile.workflow_stage_label, "Compléter ma demande")
+
+    def test_the_depositor_is_actor_of_his_own_request(self):
+        """Le test qui manquait — et qui aurait évité la régression.
+
+        `role_porteur` n'a pas de groupe : personne ne le porte en permanence.
+        Sans ligne d'acteur, le déposant n'a aucun rôle sur sa propre demande
+        et `available_transitions()` lui renvoie une liste vide. Le dossier
+        n'est pas en erreur, il est simplement sans issue — et rien ne le dit.
+
+        On vérifie donc la cause (la ligne d'acteur) **et** sa conséquence
+        observable (le bouton que le déposant voit).
+        """
+        profile = self._expert_request()
+        porteur = self.env.ref('opex_workflow.role_porteur')
+
+        actors = profile.workflow_instance_id.sudo().actor_ids
+        self.assertEqual(len(actors), 1)
+        self.assertEqual(actors.role_id, porteur)
+        self.assertEqual(actors.user_id, self.member_user)
+        self.assertEqual(actors.access_level, 'full')
+
+        # La conséquence : le déposant voit bien sa transition de soumission.
+        available = profile.workflow_instance_id.available_transitions(
+            user=self.member_user)
+        self.assertEqual(available.mapped('code'), ['submit'])
+
+    def test_the_engine_places_the_actor_no_module_code_does(self):
+        """La correction est dans le moteur, pas recopiée dans chaque `create()`.
+
+        C'est tout l'objet du champ : un module métier qui démarre un workflow
+        ne doit rien avoir à écrire, donc rien à oublier. Si quelqu'un vide
+        `initiator_role_id` en croyant que le rattachement vit ailleurs, ce
+        test le lui dit.
+        """
+        for code in ('profile_request', 'profile_request_investor'):
+            with self.subTest(definition=code):
+                definition = self.Definition._get_for_code(code)
+                self.assertEqual(
+                    definition.initiator_role_id,
+                    self.env.ref('opex_workflow.role_porteur'))
 
     def test_submission_is_blocked_until_the_cv_is_joined(self):
         """La condition `has_document('cv')` s'appuie sur les conventions du
@@ -355,12 +419,9 @@ class TestProfiles(TransactionCase):
     # ------------------------------------------------------------
 
     def test_investor_request_runs_the_same_process(self):
-        profile = self.Investor.create({
-            'partner_id': self.member.id,
+        profile = self.Investor.with_user(self.member_user).create({
             'type_investisseur': 'fonds',
         })
-        profile.workflow_instance_id.add_actor(
-            self.env.ref('opex_workflow.role_porteur'), self.member_user, 'full')
 
         self.assertEqual(profile.workflow_stage_id.code, 'draft')
         self._do(profile, 'submit', self.member_user)

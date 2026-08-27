@@ -19,46 +19,136 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     n'est jamais lu directement, il est cherché *dans* cet ensemble. La règle
     d'enregistrement (`ir.rule`) et la surcharge de `create()` restent le
     filet : elles protègent la base même si un écran oublie un contrôle.
+
+    ⚠ **Tout ce qui est défini ici est préfixé, sans exception** : routes sous
+    `/my/crowdfunding/…`, méthodes en `portal_crowdfunding_*`, helpers en
+    `_crowdfunding_*`, constantes en `_CROWDFUNDING_*`.
+
+    Ce n'est pas de la cosmétique. Odoo fusionne **toutes les classes feuilles
+    d'un même arbre de controller** en une seule (`_generate_routing_rules()`,
+    `odoo/http.py`) : `CustomerPortal` étant l'ancêtre commun de ce module,
+    d'`opex_membership`, d'`opex_innovation` et du natif `project`, un nom
+    partagé n'existe qu'en un seul exemplaire — celui de la classe qui gagne
+    la MRO. Sans erreur, sans avertissement, au chargement comme au runtime.
+
+    Constaté ici, et c'est ce qui a motivé le préfixe : `portal_my_projects`
+    et `portal_project_new` faisaient disparaître `/my/projects` et
+    `/my/projects/new` du routing map (404), au profit d'`opex_innovation` ;
+    `_current_draft`, `_own_project`, `_STEP_FIELDS` et `_render_step`
+    résolvaient vers `opex_innovation` ou `opex_membership` — ce module lisait
+    donc les brouillons d'un autre module.
     """
+
+    #: Pagination : constante locale plutôt que `self._items_per_page`, hérité
+    #: de `CustomerPortal`. Ce champ natif est fait pour être surchargé, et il
+    #: l'est — par `opex_membership.ClusterPortal`, qui le passe de 80 à 20
+    #: pour ses propres écrans. Dans la classe fusionnée, cette valeur-là
+    #: gagnait aussi pour nos listes. On garde 20 (le comportement observé
+    #: jusqu'ici), mais décidé ici.
+    _CROWDFUNDING_ITEMS_PER_PAGE = 20
 
     #: Champs saisis à chaque écran. Une seule table : elle décide à la fois de
     #: ce que l'écran affiche et de ce que le `write()` accepte, de sorte qu'un
     #: champ ajouté au gabarit sans l'être ici est ignoré côté serveur.
-    _STEP_FIELDS = {
+    _CROWDFUNDING_STEP_FIELDS = {
         'projet': ('name', 'porteur_type', 'probleme', 'solution'),
         'besoin': ('secteur', 'maturite', 'besoin_type', 'montant_indicatif'),
     }
 
     # ------------------------------------------------------------------
+    # Compteurs des tuiles d'accueil
+    # ------------------------------------------------------------------
+    def _prepare_home_portal_values(self, counters):
+        """Compte les tuiles **ici**, jamais dans le gabarit.
+
+        ⚠ Ces trois comptes se faisaient en QWeb, dans
+        `portal_my_home_crowdfunding`. Un `search_count()` posé dans un gabarit
+        s'exécute sous l'identité du visiteur : celui sur
+        `opex.crowdfunding.project` n'avait aucun garde, et tout utilisateur
+        **interne** hors Comité CEO / Contrôle Qualité — comité d'évaluation,
+        gestionnaire Innovation, Secrétariat, COPIL — n'a aucune ligne ACL sur
+        ce modèle. `AccessError`, et c'est **l'accueil du portail entier** qui
+        tombait en 403, pour une tuile qui ne le concernait même pas.
+
+        `has_access()` répond sans lever : un rôle qui n'a rien à voir avec le
+        crowdfunding obtient 0 et une tuile sans chiffre, pas une page cassée.
+        Les deux autres modules comptaient déjà ainsi.
+
+        Pas de `sudo()` non plus sur les relations et les missions : les ACL
+        portail et les `ir.rule` les bornent déjà au contact connecté. Un
+        `sudo()` dans un gabarit contourne les deux et ne laisse aucune trace.
+
+        ⚠ **Chaque compteur est conditionné à `counters`, sans exception.** Ce
+        n'est pas une convention de style : la route `/my/counters` renvoie ce
+        dictionnaire **tel quel** au navigateur, et
+        `portal_home_counters.js` fait, pour *chaque clé reçue*,
+        `this.el.querySelector("[data-placeholder_count='<clé>']").textContent = …`.
+        Une clé renvoyée sans nœud correspondant dans le DOM donne `null`, la
+        boucle lève, le `Promise.all` est rejeté — et c'est **tout le
+        JavaScript de l'accueil** qui meurt : compteurs non remplis, tuiles
+        jamais démasquées, spinner qui tourne indéfiniment et boîte « Oops! »,
+        pour tous les utilisateurs. Payé le 26/08 en calculant ces trois
+        compteurs inconditionnellement.
+
+        Le nom de la méthode n'est pas préfixé, contrairement au reste de la
+        classe (règle 1 bis) : c'est un hook natif, et il relaie `super()` —
+        les surcharges coopératives se chaînent sur toute la MRO fusionnée au
+        lieu de s'écraser.
+        """
+        values = super()._prepare_home_portal_values(counters)
+        partner = request.env.user.partner_id
+        env = request.env
+
+        if 'crowdfunding_project_count' in counters:
+            Project = env['opex.crowdfunding.project']
+            values['crowdfunding_project_count'] = (
+                Project.search_count([('partner_id', '=', partner.id)])
+                if Project.has_access('read') else 0
+            )
+        if 'crowdfunding_relation_count' in counters:
+            Relation = env['opex.crowdfunding.relation']
+            values['crowdfunding_relation_count'] = (
+                Relation.search_count([('partner_id', '=', partner.id)])
+                if Relation.has_access('read') else 0
+            )
+        if 'crowdfunding_mission_count' in counters:
+            Mission = env['opex.crowdfunding.mission']
+            values['crowdfunding_mission_count'] = (
+                Mission.search_count([('expert_id', '=', partner.id)])
+                if Mission.has_access('read') else 0
+            )
+        return values
+
+    # ------------------------------------------------------------------
     # Résolution des projets du porteur connecté
     # ------------------------------------------------------------------
-    def _own_projects_domain(self):
+    def _crowdfunding_own_projects_domain(self):
         """Filtre applicatif ; la règle d'enregistrement le garantit en base."""
         return [('partner_id', '=', request.env.user.partner_id.id)]
 
-    def _own_project(self, project_id):
+    def _crowdfunding_own_project(self, project_id):
         """Projet du porteur connecté, en `sudo()`, ou recordset vide.
 
         La recherche part du contact connecté : un identifiant forgé ne
         remonte rien plutôt que de déclencher une erreur d'accès.
         """
         return request.env['opex.crowdfunding.project'].sudo().search(
-            self._own_projects_domain() + [('id', '=', project_id)], limit=1)
+            self._crowdfunding_own_projects_domain() + [('id', '=', project_id)], limit=1)
 
-    def _current_draft(self):
+    def _crowdfunding_current_draft(self):
         """Le brouillon en cours du porteur, ou recordset vide.
 
         Un seul brouillon à la fois : le porteur qui revient reprend celui
         qu'il a laissé plutôt que d'en semer des copies vides.
         """
         return request.env['opex.crowdfunding.project'].sudo().search(
-            self._own_projects_domain() + [('state', '=', 'draft')],
+            self._crowdfunding_own_projects_domain() + [('state', '=', 'draft')],
             order='id desc', limit=1)
 
     # ------------------------------------------------------------------
     # Saisie
     # ------------------------------------------------------------------
-    def _clean_step_values(self, step, post):
+    def _crowdfunding_clean_step_values(self, step, post):
         """Valeurs propres d'un écran : rien que ses champs, rien d'invalide.
 
         Les `Selection` sont vérifiées contre leurs valeurs autorisées et le
@@ -66,9 +156,9 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         écriture directe ferait remonter une erreur brute au porteur.
         """
         Project = request.env['opex.crowdfunding.project']
-        descriptions = Project.fields_get(self._STEP_FIELDS[step])
+        descriptions = Project.fields_get(self._CROWDFUNDING_STEP_FIELDS[step])
         values = {}
-        for nom in self._STEP_FIELDS[step]:
+        for nom in self._CROWDFUNDING_STEP_FIELDS[step]:
             if nom not in post:
                 continue
             brut = post.get(nom)
@@ -83,12 +173,12 @@ class CrowdfundingCustomerPortal(CustomerPortal):
                 elif not brut:
                     values[nom] = False
             elif type_champ == 'monetary':
-                values[nom] = self._parse_amount(brut)
+                values[nom] = self._crowdfunding_parse_amount(brut)
             else:
                 values[nom] = brut
         return values
 
-    def _parse_amount(self, brut):
+    def _crowdfunding_parse_amount(self, brut):
         """Montant indicatif saisi à la main : « 2 500 000,50 » compris."""
         nettoye = brut.replace(' ', '').replace(' ', '').replace(',', '.')
         try:
@@ -96,7 +186,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         except ValueError:
             return 0.0
 
-    def _store_pitch(self, project, fichier):
+    def _crowdfunding_store_pitch(self, project, fichier):
         """Document facultatif. Un champ vide ne doit pas effacer l'existant."""
         if not fichier or not getattr(fichier, 'filename', None):
             return
@@ -106,25 +196,26 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         })
 
     # ------------------------------------------------------------------
-    # Liste — /my/projects
+    # Liste — /my/crowdfunding
     # ------------------------------------------------------------------
-    @http.route(['/my/projects', '/my/projects/page/<int:page>'],
+    @http.route(['/my/crowdfunding', '/my/crowdfunding/page/<int:page>'],
                 type='http', auth='user', website=True)
-    def portal_my_projects(self, page=1, **kw):
+    def portal_crowdfunding_projects(self, page=1, **kw):
         Project = request.env['opex.crowdfunding.project']
         if not Project.has_access('read'):
             return request.redirect('/my')
 
-        domain = self._own_projects_domain()
+        domain = self._crowdfunding_own_projects_domain()
         pager_values = portal_pager(
-            url='/my/projects',
+            url='/my/crowdfunding',
             total=Project.sudo().search_count(domain),
             page=page,
-            step=self._items_per_page,
+            step=self._CROWDFUNDING_ITEMS_PER_PAGE,
         )
         projects = Project.sudo().search(
             domain, order='create_date desc, id desc',
-            limit=self._items_per_page, offset=pager_values['offset'])
+            limit=self._CROWDFUNDING_ITEMS_PER_PAGE,
+            offset=pager_values['offset'])
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -132,21 +223,21 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             # Le fil d'Ariane teste `project` : le poser explicitement évite
             # de dépendre du sort réservé à une variable non définie.
             'project': False,
-            'draft': self._current_draft(),
+            'draft': self._crowdfunding_current_draft(),
             'page_name': 'crowdfunding',
             'pager': pager_values,
-            'default_url': '/my/projects',
+            'default_url': '/my/crowdfunding',
         })
         return request.render('opex_crowdfunding.portal_my_projects', values)
 
     # ------------------------------------------------------------------
-    # Dépôt — /my/projects/new
+    # Dépôt — /my/crowdfunding/new
     # ------------------------------------------------------------------
     # Deux écrans. Le projet est créé en base dès la validation du premier :
     # à partir de là, tout est `write()` partiel, et quitter la page ne perd
     # que ce qui n'a pas encore été envoyé.
 
-    def _render_step(self, step, project, **extra):
+    def _crowdfunding_render_step(self, step, project, **extra):
         values = self._prepare_portal_layout_values()
         values.update({
             'step': step,
@@ -162,16 +253,16 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         values.update(extra)
         return request.render('opex_crowdfunding.portal_project_form', values)
 
-    @http.route(['/my/projects/new'], type='http', auth='user', website=True,
+    @http.route(['/my/crowdfunding/new'], type='http', auth='user', website=True,
                 methods=['GET', 'POST'])
-    def portal_project_new(self, **post):
+    def portal_crowdfunding_new(self, **post):
         """Écran 1 — le projet. Crée le brouillon à la première validation."""
-        project = self._current_draft()
+        project = self._crowdfunding_current_draft()
 
         if request.httprequest.method == 'POST':
-            values = self._clean_step_values('projet', post)
+            values = self._crowdfunding_clean_step_values('projet', post)
             if not values.get('name') and not project.name:
-                return self._render_step(
+                return self._crowdfunding_render_step(
                     'projet', project, saisie=post,
                     error=_("Donnez un titre à votre projet pour pouvoir "
                             "enregistrer votre saisie."))
@@ -182,43 +273,43 @@ class CrowdfundingCustomerPortal(CustomerPortal):
                 # force `partner_id` et `state` côté modèle, quoi qu'envoie le
                 # navigateur.
                 project = request.env['opex.crowdfunding.project'].sudo().create(values)
-            return request.redirect('/my/projects/new/besoin')
+            return request.redirect('/my/crowdfunding/new/besoin')
 
         # Le porteur qui revient reprend son brouillon, et on le lui dit.
-        return self._render_step('projet', project, reprise=bool(project))
+        return self._crowdfunding_render_step('projet', project, reprise=bool(project))
 
-    @http.route(['/my/projects/new/besoin'], type='http', auth='user', website=True,
+    @http.route(['/my/crowdfunding/new/besoin'], type='http', auth='user', website=True,
                 methods=['GET', 'POST'])
-    def portal_project_new_besoin(self, **post):
+    def portal_crowdfunding_new_besoin(self, **post):
         """Écran 2 — le besoin, puis « Présenter mon projet »."""
-        project = self._current_draft()
+        project = self._crowdfunding_current_draft()
         if not project:
-            return request.redirect('/my/projects/new')
+            return request.redirect('/my/crowdfunding/new')
 
         if request.httprequest.method == 'POST':
-            project.write(self._clean_step_values('besoin', post))
-            self._store_pitch(project, request.httprequest.files.get('pitch_document'))
+            project.write(self._crowdfunding_clean_step_values('besoin', post))
+            self._crowdfunding_store_pitch(project, request.httprequest.files.get('pitch_document'))
             if post.get('enregistrer'):
-                return request.redirect('/my/projects/%s' % project.id)
+                return request.redirect('/my/crowdfunding/%s' % project.id)
             # `action_submit()` vérifie lui-même les informations minimales :
             # la règle reste dans le modèle, cet écran ne la rejoue pas.
             try:
                 with request.env.cr.savepoint():
                     project.action_submit()
             except UserError as error:
-                return self._render_step('besoin', project, error=error.args[0])
-            return request.redirect('/my/projects/%s' % project.id)
+                return self._crowdfunding_render_step('besoin', project, error=error.args[0])
+            return request.redirect('/my/crowdfunding/%s' % project.id)
 
-        return self._render_step('besoin', project)
+        return self._crowdfunding_render_step('besoin', project)
 
     # ------------------------------------------------------------------
-    # Suivi — /my/projects/<id>
+    # Suivi — /my/crowdfunding/<id>
     # ------------------------------------------------------------------
-    @http.route(['/my/projects/<int:project_id>'], type='http', auth='user', website=True)
-    def portal_project_page(self, project_id, **kw):
-        project = self._own_project(project_id)
+    @http.route(['/my/crowdfunding/<int:project_id>'], type='http', auth='user', website=True)
+    def portal_crowdfunding_project(self, project_id, **kw):
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -242,16 +333,16 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         return request.render('opex_crowdfunding.portal_project_page', values)
 
     # ------------------------------------------------------------------
-    # Dossier complémentaire — /my/projects/<id>/dossier
+    # Dossier complémentaire — /my/crowdfunding/<id>/dossier
     # ------------------------------------------------------------------
     #: Les champs que chaque questionnaire accepte en écriture. Comme pour le
     #: dépôt : ce qui n'est pas listé ici est ignoré, même si un champ traîne
     #: dans le gabarit ou dans un POST forgé.
     #
     #: ⚠ Un quatrième type de besoin ajoute une entrée ici et une dans
-    #: `_DOSSIER_DOCUMENTS`. Le décompte complet des cinq fichiers à toucher
+    #: `_CROWDFUNDING_DOSSIER_DOCUMENTS`. Le décompte complet des cinq fichiers à toucher
     #: est dans `_champs_dossier_requis()`, côté modèle.
-    _DOSSIER_FIELDS = {
+    _CROWDFUNDING_DOSSIER_FIELDS = {
         'investisseur': (
             'business_model', 'marche', 'traction', 'equipe', 'besoin_financier',
             'utilisation_fonds', 'valorisation', 'previsions_financieres',
@@ -269,15 +360,15 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     }
 
     #: Le document du questionnaire : champ binaire, champ du nom de fichier.
-    _DOSSIER_DOCUMENTS = {
+    _CROWDFUNDING_DOSSIER_DOCUMENTS = {
         'investisseur':       ('pitch_deck', 'pitch_deck_filename'),
         'sponsor':            ('sponsor_document', 'sponsor_document_filename'),
         'financement_public': ('public_document', 'public_document_filename'),
     }
 
-    def _clean_dossier_values(self, project, post):
+    def _crowdfunding_clean_dossier_values(self, project, post):
         """Valeurs propres du questionnaire correspondant au besoin exprimé."""
-        champs = self._DOSSIER_FIELDS.get(project.besoin_type, ())
+        champs = self._CROWDFUNDING_DOSSIER_FIELDS.get(project.besoin_type, ())
         Project = request.env['opex.crowdfunding.project']
         descriptions = Project.fields_get(champs) if champs else {}
         values = {}
@@ -287,14 +378,14 @@ class CrowdfundingCustomerPortal(CustomerPortal):
                 continue
             brut = brut.strip()
             if descriptions[nom]['type'] == 'monetary':
-                values[nom] = self._parse_amount(brut)
+                values[nom] = self._crowdfunding_parse_amount(brut)
             else:
                 values[nom] = brut
         return values
 
-    def _store_dossier_document(self, project, post_files):
+    def _crowdfunding_store_dossier_document(self, project, post_files):
         """Document du questionnaire. Champ vide = document conservé."""
-        paire = self._DOSSIER_DOCUMENTS.get(project.besoin_type)
+        paire = self._CROWDFUNDING_DOSSIER_DOCUMENTS.get(project.besoin_type)
         if not paire:
             return
         champ_binaire, champ_nom = paire
@@ -306,32 +397,32 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             champ_nom: fichier.filename,
         })
 
-    @http.route(['/my/projects/<int:project_id>/dossier'],
+    @http.route(['/my/crowdfunding/<int:project_id>/dossier'],
                 type='http', auth='user', website=True, methods=['GET', 'POST'])
-    def portal_project_dossier(self, project_id, **post):
+    def portal_crowdfunding_dossier(self, project_id, **post):
         """Le questionnaire complémentaire, demandé seulement après un GO.
 
         Trois besoins, trois questionnaires : l'aiguillage se fait sur
         `besoin_type`, ici comme dans le gabarit.
         """
-        project = self._own_project(project_id)
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
         # Le même écran sert deux fois : après le GO, puis quand le contrôle
         # qualité demande des compléments. C'est le même questionnaire, ce
         # n'est pas le même acte métier — d'où deux transitions distinctes.
         if project.state not in ('dossier_progressif', 'quality_complement'):
-            return request.redirect('/my/projects/%s' % project.id)
+            return request.redirect('/my/crowdfunding/%s' % project.id)
 
         erreur = None
         if request.httprequest.method == 'POST':
             # Écriture d'abord, dans tous les cas : le porteur peut revenir
             # finir plus tard, rien de ce qu'il a tapé n'est perdu.
             depuis_complement = project.state == 'quality_complement'
-            project.write(self._clean_dossier_values(project, post))
-            self._store_dossier_document(project, request.httprequest.files)
+            project.write(self._crowdfunding_clean_dossier_values(project, post))
+            self._crowdfunding_store_dossier_document(project, request.httprequest.files)
             if post.get('enregistrer'):
-                return request.redirect('/my/projects/%s' % project.id)
+                return request.redirect('/my/crowdfunding/%s' % project.id)
             try:
                 with request.env.cr.savepoint():
                     if depuis_complement:
@@ -341,7 +432,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             except UserError as error:
                 erreur = error.args[0]
             else:
-                return request.redirect('/my/projects/%s' % project.id)
+                return request.redirect('/my/crowdfunding/%s' % project.id)
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -361,7 +452,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     # vérification recopiée ici finirait par diverger, et ce serait cette
     # copie-là qui recevrait la requête forgée.
 
-    def _relation_du_partenaire(self, relation_id):
+    def _crowdfunding_relation_du_partenaire(self, relation_id):
         """La relation du contact connecté, en `sudo()`, ou recordset vide.
 
         Retrouvée depuis `env.user.partner_id`, jamais depuis l'identifiant
@@ -372,8 +463,8 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             ('partner_id', '=', request.env.user.partner_id.id),
         ], limit=1)
 
-    @http.route(['/my/opportunities'], type='http', auth='user', website=True)
-    def portal_my_opportunities(self, **kw):
+    @http.route(['/my/crowdfunding/opportunities'], type='http', auth='user', website=True)
+    def portal_crowdfunding_opportunities(self, **kw):
         """Les dossiers auxquels cet acteur a accès, à quelque niveau que ce soit."""
         relations = request.env['opex.crowdfunding.relation'].sudo().search(
             [('partner_id', '=', request.env.user.partner_id.id)])
@@ -389,12 +480,12 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         })
         return request.render('opex_crowdfunding.portal_my_opportunities', values)
 
-    @http.route(['/my/opportunities/<int:relation_id>'],
+    @http.route(['/my/crowdfunding/opportunities/<int:relation_id>'],
                 type='http', auth='user', website=True)
-    def portal_opportunity(self, relation_id, **kw):
-        relation = self._relation_du_partenaire(relation_id)
+    def portal_crowdfunding_opportunity(self, relation_id, **kw):
+        relation = self._crowdfunding_relation_du_partenaire(relation_id)
         if not relation:
-            return request.redirect('/my/opportunities')
+            return request.redirect('/my/crowdfunding/opportunities')
 
         gabarit, valeurs = relation._portal_payload()
         rendu = self._prepare_portal_layout_values()
@@ -402,32 +493,32 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         rendu['page_name'] = 'opportunities'
         return request.render(gabarit, rendu)
 
-    @http.route(['/my/opportunities/<int:relation_id>/interet'],
+    @http.route(['/my/crowdfunding/opportunities/<int:relation_id>/interet'],
                 type='http', auth='user', website=True, methods=['POST'])
-    def portal_opportunity_interet(self, relation_id, **post):
+    def portal_crowdfunding_opportunity_interet(self, relation_id, **post):
         """« Ça m'intéresse » — et rien d'autre ne s'ouvre pour autant."""
-        relation = self._relation_du_partenaire(relation_id)
+        relation = self._crowdfunding_relation_du_partenaire(relation_id)
         if not relation:
-            return request.redirect('/my/opportunities')
+            return request.redirect('/my/crowdfunding/opportunities')
         try:
             with request.env.cr.savepoint():
                 relation.action_exprimer_interet()
         except UserError:
             pass
-        return request.redirect('/my/opportunities/%s' % relation.id)
+        return request.redirect('/my/crowdfunding/opportunities/%s' % relation.id)
 
     # ------------------------------------------------------------------
     # L'écran de l'expert — section 16
     # ------------------------------------------------------------------
-    def _mission_de_l_expert(self, mission_id):
+    def _crowdfunding_mission_de_l_expert(self, mission_id):
         """La mission confiée au contact connecté, ou recordset vide."""
         return request.env['opex.crowdfunding.mission'].sudo().search([
             ('id', '=', mission_id),
             ('expert_id', '=', request.env.user.partner_id.id),
         ], limit=1)
 
-    @http.route(['/my/missions'], type='http', auth='user', website=True)
-    def portal_my_missions(self, **kw):
+    @http.route(['/my/crowdfunding/missions'], type='http', auth='user', website=True)
+    def portal_crowdfunding_missions(self, **kw):
         missions = request.env['opex.crowdfunding.mission'].sudo().search(
             [('expert_id', '=', request.env.user.partner_id.id)], order='id desc')
 
@@ -438,13 +529,13 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         })
         return request.render('opex_crowdfunding.portal_my_missions', values)
 
-    @http.route(['/my/missions/<int:mission_id>/reponse'],
+    @http.route(['/my/crowdfunding/missions/<int:mission_id>/reponse'],
                 type='http', auth='user', website=True, methods=['POST'])
-    def portal_mission_reponse(self, mission_id, **post):
+    def portal_crowdfunding_mission_reponse(self, mission_id, **post):
         """[Accepter] [Décliner] — les deux seuls gestes de la section 16."""
-        mission = self._mission_de_l_expert(mission_id)
+        mission = self._crowdfunding_mission_de_l_expert(mission_id)
         if not mission:
-            return request.redirect('/my/missions')
+            return request.redirect('/my/crowdfunding/missions')
         try:
             with request.env.cr.savepoint():
                 if post.get('reponse') == 'accepter':
@@ -453,17 +544,17 @@ class CrowdfundingCustomerPortal(CustomerPortal):
                     mission.action_decline()
         except UserError:
             pass
-        return request.redirect('/my/missions')
+        return request.redirect('/my/crowdfunding/missions')
 
     # ------------------------------------------------------------------
     # L'historique du porteur — l'audit trail, côté portail
     # ------------------------------------------------------------------
-    @http.route(['/my/projects/<int:project_id>/historique'],
+    @http.route(['/my/crowdfunding/<int:project_id>/historique'],
                 type='http', auth='user', website=True)
-    def portal_project_historique(self, project_id, **kw):
-        project = self._own_project(project_id)
+    def portal_crowdfunding_historique(self, project_id, **kw):
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -479,7 +570,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     #: Le bouton cliqué, et la méthode qui traduit ce choix en transition.
     #: L'acteur n'envoie jamais un état : il envoie « intéressé » ou « pas
     #: intéressé », et c'est le modèle qui sait ce que ça implique.
-    _DECISIONS = {
+    _CROWDFUNDING_DECISIONS = {
         'interesse':      'action_decision_interesse',
         'informations':   'action_decision_informations',
         'accompagnement': 'action_decision_accompagnement',
@@ -487,16 +578,16 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         'non_interesse':  'action_decision_non_interesse',
     }
 
-    @http.route(['/my/opportunities/<int:relation_id>/decision'],
+    @http.route(['/my/crowdfunding/opportunities/<int:relation_id>/decision'],
                 type='http', auth='user', website=True, methods=['POST'])
-    def portal_opportunity_decision(self, relation_id, **post):
-        relation = self._relation_du_partenaire(relation_id)
+    def portal_crowdfunding_opportunity_decision(self, relation_id, **post):
+        relation = self._crowdfunding_relation_du_partenaire(relation_id)
         if not relation:
-            return request.redirect('/my/opportunities')
+            return request.redirect('/my/crowdfunding/opportunities')
 
-        methode = self._DECISIONS.get(post.get('choix'))
+        methode = self._CROWDFUNDING_DECISIONS.get(post.get('choix'))
         if not methode:
-            return request.redirect('/my/opportunities/%s' % relation.id)
+            return request.redirect('/my/crowdfunding/opportunities/%s' % relation.id)
 
         arguments = {}
         if methode == 'action_decision_informations':
@@ -509,21 +600,21 @@ class CrowdfundingCustomerPortal(CustomerPortal):
                 getattr(relation, methode)(**arguments)
         except UserError:
             pass
-        return request.redirect('/my/opportunities/%s' % relation.id)
+        return request.redirect('/my/crowdfunding/opportunities/%s' % relation.id)
 
     # ------------------------------------------------------------------
     # Le projet suivi — section 15
     # ------------------------------------------------------------------
-    @http.route(['/my/projects/<int:project_id>/financement'],
+    @http.route(['/my/crowdfunding/<int:project_id>/financement'],
                 type='http', auth='user', website=True)
-    def portal_project_financement(self, project_id, **kw):
+    def portal_crowdfunding_financement(self, project_id, **kw):
         """« Le dossier devient un projet suivi plutôt qu'une candidature. »"""
-        project = self._own_project(project_id)
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
         closing = project._current_closing()
         if not closing:
-            return request.redirect('/my/projects/%s' % project.id)
+            return request.redirect('/my/crowdfunding/%s' % project.id)
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -538,12 +629,12 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     # ------------------------------------------------------------------
     # Côté porteur : c'est lui qui autorise le partage
     # ------------------------------------------------------------------
-    @http.route(['/my/projects/<int:project_id>/relations'],
+    @http.route(['/my/crowdfunding/<int:project_id>/relations'],
                 type='http', auth='user', website=True)
-    def portal_project_relations(self, project_id, **kw):
-        project = self._own_project(project_id)
+    def portal_crowdfunding_relations(self, project_id, **kw):
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -555,13 +646,13 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         })
         return request.render('opex_crowdfunding.portal_project_relations', values)
 
-    @http.route(['/my/projects/<int:project_id>/relations/<int:relation_id>/autoriser'],
+    @http.route(['/my/crowdfunding/<int:project_id>/relations/<int:relation_id>/autoriser'],
                 type='http', auth='user', website=True, methods=['POST'])
-    def portal_project_relation_autoriser(self, project_id, relation_id, **post):
+    def portal_crowdfunding_relation_autoriser(self, project_id, relation_id, **post):
         """Le porteur autorise le partage de son dossier avec un acteur."""
-        project = self._own_project(project_id)
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
         relation = project.relation_ids.filtered(lambda r: r.id == relation_id)
         if relation:
             try:
@@ -569,22 +660,22 @@ class CrowdfundingCustomerPortal(CustomerPortal):
                     relation.action_autoriser_partage()
             except UserError:
                 pass
-        return request.redirect('/my/projects/%s/relations' % project.id)
+        return request.redirect('/my/crowdfunding/%s/relations' % project.id)
 
     # ------------------------------------------------------------------
     # Accompagnement CEO — sections 11 et 12
     # ------------------------------------------------------------------
-    @http.route(['/my/projects/<int:project_id>/accompagnement/demander'],
+    @http.route(['/my/crowdfunding/<int:project_id>/accompagnement/demander'],
                 type='http', auth='user', website=True, methods=['GET', 'POST'])
-    def portal_accompagnement_demander(self, project_id, **post):
+    def portal_crowdfunding_accompagnement_demander(self, project_id, **post):
         """Déclencheur 3 — « Être accompagné par CEO », à l'initiative du porteur.
 
         Le dossier ne quitte pas son étape : la demande ouvre un sous-workflow
         à côté du parcours principal (section 11, cas 3).
         """
-        project = self._own_project(project_id)
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
 
         erreur = None
         if request.httprequest.method == 'POST':
@@ -595,7 +686,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             except UserError as error:
                 erreur = error.args[0]
             else:
-                return request.redirect('/my/projects/%s' % project.id)
+                return request.redirect('/my/crowdfunding/%s' % project.id)
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -606,21 +697,21 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         return request.render(
             'opex_crowdfunding.portal_accompagnement_demande', values)
 
-    @http.route(['/my/projects/<int:project_id>/accompagnement'],
+    @http.route(['/my/crowdfunding/<int:project_id>/accompagnement'],
                 type='http', auth='user', website=True, methods=['GET', 'POST'])
-    def portal_accompagnement(self, project_id, **post):
+    def portal_crowdfunding_accompagnement(self, project_id, **post):
         """La proposition d'accompagnement, et la réponse du porteur.
 
         Section 12 : la convention acceptée est la précondition du passage à
         l'accompagnement actif. C'est ici, et nulle part ailleurs, que le
         porteur la donne.
         """
-        project = self._own_project(project_id)
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
         accompagnement = project._accompagnement_en_cours()
         if not accompagnement:
-            return request.redirect('/my/projects/%s' % project.id)
+            return request.redirect('/my/crowdfunding/%s' % project.id)
 
         erreur = None
         if request.httprequest.method == 'POST' and accompagnement.state == 'propose':
@@ -636,7 +727,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             except UserError as error:
                 erreur = error.args[0]
             else:
-                return request.redirect('/my/projects/%s' % project.id)
+                return request.redirect('/my/crowdfunding/%s' % project.id)
 
         values = self._prepare_portal_layout_values()
         values.update({
@@ -648,11 +739,11 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         return request.render('opex_crowdfunding.portal_accompagnement', values)
 
     # ------------------------------------------------------------------
-    # Clarifications — /my/projects/<id>/clarifications
+    # Clarifications — /my/crowdfunding/<id>/clarifications
     # ------------------------------------------------------------------
-    @http.route(['/my/projects/<int:project_id>/clarifications'],
+    @http.route(['/my/crowdfunding/<int:project_id>/clarifications'],
                 type='http', auth='user', website=True, methods=['GET', 'POST'])
-    def portal_project_clarifications(self, project_id, **post):
+    def portal_crowdfunding_clarifications(self, project_id, **post):
         """Le porteur répond aux questions ciblées du comité (section 6).
 
         Les réponses sont enregistrées au fil de l'eau : un porteur qui ne
@@ -660,13 +751,13 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         revenant. Le dossier ne repart au comité que lorsqu'il ne reste plus
         rien sans réponse — et c'est le modèle qui en juge.
         """
-        project = self._own_project(project_id)
+        project = self._crowdfunding_own_project(project_id)
         if not project:
-            return request.redirect('/my/projects')
+            return request.redirect('/my/crowdfunding')
         if project.state != 'clarification':
             # Rien à répondre : on renvoie le porteur sur le suivi de son
             # projet, qui lui dira où il en est.
-            return request.redirect('/my/projects/%s' % project.id)
+            return request.redirect('/my/crowdfunding/%s' % project.id)
 
         erreur = None
         if request.httprequest.method == 'POST':
@@ -682,7 +773,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
             except UserError as error:
                 erreur = error.args[0]
             else:
-                return request.redirect('/my/projects/%s' % project.id)
+                return request.redirect('/my/crowdfunding/%s' % project.id)
 
         values = self._prepare_portal_layout_values()
         values.update({

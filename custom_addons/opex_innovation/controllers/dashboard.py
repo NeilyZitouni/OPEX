@@ -55,6 +55,38 @@ class InnovationPortalCounters(CustomerPortal):
                 lambda c: c.instance_id
                 and c.instance_id._has_access(request.env.user)))
 
+        if 'innovation_mission_count' in counters:
+            # Compteur **propre** à la tuile « mes missions ». Les deux tuiles
+            # partageaient `innovation_opportunity_count`, et deux tuiles pour
+            # un seul `data-placeholder_count` ne fonctionnent pas :
+            # `portal_home_counters.js` fait `querySelector()`, qui ne renvoie
+            # que le **premier** nœud — la seconde tuile restait en `d-none`
+            # jusqu'au rechargement suivant, où le cache de session la
+            # démasquait. Constaté à l'écran le 27/08.
+            #
+            # Le domaine reprend exactement celui de `portal_missions()` : ce
+            # que la tuile annonce doit être ce que l'écran contient — les
+            # propositions retenues où le contact intervient **comme expert ou
+            # mentor**, pas toutes ses opportunités.
+            #
+            # ⚠ Pas de `has_access()` ici, contrairement aux compteurs du
+            # crowdfunding : `opex.matching.candidate` n'a aucune ligne ACL
+            # pour `base.group_portal` (seulement `base.group_user` et les
+            # groupes du moteur). La garde renverrait donc `False` pour **tout**
+            # expert portail et le compteur vaudrait 0 à jamais. La visibilité
+            # se tranche ici comme partout ailleurs dans ce module, sur
+            # `instance._has_access()` — la seule fonction du moteur qui en
+            # décide, et un contrôle plus fin qu'une ACL de modèle.
+            Candidate = request.env['opex.matching.candidate'].sudo()
+            missions = Candidate.search([
+                ('partner_id', '=', partner.id),
+                ('candidate_type', 'in', ('expert', 'mentor')),
+                ('state', '=', 'accepted'),
+            ])
+            values['innovation_mission_count'] = len(missions.filtered(
+                lambda c: c.instance_id
+                and c.instance_id._has_access(request.env.user)))
+
         if 'innovation_evaluation_count' in counters:
             Evaluation = request.env['opex.innovation.evaluation'].sudo()
             values['innovation_evaluation_count'] = Evaluation.search_count([

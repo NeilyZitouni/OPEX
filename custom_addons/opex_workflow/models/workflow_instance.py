@@ -505,6 +505,67 @@ class WorkflowInstance(models.Model):
             'access_level': access_level,
         })
 
+    def _grant_initiator_role(self):
+        """Donne à l'initiateur le rôle déclaré par la définition.
+
+        Appelée par `_start_for()`, donc sur **tout** démarrage d'instance, y
+        compris un sous-workflow. Sans effet si la définition ne déclare aucun
+        rôle d'initiateur — c'est le cas des processus dont le titulaire n'est
+        pas celui qui ouvre le dossier.
+
+        Silencieuse sur l'utilisateur public : un enregistrement créé par un
+        visiteur non connecté n'a pas d'acteur à désigner, et lui en donner un
+        ouvrirait le dossier à tous les visiteurs, qui partagent ce compte.
+        """
+        self.ensure_one()
+        role = self.definition_id.sudo().initiator_role_id
+        user = self.initiator_id
+        if not role or not user or user.sudo()._is_public():
+            return False
+        # `full` : l'initiateur est le titulaire du dossier qu'il vient
+        # d'ouvrir. Un accès `limited` l'empêcherait de relire ce qu'il a
+        # déposé dès que les `ir.rule` du moteur s'appliquent.
+        return self.add_actor(role, user, 'full')
+
+    @api.model
+    def _backfill_missing_initiator_actors(self, definition_codes=None):
+        """Pose l'acteur initiateur sur les instances nées sans lui.
+
+        Un correctif qui ne vaudrait que pour l'avenir laisserait derrière lui
+        les dossiers déjà ouverts : leur déposant resterait incapable de
+        franchir la moindre transition, sans que rien ne le signale. Appelée
+        depuis les fichiers de données du module métier, hors bloc `noupdate`.
+
+        Ne touche qu'aux instances **en cours** : rejouer l'histoire d'un
+        dossier clos rouvrirait un accès que sa clôture avait fermé. Idempotent
+        — `add_actor()` l'est déjà, et une instance qui a son acteur n'est même
+        pas relue.
+        """
+        domain = [
+            ('state', '=', 'running'),
+            ('definition_id.initiator_role_id', '!=', False),
+        ]
+        if definition_codes:
+            domain.append(('definition_id.code', 'in', definition_codes))
+
+        repaired = 0
+        for instance in self.sudo().search(domain):
+            role = instance.definition_id.initiator_role_id
+            if instance.actor_ids.filtered(lambda a: a.role_id == role):
+                continue
+            # Instance orpheline — son enregistrement métier a été supprimé
+            # sans elle. Lui poser un acteur ne rendrait service à personne et
+            # laisserait des lignes d'accès pointant vers un dossier disparu.
+            if not instance._get_record():
+                continue
+            if instance._grant_initiator_role():
+                repaired += 1
+        if repaired:
+            _logger.info(
+                "opex_workflow: acteur initiateur posé sur %s instance(s) "
+                "qui en étaient dépourvues.", repaired)
+        return repaired
+
     def remove_actor(self, role, user, keep_trace=True):
         """Retire l'accès de `user` au titre de `role`.
 
@@ -1207,6 +1268,17 @@ class WorkflowInstance(models.Model):
                 fields.Command.create(values) for values in (actor_values or [])
             ],
         })
+
+        # L'initiateur devient acteur de son dossier, si la définition le
+        # demande. C'est ici, et nulle part ailleurs : `_start_for()` est le
+        # seul chemin par lequel une instance naît — `start_workflow()` du
+        # mixin et `start_subworkflow()` y passent tous les deux. Un module
+        # métier n'a donc rien à écrire, et surtout rien à oublier.
+        #
+        # Le rôle est posé **avant** l'historique pour que le journal d'un
+        # dossier soit déjà lisible par son porteur à la ligne 1 : les
+        # `ir.rule` de l'historique traversent `active_actor_ids`.
+        instance._grant_initiator_role()
 
         # Première ligne d'historique : sans elle, le journal d'un dossier
         # commence à sa deuxième étape et l'entrée dans le processus n'est

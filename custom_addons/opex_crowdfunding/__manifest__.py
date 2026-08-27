@@ -40,6 +40,7 @@ La comparaison des deux est le livrable.
         'views/res_partner_views.xml',
         'views/crowdfunding_menus.xml',
         'views/portal_templates.xml',
+        'views/staff_templates.xml',
     ],
 
     'installable': True,

@@ -266,7 +266,7 @@ class OpexCrowdfundingProject(models.Model):
     def create(self, vals_list):
         """Un porteur portail ne présente de projet qu'en son propre nom.
 
-        Le formulaire de `/my/projects/new` est rempli côté navigateur : ni
+        Le formulaire de `/my/crowdfunding/new` est rempli côté navigateur : ni
         `partner_id` ni `state` ne peuvent en venir. Les réécrire ici, plutôt
         que de se contenter de ne pas les afficher, ferme la porte à une
         requête forgée qui déposerait un projet au nom d'un autre contact — ou
@@ -1317,7 +1317,7 @@ class OpexCrowdfundingProject(models.Model):
     _PORTAL_NEXT_ACTIONS = {
         'draft': (
             "Il vous reste quelques informations à donner pour présenter votre projet.",
-            "Présenter mon projet", '/my/projects/new',
+            "Présenter mon projet", '/my/crowdfunding/new',
         ),
         'depot_express': (
             "Votre demande est enregistrée. Le comité CEO va l'examiner.", None, None,
@@ -1328,12 +1328,12 @@ class OpexCrowdfundingProject(models.Model):
         'clarification': (
             "Le comité CEO vous a adressé des questions. Vos réponses lui "
             "permettront de statuer.",
-            "Répondre aux questions", '/my/projects/%(id)s/clarifications',
+            "Répondre aux questions", '/my/crowdfunding/%(id)s/clarifications',
         ),
         'dossier_progressif': (
             "Bonne nouvelle : votre projet est retenu pour la suite. Il reste "
             "à compléter votre dossier.",
-            "Compléter mon dossier", '/my/projects/%(id)s/dossier',
+            "Compléter mon dossier", '/my/crowdfunding/%(id)s/dossier',
         ),
         # Les entrées ci-dessous décriront une action du porteur dès que les
         # extensions suivantes auront ouvert les écrans correspondants. D'ici
@@ -1344,7 +1344,7 @@ class OpexCrowdfundingProject(models.Model):
         ),
         'quality_complement': (
             "Le contrôle qualité a besoin de compléments sur votre dossier.",
-            "Compléter mon dossier", '/my/projects/%(id)s/dossier',
+            "Compléter mon dossier", '/my/crowdfunding/%(id)s/dossier',
         ),
         'etude_decision': (
             "Votre dossier est à l'étude au comité CEO.", None, None,
@@ -1371,11 +1371,11 @@ class OpexCrowdfundingProject(models.Model):
         ),
         'closing': (
             "Votre financement est en cours de finalisation.",
-            "Voir mon financement", '/my/projects/%(id)s/financement',
+            "Voir mon financement", '/my/crowdfunding/%(id)s/financement',
         ),
         'closed': (
             "Votre financement est conclu. Votre projet est maintenant suivi.",
-            "Voir mon financement", '/my/projects/%(id)s/financement',
+            "Voir mon financement", '/my/crowdfunding/%(id)s/financement',
         ),
         'rejected': (
             "Votre projet n'a pas été retenu. Le comité CEO reste disponible "

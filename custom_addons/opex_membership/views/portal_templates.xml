@@ -83,7 +83,14 @@
                 <t t-set="title">Mes dossiers d'adhésion</t>
             </t>
 
-            <div class="mb-4">
+            <!-- Refus de dépôt d'un second dossier, expliqué au candidat :
+                 le texte vient du modèle, pas d'ici, pour dire exactement ce
+                 que le serveur a refusé et pourquoi. -->
+            <div t-if="error" class="alert alert-warning" role="alert">
+                <t t-out="error"/>
+            </div>
+
+            <div t-if="can_deposit" class="mb-4">
                 <a href="/my/membership/new" class="btn btn-primary">
                     <i class="fa fa-plus me-1"/>Déposer un dossier d'adhésion
                 </a>

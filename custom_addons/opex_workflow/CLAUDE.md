@@ -121,12 +121,212 @@ Conséquences concrètes ici :
 - Ne pas nommer un champ `stage_id` sur un modèle métier : `project.project` et
   plusieurs modèles natifs l'utilisent déjà.
 
+#### 1 bis. La règle vaut aussi **entre nos propres modules** — controllers portail
+
+Découvert le 26/08 en cherchant pourquoi `/my/projects` renvoyait 404.
+
+`_generate_routing_rules()` (`odoo/http.py`) fusionne **toutes les classes
+feuilles d'un même arbre de controller** en une seule classe dynamique :
+
+```python
+Ctrl = type(name, tuple(reversed(leaf_controllers)), {})
+```
+
+`portal.CustomerPortal` est l'ancêtre commun de `opex_membership`,
+`opex_innovation`, `opex_crowdfunding` **et** du natif `project`. Leurs
+controllers n'en forment donc qu'un seul à l'exécution. Conséquence : pour un
+**nom donné**, il n'existe qu'un exemplaire, celui qui gagne la MRO —
+
+- **une méthode de route** : ses URL disparaissent purement et simplement du
+  routing map. `portal_my_projects` était défini dans `project`,
+  `opex_crowdfunding` et `opex_innovation` ; seul `/my/innovation` a survécu,
+  `/my/projects` est tombé en 404 — y compris celui du module natif.
+- **un helper ou un attribut de classe** : c'est l'implémentation d'un autre
+  module qui s'exécute. Mesuré sur la classe fusionnée : `_current_draft`,
+  `_own_project`, `_save_step` et `_STEP_FIELDS` résolvaient tous vers
+  `opex_innovation`, `_render_step` vers `opex_membership`, et
+  `_items_per_page` vers `opex_membership.ClusterPortal`.
+
+**Ni erreur, ni avertissement, ni au chargement ni au runtime.** Le module
+paraît installé, ses templates existent, ses imports sont bons — et la moitié
+de son portail exécute le code du voisin. Aucun test unitaire ne l'attrape :
+seul le routing map réel (`env['ir.http'].routing_map()`) le montre.
+
+**La ligne de partage, c'est `super()`.** Une surcharge coopérative d'un hook
+natif — `_prepare_home_portal_values()`, qui commence par
+`super()._prepare_home_portal_values(counters)` — traverse la MRO de la classe
+fusionnée et **s'exécute en chaîne** : `opex_membership` et `opex_innovation`
+la surchargent tous les deux, et les deux tournent. C'est le mécanisme prévu,
+il n'y a rien à corriger là. Le dégât ne concerne que les méthodes qui
+n'appellent **pas** `super()` — une route, un helper, une constante définie
+indépendamment dans deux modules : la première de la MRO existe, les autres
+n'existent tout simplement pas.
+
+Règle : **tout ce qu'un controller portail définit sans passer par `super()`
+est préfixé au nom du module** — routes (`/my/<module>/…`), méthodes
+(`portal_<module>_*`), helpers (`_<module>_*`), constantes (`_<MODULE>_*`).
+Les hooks natifs qu'Odoo appelle lui-même gardent leur nom, à condition de
+relayer `super()`.
+
+Vérification, sur une base à jour :
+
+```python
+router = env['ir.http'].routing_map(key=1)
+sorted(str(r.rule) for r in router.iter_rules() if '/my/' in str(r.rule))
+```
+
 ### 2. Un contrôle d'accès = une seule fonction, jamais recopié
 
 Ici : « cet utilisateur peut-il déclencher cette transition ? » existe en **un seul
 endroit**, `opex.workflow.instance._check_transition_allowed()`, appelé par le
 back-office, le wizard, le portail et les tests. Une vérification dupliquée finit
 par en oublier une occurrence — et c'est celle-là qui reçoit la requête forgée.
+
+#### 2 bis. Un `search()` dans un gabarit fait tomber la page d'un autre
+
+Découvert le 26/08 : un compte du comité d'évaluation recevait un **403 sur
+`/my`**, l'accueil du portail — `You are not allowed to access 'Projet Smart
+Crowdfunding' (opex.crowdfunding.project) records`. Ni le comité, ni `/my`
+n'ont pourtant quoi que ce soit à voir avec le module Crowdfunding.
+
+En cause, une tuile greffée sur `portal.portal_my_home` qui comptait dans le
+gabarit :
+
+```xml
+<t t-set="count"
+   t-value="request.env['opex.crowdfunding.project'].search_count(
+                [('partner_id', '=', request.env.user.partner_id.id)]) or ''"/>
+```
+
+Un `search()` / `search_count()` posé en QWeb **s'exécute sous l'identité du
+visiteur**. Sans ligne `ir.model.access` pour son groupe, il lève `AccessError`
+au milieu du rendu, et c'est **la page entière** qui part en 403 — pas la tuile.
+Une greffe sur un gabarit partagé fait donc tomber la page de tous les autres
+modules. Aucun test unitaire ne l'attrape : il faut charger `/my` avec un compte
+de chaque rôle.
+
+**Le contrôle d'accès vit dans le controller, jamais dans le gabarit.** Le
+compteur se calcule dans `_prepare_home_portal_values()`, gardé par
+`has_access('read')` qui répond au lieu de lever :
+
+```python
+values['x_count'] = X.search_count(domain) if X.has_access('read') else 0
+```
+
+Corollaire : `sudo()` dans un gabarit n'est pas la parade. Il empêche l'erreur
+en supprimant *tout* contrôle — ACL et `ir.rule` — sans laisser de trace. Deux
+tuiles du même module le faisaient ; elles comptent désormais dans le controller
+sans `sudo()`, les `ir.rule` bornant déjà le résultat au contact connecté.
+
+Reste admis dans un gabarit : l'introspection de champs
+(`dict(record._fields['state'].selection)`), et l'appel d'une méthode métier qui
+porte elle-même sa garde (`user._is_innovation_staff()`,
+`partner.sudo().opex_can_apply_membership()`) — ni l'une ni l'autre n'interroge
+un modèle sous une identité qui pourrait ne pas y avoir droit.
+
+#### 2 ter. Le contrat de `/my/counters` est une condition de fonctionnement
+
+Payé le 26/08, dans la foulée du correctif de 2 bis. Un compteur de tuile
+portail se déclare des deux côtés :
+
+- **gabarit** : `<t t-set="placeholder_count" t-value="'x_count'"/>` pose le
+  nœud `[data-placeholder_count='x_count']` ;
+- **controller** : `_prepare_home_portal_values()` ne renseigne `values['x_count']`
+  **que si `'x_count' in counters`**.
+
+Les deux, ou aucun. `portal_home_counters.js` (lignes 33-37) fait, pour
+**chaque clé reçue** :
+
+```js
+this.el.querySelector(`[data-placeholder_count='${counterName}']`).textContent = …
+```
+
+Une clé sans nœud ⇒ `null.textContent` ⇒ la boucle lève ⇒ le `Promise.all`
+est rejeté ⇒ **tout le JavaScript de l'accueil meurt** : aucun compteur
+rempli, aucune tuile démasquée, et une boîte « Oops! » par-dessus la page.
+Pas seulement la tuile fautive, pas seulement son module, pas seulement le
+rôle concerné : **tous les utilisateurs**, sur `/my` et `/my/home`.
+
+Trois compteurs calculés sans regarder `counters` ont suffi. Le `if … in
+counters` des modules natifs n'est donc pas un style d'écriture à imiter,
+c'est ce qui fait tenir la page.
+
+#### 2 ter bis. Un `placeholder_count` n'appartient qu'à une seule tuile
+
+Corollaire du précédent, payé le 27/08. Deux tuiles d'`opex_innovation`
+— « mes missions » et « mes opportunités » — déclaraient le même
+`innovation_opportunity_count`, au motif raisonnable que les deux écrans lisent
+les mêmes propositions.
+
+`portal_home_counters.js` résout chaque compteur ainsi :
+
+```js
+const el = this.el.querySelector(`[data-placeholder_count='${counterName}']`);
+```
+
+`querySelector` renvoie le **premier** nœud, jamais les deux. La seconde tuile
+n'était donc pas démasquée au premier chargement ; elle n'apparaissait qu'au
+suivant, quand `force_show` la révélait depuis
+`request.session['portal_counters']`. Un utilisateur qui arrive sur son espace
+pour la première fois ne voit pas la moitié de ce qui le concerne, et
+l'anomalie s'efface d'elle-même dès qu'on recharge — donc dès qu'on cherche à
+la reproduire.
+
+Règle : **un compteur, une tuile, un domaine**. Deux écrans qui montrent des
+choses différentes ont deux compteurs, même s'ils lisent la même table — et le
+domaine du compteur est exactement celui de l'écran qu'il annonce, sans quoi la
+tuile promet un nombre que la page ne contient pas.
+
+Le balayage qui le vérifie, sur les trois modules :
+
+```bash
+grep -rn "placeholder_count\"" --include='*.xml' opex_*/views/ | sort
+```
+
+Aucun compteur ne doit apparaître deux fois.
+
+#### 2 quater. Le spinner qui reste EST un symptôme, pas un détail
+
+`portal_home_counters.js` supprime `.o_portal_doc_spinner` **après** le
+`Promise.all` (ligne 49). Un spinner encore visible sur l'accueil du portail
+signifie donc qu'une promesse a été rejetée — le JS est mort avant la fin.
+
+Il était présent sur mes propres captures pendant deux tours sans que je le
+relève. **Un spinner figé sur une capture ⇒ ouvrir la console avant de
+conclure quoi que ce soit.**
+
+#### 2 quinquies. Un test HTTP ne verra jamais une erreur JavaScript
+
+`requests.get()` et `url_open()` d'`HttpCase` lisent le HTML **rendu par le
+serveur**. Ils voient les tuiles, leurs classes, leurs liens — et passent au
+vert pendant qu'une exception JS vide la page dans un vrai navigateur. La
+capture d'écran d'un HTML sauvegardé ne vaut pas mieux : les RPC ne partent
+pas, l'erreur ne se produit pas.
+
+Un écran portail qui dépend de JavaScript — compteurs, tuiles démasquées,
+interactions `Colibri` — se vérifie **dans un navigateur, console ouverte,
+avec une vraie session**. Le reste ne prouve que le HTML.
+
+#### 2 sexies. `portal_searchbar` n'affiche pas toujours le `title` qu'on lui pose
+
+`portal.portal_searchbar` (`odoo/addons/portal/views/portal_templates.xml:311`) :
+
+```xml
+<t t-if="breadcrumbs_searchbar">
+    <t t-call="portal.portal_breadcrumbs"/>
+</t>
+<span t-else="" class="navbar-brand mb-0 h1 me-auto" t-esc="title or 'No title'"/>
+```
+
+Le titre n'est rendu que dans la branche **`t-else`**. Une page qui pose
+`breadcrumbs_searchbar = True` — la plupart des nôtres — affiche son fil
+d'Ariane à la place, et son `<t t-set="title">` ne sert **à rien**. Le libellé
+visible est alors celui du `portal.portal_breadcrumbs`, à modifier là.
+
+Trouvé le 27/08 en renommant l'écran `/my/crowdfunding` : le titre changé dans
+la searchbar n'apparaissait nulle part, et le gabarit avait pourtant l'air
+juste. **Un libellé qui ne s'affiche pas alors que le gabarit le pose : lire la
+page rendue, pas le gabarit.**
 
 ### 3. « Présent dans le HTML » ≠ « visible à l'écran »
 

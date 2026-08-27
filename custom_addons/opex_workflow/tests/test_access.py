@@ -220,3 +220,103 @@ class TestDynamicAccess(WorkflowCase):
         self.assertEqual(visible, task)
         # …sans pour autant lui ouvrir le dossier lui-même.
         self.assertFalse(self._visible_instances(internal))
+
+    # ------------------------------------------------------------
+    # initiator_role_id — l'acteur que le métier ne doit plus poser
+    # ------------------------------------------------------------
+
+    def _initiator_definition(self, code, role=None):
+        definition = self._linear_definition(code=code, publish=False)
+        definition.initiator_role_id = (role or self.role_porteur).id
+        definition.action_publish()
+        return definition
+
+    def test_the_initiator_becomes_actor_of_the_instance_he_starts(self):
+        """Le correctif de cause : le moteur pose la ligne, pas le métier.
+
+        Le rôle Porteur n'a pas de groupe. Tant que la ligne d'acteur relevait
+        du `create()` de chaque module métier, l'oubli était muet et le
+        déposant se retrouvait sans aucune transition sur son propre dossier.
+        """
+        self._initiator_definition('initiator_wf')
+        record = self.env['res.partner'].create({'name': "Dossier initié"})
+        instance = self.Instance.with_user(self.porteur)._start_for(
+            record, 'initiator_wf')
+
+        actors = instance.sudo().actor_ids
+        self.assertEqual(len(actors), 1)
+        self.assertEqual(actors.role_id, self.role_porteur)
+        self.assertEqual(actors.user_id, self.porteur)
+        self.assertEqual(actors.access_level, 'full')
+        # La conséquence observable : le dossier lui est visible et agissable.
+        self.assertTrue(instance._has_access(self.porteur, 'full'))
+
+    def test_without_the_field_the_engine_places_nothing(self):
+        """Un processus ouvert par un tiers pour le compte d'un autre.
+
+        Y poser l'initiateur donnerait un accès complet à celui qui ouvre le
+        dossier — le CEO sur un suivi d'industrialisation, par exemple. Le
+        champ vide doit donc rester strictement sans effet.
+        """
+        record = self.env['res.partner'].create({'name': "Dossier tiers"})
+        instance = self.Instance.with_user(self.porteur)._start_for(
+            record, 'access_wf')
+        self.assertFalse(instance.sudo().actor_ids)
+
+    def test_the_public_user_never_becomes_actor(self):
+        """Le compte public est partagé par tous les visiteurs.
+
+        Lui donner un rôle sur un dossier l'ouvrirait à n'importe qui.
+        """
+        self._initiator_definition('initiator_public_wf')
+        record = self.env['res.partner'].create({'name': "Dossier public"})
+        instance = self.Instance._start_for(record, 'initiator_public_wf')
+
+        # `initiator_id` réécrit plutôt que `_start_for()` appelé sous le compte
+        # public : celui-ci n'a aucun droit de lecture sur la configuration du
+        # moteur, et le test échouerait sur l'ACL avant d'atteindre la garde
+        # qu'il prétend vérifier.
+        instance.sudo().actor_ids.unlink()
+        instance.sudo().initiator_id = self.env.ref('base.public_user')
+
+        self.assertFalse(instance._grant_initiator_role())
+        self.assertFalse(instance.sudo().actor_ids)
+
+    def test_backfill_repairs_instances_started_before_the_field_existed(self):
+        """Un correctif qui ne vaut que pour l'avenir laisse des dossiers morts.
+
+        Les demandes déjà déposées sont nées sans acteur : sans rattrapage,
+        leurs déposants resteraient définitivement bloqués.
+        """
+        definition = self._initiator_definition('initiator_backfill_wf')
+        record = self.env['res.partner'].create({'name': "Dossier ancien"})
+        instance = self.Instance.with_user(self.porteur)._start_for(
+            record, 'initiator_backfill_wf')
+
+        # On remet l'instance dans l'état d'avant le correctif.
+        instance.sudo().actor_ids.unlink()
+        self.assertFalse(instance.sudo().actor_ids)
+
+        repaired = self.Instance._backfill_missing_initiator_actors(
+            definition_codes=[definition.code])
+
+        self.assertEqual(repaired, 1)
+        self.assertEqual(instance.sudo().actor_ids.user_id, self.porteur)
+        # Idempotent : un second passage ne recrée rien.
+        self.assertEqual(
+            self.Instance._backfill_missing_initiator_actors(
+                definition_codes=[definition.code]), 0)
+
+    def test_backfill_ignores_instances_whose_record_is_gone(self):
+        """Une instance orpheline n'a personne à qui ouvrir quoi que ce soit."""
+        definition = self._initiator_definition('initiator_orphan_wf')
+        record = self.env['res.partner'].create({'name': "Dossier supprimé"})
+        instance = self.Instance.with_user(self.porteur)._start_for(
+            record, 'initiator_orphan_wf')
+        instance.sudo().actor_ids.unlink()
+        record.unlink()
+
+        self.assertEqual(
+            self.Instance._backfill_missing_initiator_actors(
+                definition_codes=[definition.code]), 0)
+        self.assertFalse(instance.sudo().actor_ids)

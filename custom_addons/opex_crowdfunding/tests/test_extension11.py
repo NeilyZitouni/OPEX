@@ -327,7 +327,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
     def test_ecran_porteur_progression_et_prochaine_action(self):
         projet = self._projet(state='quality_gate')
         self.authenticate('cf11_porteur', 'cf11_porteur')
-        url = '/my/projects/%s' % projet.id
+        url = '/my/crowdfunding/%s' % projet.id
         page = self.url_open(url)
         texte = self._texte(page)
 
@@ -349,7 +349,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
         self.env.cr.precommit.run()
 
         self.authenticate('cf11_porteur', 'cf11_porteur')
-        url = '/my/projects/%s/historique' % projet.id
+        url = '/my/crowdfunding/%s/historique' % projet.id
         page = self.url_open(url)
         texte = self._texte(page)
 
@@ -364,7 +364,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
         projet.with_user(self.ceo).action_route_rejected()
 
         self.authenticate('cf11_porteur', 'cf11_porteur')
-        page = self.url_open('/my/projects/%s/historique' % projet.id)
+        page = self.url_open('/my/crowdfunding/%s/historique' % projet.id)
         contenu = html.unescape(page.text)
         self.assertIn("n'a pas été retenu", self._texte(page))
         self.assertNotIn("Marché déjà couvert", contenu,
@@ -384,7 +384,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
         })
 
         self.authenticate('cf11_investisseur', 'cf11_investisseur')
-        url = '/my/opportunities'
+        url = '/my/crowdfunding/opportunities'
         page = self.url_open(url)
         texte = self._texte(page)
 
@@ -401,7 +401,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
             groups='base.group_portal', name="Capital Oran")
 
         self.authenticate('cf11_autre_inv', 'cf11_autre_inv')
-        texte = self._texte(self.url_open('/my/opportunities'))
+        texte = self._texte(self.url_open('/my/crowdfunding/opportunities'))
         self.assertIn("Aucun dossier ne vous est soumis", texte)
 
     # ------------------------------------------------------------------
@@ -410,7 +410,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
     def test_ecran_expert_mission_proposee_et_deux_boutons(self):
         mission = self._mission()
         self.authenticate('cf11_expert', 'cf11_expert')
-        url = '/my/missions'
+        url = '/my/crowdfunding/missions'
         page = self.url_open(url)
         texte = self._texte(page)
 
@@ -425,20 +425,20 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
         mission = self._mission()
         self.authenticate('cf11_expert', 'cf11_expert')
 
-        self.url_open('/my/missions/%s/reponse' % mission.id, data={
-            'reponse': 'accepter', 'csrf_token': self._jeton('/my/missions')})
+        self.url_open('/my/crowdfunding/missions/%s/reponse' % mission.id, data={
+            'reponse': 'accepter', 'csrf_token': self._jeton('/my/crowdfunding/missions')})
 
         mission.invalidate_recordset()
         self.assertEqual(mission.state, 'acceptee')
-        texte = self._texte(self.url_open('/my/missions'))
+        texte = self._texte(self.url_open('/my/crowdfunding/missions'))
         self.assertNotIn("Nouvelle mission proposée", texte)
 
     def test_l_expert_decline_depuis_son_ecran(self):
         mission = self._mission()
         self.authenticate('cf11_expert', 'cf11_expert')
 
-        self.url_open('/my/missions/%s/reponse' % mission.id, data={
-            'reponse': 'decliner', 'csrf_token': self._jeton('/my/missions')})
+        self.url_open('/my/crowdfunding/missions/%s/reponse' % mission.id, data={
+            'reponse': 'decliner', 'csrf_token': self._jeton('/my/crowdfunding/missions')})
 
         mission.invalidate_recordset()
         self.assertEqual(mission.state, 'declinee')
@@ -450,7 +450,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
         projet.write({'business_model': "Abonnement mensuel par atelier."})
 
         self.authenticate('cf11_expert', 'cf11_expert')
-        page = self.url_open('/my/missions')
+        page = self.url_open('/my/crowdfunding/missions')
         contenu = html.unescape(page.text)
         self.assertNotIn("Abonnement mensuel", contenu,
                          "Le dossier du porteur a fuité à l'expert.")
@@ -459,7 +459,7 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
             self.env, login='cf11_autre_expert', password='cf11_autre_expert',
             groups='base.group_portal', name="Karim Slimani")
         self.authenticate('cf11_autre_expert', 'cf11_autre_expert')
-        texte = self._texte(self.url_open('/my/missions'))
+        texte = self._texte(self.url_open('/my/crowdfunding/missions'))
         self.assertIn("Aucune mission", texte)
 
     def test_un_expert_ne_repond_pas_pour_un_autre(self):
@@ -469,8 +469,8 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
             groups='base.group_portal', name="Intrus")
 
         self.authenticate('cf11_intrus', 'cf11_intrus')
-        self.url_open('/my/missions/%s/reponse' % mission.id, data={
-            'reponse': 'accepter', 'csrf_token': self._jeton('/my/missions')})
+        self.url_open('/my/crowdfunding/missions/%s/reponse' % mission.id, data={
+            'reponse': 'accepter', 'csrf_token': self._jeton('/my/crowdfunding/missions')})
 
         mission.invalidate_recordset()
         self.assertEqual(mission.state, 'proposee')
@@ -488,9 +488,9 @@ class TestExtension11Interfaces(HttpCase, InterfacesCommon):
         """Même piège `d-none` que la tuile « Mes projets » : sans
         `config_card`, la carte reste masquée tant que le compteur est nul."""
         cas = (
-            ('cf11_porteur', 'cf11_porteur', '/my/projects'),
-            ('cf11_investisseur', 'cf11_investisseur', '/my/opportunities'),
-            ('cf11_expert', 'cf11_expert', '/my/missions'),
+            ('cf11_porteur', 'cf11_porteur', '/my/crowdfunding'),
+            ('cf11_investisseur', 'cf11_investisseur', '/my/crowdfunding/opportunities'),
+            ('cf11_expert', 'cf11_expert', '/my/crowdfunding/missions'),
         )
         for login, motdepasse, url in cas:
             self.authenticate(login, motdepasse)

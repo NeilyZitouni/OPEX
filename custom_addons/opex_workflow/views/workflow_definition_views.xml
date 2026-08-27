@@ -45,6 +45,8 @@
                             <field name="code" placeholder="innovation_project"/>
                             <field name="model_id" options="{'no_create': True}"/>
                             <field name="model_name" invisible="1"/>
+                            <field name="initiator_role_id"
+                                   options="{'no_create': True}"/>
                         </group>
                         <group>
                             <field name="version"/>

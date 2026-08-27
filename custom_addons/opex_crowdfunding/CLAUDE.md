@@ -120,11 +120,134 @@ Payées cher sur le module précédent. Elles s'appliquent ici aussi.
 1. **Collisions de nommage avec l'API interne d'Odoo.** `category_id`, `_register`,
    `stage_id`, `name_get` sont déjà pris à divers endroits. Une collision est
    souvent masquée silencieusement et échoue au runtime, pas au chargement.
+
+   **1 bis — la même règle vaut entre nos propres modules, sur les controllers
+   portail.** Découvert le 26/08 : `/my/projects` renvoyait 404 alors que le
+   controller existait, était importé et que ses 12 templates étaient en base.
+   `_generate_routing_rules()` (`odoo/http.py`) fusionne **toutes les classes
+   feuilles d'un même arbre de controller** en une seule
+   (`Ctrl = type(name, tuple(reversed(leaf_controllers)), {})`). `CustomerPortal`
+   étant l'ancêtre commun de ce module, d'`opex_membership`, d'`opex_innovation`
+   et du natif `project`, un nom partagé n'existe **qu'en un exemplaire** :
+
+   - méthode de route → ses URL **disparaissent du routing map** (`portal_my_projects`
+     et `portal_project_new` étaient pris par `opex_innovation` ; `/my/projects`,
+     `/my/projects/page/<n>` et `/my/projects/new` sont tombés en 404, et le
+     `/my/projects` du module natif `project` avec eux) ;
+   - helper ou attribut de classe → **c'est le code du voisin qui s'exécute**.
+     Mesuré sur la classe fusionnée : `_current_draft`, `_own_project`,
+     `_save_step`, `_STEP_FIELDS` résolvaient vers `opex_innovation`,
+     `_render_step` vers `opex_membership`, `_items_per_page` vers
+     `opex_membership.ClusterPortal` (20 au lieu de 80).
+
+   Ni erreur, ni avertissement. Seul le routing map réel le montre —
+   `env['ir.http'].routing_map(key=1)`, pas la relecture du code.
+
+   La ligne de partage est `super()` : une surcharge coopérative d'un hook natif
+   (`_prepare_home_portal_values()`) traverse la MRO et s'exécute en chaîne —
+   rien à craindre de ce côté. Le dégât ne touche que ce qui est défini
+   indépendamment dans deux modules sans relayer `super()` : routes, helpers,
+   constantes.
+
+   **D'où la règle appliquée ici sans exception** : routes sous
+   `/my/crowdfunding/…`, méthodes `portal_crowdfunding_*`, helpers
+   `_crowdfunding_*`, constantes `_CROWDFUNDING_*`. Un nouveau point d'entrée
+   qui ne respecte pas ce préfixe est un 404 en puissance.
 2. **Un contrôle d'accès = une seule fonction, jamais recopiée.** Ici :
    `_is_ceo()`, `_is_quality_control()`, `_project_access_denied()`. Une
    vérification dupliquée finit par en oublier une occurrence.
+
+   ✅ **Écart refermé le 26/08.** Ce qui manquait n'était pas la fusion des
+   trois helpers d'appartenance — `_crowdfunding_own_project()`,
+   `_crowdfunding_relation_du_partenaire()`,
+   `_crowdfunding_mission_de_l_expert()` répondent à trois questions
+   différentes, sur trois modèles différents (« ce projet est-il le mien ? »,
+   « cette relation est-elle la mienne ? », « cette mission m'est-elle
+   confiée ? ») ; les réunir aurait obscurci le code sans rien protéger de plus.
+   Ils restent en place.
+
+   Ce qui manquait, c'est le contrôle **de rôle** : « suis-je habilité à
+   instruire ? ». Il n'existait nulle part, et il est désormais unique —
+   `res.users._is_crowdfunding_staff()` (`models/res_users.py`), sur
+   `group_ceo` + `group_quality_control`, appelé par la tuile d'accueil du
+   portail. Posé sur `res.users` et non dans le controller pour qu'un gabarit
+   puisse l'appeler : une liste de groupes recopiée dans un `t-if` aurait
+   divergé de celle de la route au premier rôle ajouté. `opex_innovation` a
+   reçu le même traitement (`_is_innovation_staff()`, que `_staff_user()`
+   interroge au lieu de refaire le test), `opex_membership` l'avait déjà
+   (`_is_opex_staff()`).
+
+   **2 bis — un `search()` dans un gabarit fait tomber la page d'un autre.**
+   Payé ici le 26/08 : un compte du **comité d'évaluation** (`opex_innovation`,
+   utilisateur interne) recevait un **403 sur `/my`** — *« You are not allowed
+   to access 'Projet Smart Crowdfunding' »*. La cause était notre tuile
+   d'accueil, qui comptait ses projets en QWeb :
+
+   ```xml
+   <t t-set="count" t-value="request.env['opex.crowdfunding.project'].search_count(...)"/>
+   ```
+
+   Un `search_count()` en QWeb s'exécute **sous l'identité du visiteur**. Nos
+   ACL n'ouvrent `opex.crowdfunding.project` qu'à `group_ceo`,
+   `group_quality_control` et `base.group_portal` — c'est correct, un comité
+   d'évaluation n'a rien à y lire. Mais l'`AccessError` levée en plein rendu
+   emportait **l'accueil du portail entier**, celui de tous les modules.
+   Le controller, lui, faisait déjà le contrôle proprement
+   (`if not Project.has_access('read'): redirect('/my')`) — et renvoyait donc
+   vers une page qui plantait.
+
+   **Le contrôle d'accès vit dans le controller, jamais dans le gabarit.** Les
+   trois compteurs sont passés dans `_prepare_home_portal_values()`, gardés par
+   `has_access('read')`, qui répond au lieu de lever. Et **`sudo()` n'est pas la
+   parade** : les tuiles « opportunités » et « missions » l'utilisaient, ce qui
+   n'échouait pas mais supprimait ACL *et* `ir.rule` sans laisser de trace.
+   Elles comptent maintenant sans `sudo()`.
+
+   ⚠ Ne jamais corriger ce genre de 403 en élargissant l'ACL : si un rôle n'a
+   pas accès au modèle, c'est en général qu'il ne devrait pas y toucher.
+   **2 ter — le contrat de `/my/counters` est une condition de fonctionnement.**
+   Payé le 26/08, dans la foulée du correctif précédent. Un compteur de tuile se
+   déclare **des deux côtés, ou d'aucun** : `placeholder_count` dans le gabarit
+   (qui pose le nœud `[data-placeholder_count]`), et `if 'x_count' in counters:`
+   dans `_prepare_home_portal_values()`. `portal_home_counters.js` fait pour
+   *chaque clé reçue* `querySelector(...).textContent = …` ; une clé sans nœud
+   donne `null`, la boucle lève, le `Promise.all` est rejeté et **tout le
+   JavaScript de l'accueil meurt** — compteurs vides, tuiles jamais démasquées,
+   boîte « Oops! » — pour **tous** les utilisateurs, pas seulement ceux de ce
+   module. Nos trois compteurs calculés sans regarder `counters` ont suffi.
 3. **« Présent dans le HTML » ≠ « visible à l'écran ».** Un test qui vérifie
    `'texte' in body` passe alors que l'utilisateur ne voit rien.
+
+   **2 quater — un `placeholder_count` n'appartient qu'à une seule tuile.**
+   Corollaire, payé le 27/08 côté `opex_innovation` : deux tuiles déclaraient le
+   même compteur. `portal_home_counters.js` le résout par `querySelector()`, qui
+   ne renvoie que le **premier** nœud — la seconde tuile n'était démasquée qu'au
+   rechargement suivant, via le cache de session, donc jamais au moment où
+   quelqu'un découvre son espace. Un compteur, une tuile, et le domaine du
+   compteur est exactement celui de l'écran qu'il annonce. Vérification :
+   `grep -rn 'placeholder_count"' --include='*.xml' opex_*/views/ | sort` — aucun
+   nom ne doit sortir deux fois.
+
+   **2 quinquies — `portal_searchbar` n'affiche pas toujours le `title` posé.**
+   Il n'est rendu que dans la branche `t-else`, quand `breadcrumbs_searchbar` est
+   **faux**. Nos écrans le mettent à vrai : le libellé visible vient alors du fil
+   d'Ariane (`portal.portal_breadcrumbs`), et le `t-set="title"` de la searchbar
+   ne sert à rien. Constaté le 27/08 en renommant `/my/crowdfunding` — le titre
+   changé n'apparaissait nulle part, gabarit pourtant juste. **Un libellé qui ne
+   s'affiche pas : lire la page rendue, pas le gabarit.**
+
+   **3 bis — le spinner qui reste EST le symptôme.**
+   `portal_home_counters.js` supprime `.o_portal_doc_spinner` **après** le
+   `Promise.all`. Un spinner encore visible sur l'accueil = une promesse
+   rejetée. Il figurait sur mes captures pendant deux tours sans être relevé :
+   **spinner figé ⇒ ouvrir la console avant de conclure.**
+
+   **3 ter — un test HTTP ne verra jamais une erreur JavaScript.**
+   `url_open()` et `requests.get()` lisent le HTML **du serveur** ; ils passent
+   au vert pendant qu'une exception JS vide la page. Screenshot d'un HTML
+   sauvegardé : même limite, les RPC ne partent pas. Tout écran portail qui
+   dépend du JS — compteurs, démasquage de tuiles, interactions `Colibri` — se
+   vérifie **dans un vrai navigateur, console ouverte, session réelle**.
 4. **`mail.mt_note` pour tout message interne.** `mail.mt_comment` uniquement pour
    ce que le porteur doit recevoir par email. Bug déjà rencontré et corrigé.
 5. **Odoo 19** : `res.groups.privilege` (plus de `category_id` sur `res.groups`) ;
@@ -217,7 +340,14 @@ le compteur revient **strictement positif**. Une tuile posée avec
 exactement le porteur qu'on attend. Ici : `config_card="True"`, compteur calculé
 dans le gabarit, et un test qui vérifie l'absence de `d-none` sur la carte.
 
-Routes : `/my/projects`, `/my/projects/new`, `/my/projects/<id>`.
+Routes : `/my/crowdfunding`, `/my/crowdfunding/new`, `/my/crowdfunding/<id>`.
+
+⚠️ **Renommées le 26/08** (correctif du 404, cf. règle transversale 1 bis). Tout
+l'espace de noms du portail est passé sous `/my/crowdfunding/…` : les projets à
+la racine, `/my/crowdfunding/opportunities/…` pour l'acteur financier,
+`/my/crowdfunding/missions/…` pour l'expert. Les anciens chemins `/my/projects`,
+`/my/opportunities` et `/my/missions` ne sont **pas** conservés en redirection —
+ils appartiennent à l'espace de noms générique qui a causé la collision.
 
 ⚠️ Le CTA est **« Présenter mon projet »**, jamais « Constituer mon dossier de
 financement ». Le document insiste explicitement dessus : le libellé conditionne le
@@ -685,8 +815,76 @@ comparaison moins honnête.
 
 ---
 
-# Hors périmètre — assumé
+# `/staff/crowdfunding` — un écran de démonstration, et ce qu'il ne couvre pas
 
+⚠ **À dire tel quel en soutenance.** Ajouté le 27/08, après avoir d'abord
+tranché l'inverse (tuile pointant sur le back-office) : la démonstration ne doit
+pas quitter le site. Trois routes, calquées sur `/staff/innovation` :
+
+| Route | Contenu |
+|---|---|
+| `/staff/crowdfunding` | la file, filtrée par rôle |
+| `/staff/crowdfunding/<id>` | le dossier **en lecture seule** + les décisions ouvertes à ce rôle à cette étape |
+| `/staff/crowdfunding/<id>/action` | l'exécution, POST, déléguée à la méthode du modèle |
+
+**Les files réutilisent les six domaines de `opex.crowdfunding.work.queue`**,
+sans les réécrire : la même définition compte dans le back-office et liste dans
+le portail. Deux nuances :
+
+- la file du **Contrôle Qualité** ajoute `state = quality_gate` à
+  `_domaine_controles_anomalie()`. Les six files du back-office n'ont pas de
+  file « dossiers attendant un premier contrôle » ; s'en tenir aux anomalies
+  aurait privé le rôle de son travail principal ;
+- « investisseurs en attente » et « accompagnements en retard » portent sur
+  `relation` et `accompagnement`, pas sur des dossiers : affichées **en
+  compteur seul**, avec la mention qu'elles se traitent au back-office.
+
+**Contrôle d'accès** : `res.users._is_crowdfunding_staff()` en première ligne
+de chaque route, puis `_crowdfunding_staff_project()` qui ne retrouve un
+dossier qu'**à travers la file du rôle** — un identifiant forgé ne remonte rien
+plutôt que de lever. Le nom de méthode reçu en POST n'est jamais appelé tel
+quel : il est cherché dans la table des actions ouvertes à ce rôle à cette
+étape, et le modèle revérifie ensuite (`_ensure_ceo`,
+`_ensure_quality_control`). Aucun `t-if` ne sert de garde.
+
+## Ce que cet écran NE fait PAS — la liste à connaître avant de le montrer
+
+1. **Aucune saisie du dossier.** Le formulaire back-office du projet compte
+   **144 champs** ; ici tout est en lecture seule. Corriger une donnée impose
+   le back-office.
+2. **Ni la préqualification, ni la fiche de contrôle qualité.** Les sept
+   critères, le commentaire, le résultat d'un côté ; les cinq cases, les
+   anomalies et l'avis à quatre valeurs de l'autre — **saisis au back-office**.
+   Les boutons du portail ne font que *conclure* : `action_quality_ok()` exige
+   une fiche dont l'avis correspond déjà (`_ensure_quality_gate_control`), et
+   `action_clarify()` exige au moins une question déjà rédigée. Sans elles, le
+   bouton renvoie le message du modèle — c'est voulu, pas un bug.
+3. **Le matching financier n'y est pas.** Valider / modifier / exclure /
+   ajouter un acteur, les scores et leur explication : back-office. L'étape
+   `matching_financier` apparaît dans la file du comité, sans bouton.
+4. **L'accompagnement n'y est pas** : missions, jalons, livrables,
+   contrepartie — quatre modèles liés.
+5. **Le closing n'y est pas** : documents à valider un par un, échéancier,
+   versements, suivi post-financement.
+6. **Pas de chatter** : ni suivi, ni relance, ni pièce jointe. L'historique
+   affiché est celui du porteur (`_portal_historique()`, `mt_comment` +
+   changements d'état) — **pas** le journal d'instruction complet.
+7. **Pas de filtres, de regroupements, de tri, d'export, ni de vue liste
+   éditable.** La vue de recherche du back-office (filtre « En cours », par
+   étape, par secteur) n'a pas d'équivalent.
+8. **Pas d'activités planifiées** (`mail.activity`) ni de rappels.
+
+Chaque fiche porte en bas un lien discret **« Ouvrir dans le back-office »**
+vers ces huit cas. Le jury ne le verra pas si la démonstration se déroule bien.
+
+⚠ **Coût accepté** : un second jeu de contrôles d'accès à tenir d'accord avec
+les ACL et les groupes des menus. Il est réduit au minimum — le controller
+délègue toute décision au modèle — mais il existe, et c'est l'argument qui
+avait fait préférer le back-office le 26/08.
+
+---
+
+# Hors périmètre — assumé
 - Agent IA de contrôle qualité (le document le situe explicitement « à terme »)
 - Signature électronique cryptographique — confirmation horodatée, comme sur le
   Module 1
