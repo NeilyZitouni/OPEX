@@ -69,6 +69,25 @@
             <field name="body" type="html"><p>Votre demande de profil a été examinée. Consultez votre espace personnel.</p></field>
         </record>
 
+        <!--
+            La prise en charge ne disait rien au demandeur : sa demande passait
+            de « déposée » à « en contrôle » sans un mot. `comment` et pas
+            `note` — c'est à lui que le message s'adresse.
+
+            Pas de `target_role_ids`, comme pour « Informer le membre » :
+            l'intéressé est **follower** de sa demande (`message_subscribe()`
+            au `create()`), et le rôle Porteur n'a pas de groupe. Viser le rôle
+            n'ajouterait rien et manquerait les demandes ouvertes en
+            back-office pour le compte d'un tiers.
+        -->
+        <record id="action_profile_notify_prise_en_charge" model="opex.workflow.action">
+            <field name="name">Informer de la prise en charge</field>
+            <field name="code">profile_notify_prise_en_charge</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Le Secrétariat a pris votre demande de profil en charge : elle est en cours de contrôle.</p></field>
+        </record>
+
         <record id="action_profile_activate" model="opex.workflow.action">
             <field name="name">Activer le profil</field>
             <field name="code">profile_activate</field>
@@ -409,6 +428,16 @@
     -->
     <function model="opex.workflow.instance"
               name="_backfill_missing_initiator_actors"/>
+
+    <!--
+        La prise en charge, sur les deux définitions. `Command.link` : ces
+        transitions ne portent aujourd'hui aucune action, mais un `set`
+        effacerait ce qu'une extension future y aurait ajouté.
+    -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('tr_expert_take'), ref('tr_investor_take')],
+                     {'action_ids': [
+                         Command.link(ref('action_profile_notify_prise_en_charge'))]}]"/>
 
     <function model="opex.workflow.definition" name="action_publish"
               eval="[[ref('wf_expert_profile')]]"/>

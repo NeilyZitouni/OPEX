@@ -343,6 +343,52 @@ interne partaient par email chez le candidat. Tout `message_post()` destiné au
 personnel utilise `mail.mt_note`. `mail.mt_comment` uniquement pour ce que le
 porteur doit réellement recevoir.
 
+⚠ **Le sous-type ne décide pas que de l'email.** Deux conséquences moins
+évidentes, toutes deux mesurées le 28/08 :
+
+- un `mt_comment` part **aussi aux followers** de l'enregistrement, et le
+  porteur en est un. Une notification destinée à un expert ou à un investisseur,
+  postée en `comment` sur le projet, arrive donc chez le porteur. C'est le même
+  bug, par une autre porte ;
+- la cloche portail d'`opex_membership` filtre par
+  `mail.message._get_search_domain_share()`, qui **écarte les `mt_note`**. Un
+  message interne n'entrera jamais dans la cloche d'un compte portail, quoi
+  qu'on configure par ailleurs. Corollaire : un destinataire **portail** visé en
+  `note` — expert, évaluateur, acteur financier — ne voit rien à l'écran. Seul
+  le porteur, servi en `comment`, est atteint par cette cloche.
+
+### 4 bis. ⚠ Aucune notification email n'est délivrée dans cet environnement
+
+**À annoncer avant toute démonstration.** Le canal email est correctement câblé
+côté application — sous-types, destinataires, followers — mais rien ne sort de
+la machine.
+
+`odoo.conf` pointe `smtp_server = localhost` sur le port 25, où **aucun serveur
+n'écoute**. Mesuré le 28/08 sur la base `odoo19` :
+
+| Table | État | Nombre |
+|---|---|---|
+| `mail_notification` | `exception` | 48 |
+| `mail_mail` | `exception` | 68 |
+| `mail_notification` | `inbox` | 0 |
+
+Conséquences à connaître :
+
+- **aucun porteur n'a jamais reçu de courriel** de ce portail, sur aucun des
+  trois modules ;
+- une notification qui « ne marche pas » n'est donc pas nécessairement mal
+  configurée : vérifier `mail_message` en base **avant** de chercher le défaut
+  dans le workflow ;
+- ce qui *fonctionne* et se démontre : la cloche portail
+  (`/my/notifications`, alimentée par les `mail.message`) et, depuis le 28/08,
+  la cloche native du personnel interne (`notification_type = 'inbox'`, réglé
+  en données par `_opex_innovation_enable_inbox()` et
+  `_opex_crowdfunding_enable_inbox()`).
+
+Rien n'a été changé au SMTP : c'est une limite d'environnement, pas un défaut du
+code, et la corriger demande un serveur de messagerie, pas une modification de
+module.
+
 ### 5. Spécificités Odoo 19 déjà rencontrées
 
 - `res.groups.category_id` n'existe plus → `res.groups.privilege`

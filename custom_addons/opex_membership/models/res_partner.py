@@ -94,15 +94,58 @@ class ResPartner(models.Model):
                 [('partner_id', '=', self.id)]).ids,
         }
 
-    def _opex_notification_messages(self):
-        """Messages visibles par ce contact sur ses propres enregistrements.
+    def _opex_notification_addressed_messages(self):
+        """Messages dont ce contact est **destinataire explicite**.
 
-        La règle de visibilité est *exactement* celle de l'historique du dossier
-        (`opex.membership.file._history_entries`) : le même
-        `mail.message._get_search_domain_share()` d'Odoo, qui écarte les notes
-        internes. Les deux vues ne doivent jamais diverger — une note qu'on
-        vient d'apprendre à masquer dans l'historique ne doit pas réapparaître
-        dans la cloche. D'où l'appel commun plutôt qu'un filtre réécrit ici.
+        Seconde source de la cloche, et la seule qui laisse passer des notes
+        internes. Elle existe parce que le portail ne sert pas que des
+        porteurs : l'expert, l'évaluateur et l'acteur financier sont des
+        comptes **portail**, ils sont notifiés en `mt_note` — c'est correct,
+        un `mt_comment` partirait aussi aux followers, dont le porteur — et
+        la première source les écarte donc systématiquement. Résultat avant
+        ce correctif : des acteurs centraux du parcours étaient notifiés et ne
+        voyaient rien nulle part.
+
+        ⚠ **Ce que cette source n'ouvre pas.** Le critère est `partner_ids`,
+        c'est-à-dire les destinataires **passés explicitement** à
+        `message_post()`. Vérifié sur les données du 28/08 : une note adressée
+        au Secrétariat sur le projet d'un porteur porte `partner_ids = [3, 15]`
+        — le porteur, pourtant **follower** du projet, n'y figure pas. Les
+        followers sont notifiés par un autre chemin et ne sont jamais inscrits
+        dans ce champ.
+
+        Autrement dit : on ne voit que ce qui nous a été adressé. Un porteur ne
+        gagne l'accès à aucune note de coordination interne, **même sur son
+        propre dossier** — c'est la propriété à ne jamais casser, et le test
+        d'étanchéité porte dessus.
+
+        Corollaire assumé : un message adressé à quelqu'un sur un
+        enregistrement qu'il ne possède pas devient visible dans sa cloche.
+        C'est précisément l'effet recherché — l'expert doit apprendre qu'un
+        livrable l'attend sur un dossier qui n'est pas le sien.
+        """
+        self.ensure_one()
+        return self.env['mail.message'].sudo().search(
+            [('partner_ids', 'in', self.id)])
+
+    def _opex_notification_messages(self):
+        """Messages visibles par ce contact : deux sources, réunies.
+
+        1. **Ses propres enregistrements** — filtrés par le
+           `mail.message._get_search_domain_share()` d'Odoo, exactement comme
+           l'historique du dossier (`opex.membership.file._history_entries`).
+           Les notes internes en sont écartées, et les deux vues ne divergent
+           pas : une note qu'on apprend à masquer dans l'historique ne
+           réapparaît pas dans la cloche.
+        2. **Ce qui lui est explicitement adressé** —
+           `_opex_notification_addressed_messages()`, notes comprises, y
+           compris sur des enregistrements qui ne sont pas les siens.
+
+        ⚠ La règle n'est donc plus *identique* à celle de l'historique, elle la
+        **contient**. La différence tient en une phrase : la cloche montre en
+        plus ce qui vous a été adressé nommément. Rien d'autre n'a bougé — la
+        source 1 conserve son filtre de partage et sa double vérification
+        d'appartenance.
         """
         self.ensure_one()
         Message = self.env['mail.message'].sudo()
@@ -126,6 +169,11 @@ class ResPartner(models.Model):
             for record_id in record_ids
         }
         messages = messages.filtered(lambda m: (m.model, m.res_id) in allowed)
+
+        # ⚠ L'union vient **après** les filtres de la source 1, jamais avant :
+        # les appliquer à la source 2 lui retirerait précisément ce qu'elle
+        # apporte — les notes adressées.
+        messages |= self._opex_notification_addressed_messages()
 
         # Les messages de suivi purs n'ont pas de corps : ils encombreraient la
         # liste sans rien dire, comme dans l'historique.

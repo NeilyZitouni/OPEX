@@ -250,6 +250,53 @@ Payées cher sur le module précédent. Elles s'appliquent ici aussi.
    vérifie **dans un vrai navigateur, console ouverte, session réelle**.
 4. **`mail.mt_note` pour tout message interne.** `mail.mt_comment` uniquement pour
    ce que le porteur doit recevoir par email. Bug déjà rencontré et corrigé.
+
+   **4 bis — ⚠ Ce module est HORS de la cloche portail, et c'est un choix.**
+
+   Le portail a une cloche de notification, servie par `opex_membership` : les
+   comptes portail ne supportent pas la cloche native d'Odoo, interdite en base
+   par `CHECK (notification_type = 'email' OR NOT share)`. Elle lit les
+   `mail.message` posés sur les enregistrements d'un contact, via
+   `res.partner._opex_owned_record_ids()`.
+
+   **Les 41 `message_post()` de ce module n'y apparaissent pas.** Un porteur
+   Smart Crowdfunding ne reçoit donc aucune notification à l'écran : ni cloche,
+   ni email (voir la limite SMTP ci-dessous). Il découvre l'avancement de son
+   dossier en rouvrant `/my/crowdfunding/<id>`, où l'historique est complet.
+
+   **Pourquoi ce n'est pas corrigé.** La surcharge existe pourtant, écrite et
+   correcte, dans `models/res_partner.py` — mais elle est **inatteignable**.
+   Mesuré le 28/08, le MRO de `res.partner` est :
+
+   ```
+   opex_innovation → opex_membership → opex_crowdfunding
+   ```
+
+   et la méthode d'`opex_membership` est l'implémentation d'origine : elle
+   renvoie un dictionnaire littéral **sans relayer `super()`**. La chaîne
+   s'arrête chez elle. L'ordre du MRO suit l'ordre de chargement, lui-même issu
+   du graphe de dépendances : ce module ne dépendant de rien, il est chargé en
+   premier, donc placé en dernier.
+
+   La seule façon de le rendre actif est de le charger **après**
+   `opex_membership`, c'est-à-dire d'ajouter cette dépendance au manifeste.
+   **Arbitrage rendu le 28/08 : non.** La règle d'isolation est le fondement de
+   la comparaison entre les deux approches ; on ne peut pas présenter deux
+   modules « indépendants, sauf pour les notifications ». Le coût est réel et
+   assumé, et il se dit tel quel en soutenance.
+
+   Le code est conservé, avec son avertissement en tête de docstring, parce
+   qu'il devient actif sans une ligne de plus le jour où la dépendance serait
+   acceptée.
+
+   **4 ter — ⚠ Aucune notification email n'est délivrée dans cet
+   environnement.** `odoo.conf` pointe `smtp_server = localhost:25`, où rien
+   n'écoute. Mesuré le 28/08 : 48 `mail.notification` et 68 `mail.mail` en
+   `exception`. À annoncer avant toute démonstration. Ce qui fonctionne côté
+   personnel : la cloche **native** d'Odoo, activée en données depuis le 28/08
+   pour le Comité CEO et le Contrôle Qualité
+   (`res.users._opex_crowdfunding_enable_inbox()`, appelée par un
+   `<function>` de `security/security.xml`).
 5. **Odoo 19** : `res.groups.privilege` (plus de `category_id` sur `res.groups`) ;
    plus d'`attrs` ni de `states` dans les vues → `invisible="..."` /
    `readonly="..."` directement.

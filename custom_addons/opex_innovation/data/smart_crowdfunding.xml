@@ -85,6 +85,76 @@
             <field name="body" type="html"><p>Votre dossier a évolué. Consultez votre espace personnel.</p></field>
         </record>
 
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LES QUATRE DESTINATAIRES INTERNES
+            ═══════════════════════════════════════════════════════════════
+
+            Seize transitions de ce processus ne notifiaient personne : un
+            dossier arrivait dans la file d'un rôle sans que ce rôle l'apprenne.
+            Quatre actions suffisent à les couvrir, parce que ce qui change
+            d'une transition à l'autre est le **destinataire**, pas le message.
+
+            ⚠ Toutes en `note`. Un `mt_comment` part aussi aux followers de
+            l'enregistrement, dont le porteur : de la coordination interne
+            postée en `comment` lui arriverait. C'est le bug déjà corrigé une
+            fois sur ce projet. Le porteur, lui, est servi par
+            `scf_informer_porteur` ci-dessus, en `comment` et pour lui seul.
+        -->
+
+        <record id="scf_action_notify_ceo" model="opex.workflow.action">
+            <field name="name">Prévenir le CEO</field>
+            <field name="code">scf_notify_ceo</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Un dossier attend votre décision.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
+        </record>
+
+        <!--
+            ⚠ Deux rôles visés, et c'est délibéré.
+
+            `role_controle_qualite` n'a **pas de groupe** : personne ne le porte
+            en permanence, il s'attribue dossier par dossier par une ligne
+            d'acteur — et rien, aujourd'hui, n'en crée. Ne viser que lui ferait
+            une notification correctement configurée qui n'atteint personne :
+            exactement le défaut relevé sur le groupe CEO vide.
+
+            Le Secrétariat est donc visé en second, comme filet : il instruit
+            déjà la complétude des dossiers. Le jour où un contrôleur qualité
+            est désigné sur une instance, il reçoit en plus, sans rien changer
+            ici.
+        -->
+        <record id="scf_action_notify_qualite" model="opex.workflow.action">
+            <field name="name">Prévenir le Contrôle Qualité</field>
+            <field name="code">scf_notify_qualite</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Un dossier attend un contrôle qualité.</p></field>
+            <field name="target_role_ids" eval="[Command.set([
+                ref('role_controle_qualite'),
+                ref('opex_workflow.role_secretariat'),
+            ])]"/>
+        </record>
+
+        <record id="scf_action_notify_expert" model="opex.workflow.action">
+            <field name="name">Prévenir l'expert</field>
+            <field name="code">scf_notify_expert</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Un accompagnement vous est confié sur ce dossier.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_expert')])]"/>
+        </record>
+
+        <record id="scf_action_notify_financeur" model="opex.workflow.action">
+            <field name="name">Prévenir l'acteur financier</field>
+            <field name="code">scf_notify_financeur</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Un dossier détaillé vous est transmis pour décision.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_investisseur')])]"/>
+        </record>
+
         <record id="scf_action_tache_qualite" model="opex.workflow.action">
             <field name="name">Contrôler le dossier</field>
             <field name="code">scf_tache_qualite</field>
@@ -651,6 +721,74 @@
         revalide le graphe. Une configuration devenue incohérente fait alors
         échouer le déploiement au lieu de se découvrir en démonstration.
     -->
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Le branchement des seize transitions muettes
+        ═══════════════════════════════════════════════════════════════
+
+        Par `<function>` et `Command.link`, pour les trois raisons habituelles :
+        les transitions portent le drapeau `noupdate` de leur création dans le
+        bloc ci-dessus, un `<record>` serait donc ignoré à la mise à jour ; et
+        plusieurs d'entre elles portent déjà des actions d'un autre type
+        (`run_matching`, `create_task`) qu'un `Command.set` effacerait.
+
+        Le destinataire suit le **rôle attendu à l'étape d'arrivée**, pas celui
+        qui déclenche : prévenir le CEO d'une décision qu'il vient de prendre
+        n'aide personne.
+    -->
+
+    <!-- Vers le CEO : le dossier arrive dans sa file. -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('scf_tr_presenter'), ref('scf_tr_repondre_clarification'),
+                      ref('scf_tr_conforme'), ref('scf_tr_fin_accompagnement'),
+                      ref('scf_tr_financeur_non')],
+                     {'action_ids': [Command.link(ref('scf_action_notify_ceo'))]}]"/>
+
+    <!-- Vers le Contrôle Qualité : les deux entrées du Quality Gate. -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('scf_tr_soumettre_dossier'), ref('scf_tr_completer_dossier')],
+                     {'action_ids': [Command.link(ref('scf_action_notify_qualite'))]}]"/>
+
+    <!-- Vers l'expert : les quatre chemins qui ouvrent un accompagnement. -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('scf_tr_orientation'), ref('scf_tr_maturation'),
+                      ref('scf_tr_reevaluation_ko'),
+                      ref('scf_tr_financeur_accompagnement')],
+                     {'action_ids': [Command.link(ref('scf_action_notify_expert'))]}]"/>
+
+    <!-- Vers l'acteur financier : la transmission du dossier détaillé. -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('scf_tr_transmettre_financeur')],
+                     {'action_ids': [Command.link(ref('scf_action_notify_financeur'))]}]"/>
+
+    <!--
+        Vers le porteur. Les deux premières le concernent au premier chef :
+        son dossier part en accompagnement, il doit le savoir en même temps que
+        l'expert. Les suivantes marquent une avancée qu'il ne voyait pas.
+
+        ⚠ `scf_tr_reevaluation_ok` est **volontairement absente** de cette
+        liste, et il ne faut pas l'y remettre.
+
+        L'arc qui mène de la réévaluation au matching doit rester **sans
+        aucune action** : c'est ce qui permet d'insérer le Demo Day entre
+        l'accompagnement et le matching sans toucher à `action_ids`, et c'est
+        exactement ce que mesure le test d'acceptation de la section 18
+        (`test_the_matching_stays_available_on_demand`). La recherche d'acteurs
+        financiers est portée par `relancer_matching`, qui boucle sur l'étape,
+        précisément pour cette raison.
+
+        Une notification y a été ajoutée puis retirée le 28/08 : elle faisait
+        tomber le test, et le test avait raison. Conséquence assumée : le
+        porteur n'est pas prévenu au passage réévaluation → matching ; il l'est
+        à la relance de la recherche.
+    -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('scf_tr_orientation'), ref('scf_tr_maturation'),
+                      ref('scf_tr_investment_ready'),
+                      ref('scf_tr_relancer_matching'), ref('scf_tr_mise_en_relation')],
+                     {'action_ids': [
+                         Command.link(ref('scf_action_informer_porteur'))]}]"/>
+
     <function model="opex.workflow.definition" name="action_publish"
               eval="[[ref('wf_smart_crowdfunding')]]"/>
 

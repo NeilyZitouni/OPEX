@@ -226,3 +226,87 @@ class ResPartner(models.Model):
                 "Vous disposez déjà du profil %s.") % label)
         raise UserError(_(
             "Une demande de profil %s est déjà en cours d'examen.") % label)
+
+    # ------------------------------------------------------------
+    # Cloche de notification du portail — extension du Module 1
+    # ------------------------------------------------------------
+
+    def _opex_owned_record_ids(self):
+        """Ajoute les enregistrements Innovation au périmètre de la cloche.
+
+        ⚠ **On n'écrit pas un second système de notification.** Le Module 1 en
+        a un complet : il lit les `mail.message` déjà posés sur les
+        enregistrements du contact, en écarte les notes internes par
+        `_get_search_domain_share()`, et compare leur date à
+        `notification_last_seen`. Tout cela fonctionne déjà pour les dossiers
+        d'adhésion.
+
+        Le seul manque était le **périmètre** : `_opex_owned_record_ids()` ne
+        connaissait que `opex.membership.file` et `opex.subscription`. Les
+        actions `notify` du moteur postaient donc correctement, avec les bons
+        sous-types et les bons destinataires — et aucune n'atteignait la
+        cloche, faute d'être sur un modèle déclaré ici.
+
+        Surcharge **coopérative** : elle commence par `super()`, donc les
+        dossiers d'adhésion restent visibles. C'est la ligne de partage de la
+        règle transversale 1 bis — une méthode qui relaie `super()` s'exécute
+        en chaîne, celle qui ne le fait pas efface la précédente.
+
+        ⚠ Ne donne accès à rien. Cette table décide de ce que le contact voit
+        dans sa cloche ; la visibilité réelle des messages reste tranchée par
+        `_get_search_domain_share()` en amont, qui exclut les `mt_note`. Un
+        message de coordination interne n'y entrera jamais, même si son
+        enregistrement est listé ici.
+        """
+        self.ensure_one()
+        owned = super()._opex_owned_record_ids()
+
+        Project = self.env['opex.innovation.project'].sudo()
+        projects = Project.search([('partner_id', '=', self.id)])
+
+        owned.update({
+            'opex.innovation.project': projects.ids,
+            'opex.innovation.expert.profile':
+                self.env['opex.innovation.expert.profile'].sudo().search(
+                    [('partner_id', '=', self.id)]).ids,
+            'opex.innovation.investor.profile':
+                self.env['opex.innovation.investor.profile'].sudo().search(
+                    [('partner_id', '=', self.id)]).ids,
+            # `partner_id` est un `related` **stocké** depuis l'accompagnement :
+            # on interroge donc le livrable directement, sans traverser.
+            'opex.innovation.deliverable':
+                self.env['opex.innovation.deliverable'].sudo().search(
+                    [('partner_id', '=', self.id)]).ids,
+            'opex.innovation.industrialisation':
+                self.env['opex.innovation.industrialisation'].sudo().search(
+                    [('project_id.partner_id', '=', self.id)]).ids,
+        })
+        return owned
+
+    def _opex_notification_url(self, message):
+        """Lien vers l'écran portail qui porte le message.
+
+        Une notification qu'on ne peut pas ouvrir n'aide personne : chaque
+        modèle ajouté au périmètre ci-dessus doit avoir sa destination ici.
+        Les demandes de profil n'ont pas d'identifiant dans leur URL — le
+        controller les résout depuis `partner_id` —, d'où le lien par type.
+
+        Le suivi d'industrialisation n'a pas d'écran portail dédié : on renvoie
+        vers le projet, seul endroit où le porteur le voit aujourd'hui. Même
+        parti que le Module 1 pour les cotisations.
+        """
+        self.ensure_one()
+        if message.model == 'opex.innovation.project':
+            return '/my/innovation/%s' % message.res_id
+        if message.model == 'opex.innovation.expert.profile':
+            return '/my/innovation/profiles/expert'
+        if message.model == 'opex.innovation.investor.profile':
+            return '/my/innovation/profiles/investor'
+        if message.model == 'opex.innovation.deliverable':
+            return '/my/innovation/deliverable/%s' % message.res_id
+        if message.model == 'opex.innovation.industrialisation':
+            industrialisation = self.env[
+                'opex.innovation.industrialisation'].sudo().browse(message.res_id)
+            if industrialisation.project_id:
+                return '/my/innovation/%s' % industrialisation.project_id.id
+        return super()._opex_notification_url(message)

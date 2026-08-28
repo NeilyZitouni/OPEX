@@ -1,4 +1,8 @@
-from odoo import models
+import logging
+
+from odoo import api, models
+
+_logger = logging.getLogger(__name__)
 
 
 class ResUsers(models.Model):
@@ -30,6 +34,37 @@ class ResUsers(models.Model):
         self.ensure_one()
         return any(self.sudo()._has_group(group)
                    for group in self.OPEX_CROWDFUNDING_STAFF_GROUPS)
+
+    @api.model
+    def _opex_crowdfunding_enable_inbox(self):
+        """Active la cloche native d'Odoo pour le personnel de ce module.
+
+        Un compte interne créé par un administrateur est en
+        `notification_type = 'email'` : ses notifications partent par courriel
+        et **le systray reste vide**. Les 29 `message_post()` internes de ce
+        module n'atteignaient donc personne à l'écran.
+
+        La cloche native suffit ici : la contrainte
+        `CHECK (notification_type = 'email' OR NOT share)` d'Odoo ne vise que
+        les comptes partagés. D'où la garde `share = False`, sans laquelle un
+        compte portail ferait échouer la mise à jour du module.
+
+        ⚠ Méthode propre à ce module, malgré son air de doublon avec celle
+        d'`opex_innovation`. La règle d'isolation interdit à ce module
+        d'importer quoi que ce soit des autres, et les deux ne parlent pas des
+        mêmes groupes. Deux listes de rôles distinctes, deux méthodes.
+        """
+        internes = self.sudo().search([
+            ('share', '=', False),
+            ('notification_type', '=', 'email'),
+        ])
+        concernes = internes.filtered(lambda u: u._is_crowdfunding_staff())
+        if concernes:
+            concernes.write({'notification_type': 'inbox'})
+            _logger.info(
+                "opex_crowdfunding: cloche native activée pour %s compte(s) : %s",
+                len(concernes), ", ".join(concernes.mapped('login')))
+        return len(concernes)
 
     # `_crowdfunding_staff_url()` a été retiré le 27/08. Il aiguillait la tuile
     # d'accueil vers l'action back-office adaptée au rôle — Smart Work Queue

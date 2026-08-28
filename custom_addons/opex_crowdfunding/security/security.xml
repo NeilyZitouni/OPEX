@@ -56,4 +56,21 @@
         <field name="comment">Investisseur, fonds, organisme public, banque, sponsor ou partenaire stratégique. Son accès à un dossier dépend de l'autorisation de partage, jamais de son seul statut.</field>
     </record>
 
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Le canal par lequel le personnel reçoit
+        ═══════════════════════════════════════════════════════════════
+
+        Ce module poste 29 messages internes (`mt_note`) à destination du
+        Comité CEO et du Contrôle Qualité. Encore faut-il qu'ils s'affichent :
+        un compte interne est en `notification_type = 'email'` par défaut, ses
+        notifications partent par courriel et le systray natif reste vide.
+
+        Cette bascule est un réglage porté par les **données**, rejoué à chaque
+        mise à jour — un membre du personnel ajouté plus tard est réglé au
+        déploiement suivant. Hors de tout bloc `noupdate`, sans quoi il ne
+        s'exécuterait qu'à la première installation.
+    -->
+    <function model="res.users" name="_opex_crowdfunding_enable_inbox"/>
+
 </odoo>

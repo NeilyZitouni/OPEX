@@ -469,6 +469,14 @@ class InnovationProject(models.Model):
             # `limited` et non `full` : l'évaluateur accède au périmètre de sa
             # mission, pas au dossier entier (section 32).
             self.workflow_instance_id.add_actor(role, user, 'limited')
+            # ⚠ **Après** la ligne d'acteur, jamais avant : les destinataires
+            # d'une action `notify` sont résolus par rôle sur les acteurs de
+            # l'instance. Notifier d'abord ne toucherait personne.
+            #
+            # `notify_event()` nomme une action configurée et laisse le moteur
+            # faire : le message, le sous-type et les destinataires restent
+            # dans `data/notifications.xml`. Le Python dit quand, jamais quoi.
+            self.notify_event('innovation_notify_evaluateur_sollicite')
         return evaluation
 
     def revoke_evaluator(self, partner):

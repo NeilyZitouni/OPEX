@@ -58,6 +58,20 @@
             <field name="body" type="html"><p>L'industrialisation de votre projet a franchi une étape. Consultez votre espace.</p></field>
         </record>
 
+        <!--
+            L'abandon a son propre message : le générique ci-dessus annonce une
+            étape franchie, ce qui serait faux et blessant ici. Une notification
+            qui dit le contraire de ce qui arrive est pire que pas de
+            notification.
+        -->
+        <record id="action_indus_abandon" model="opex.workflow.action">
+            <field name="name">Informer le porteur de l'abandon</field>
+            <field name="code">indus_notify_abandon</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>L'industrialisation de votre projet a été abandonnée. Le motif figure dans l'historique du dossier.</p></field>
+        </record>
+
         <!-- ══════════ La définition ══════════ -->
 
         <record id="wf_industrialisation" model="opex.workflow.definition">
@@ -254,6 +268,19 @@
         à jour et resterait en brouillon, faute de `<function>` exécuté. Le
         piège des Extensions 10, 12 et 20.
     -->
+    <!--
+        Les deux transitions qui ne notifiaient personne. Par `<function>` et
+        `Command.link` : les transitions portent le drapeau `noupdate` de leur
+        création ci-dessus, et certaines ont déjà d'autres actions.
+    -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('indus_tr_chercher_partenaires')], {'action_ids': [
+                  Command.link(ref('action_indus_informer_porteur'))]}]"/>
+
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('indus_tr_abandonner')], {'action_ids': [
+                  Command.link(ref('action_indus_abandon'))]}]"/>
+
     <function model="opex.workflow.definition" name="action_publish"
               eval="[[ref('wf_industrialisation')]]"/>
 

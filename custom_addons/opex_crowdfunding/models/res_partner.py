@@ -74,6 +74,68 @@ class ResPartner(models.Model):
     cf_interet_technologie = fields.Boolean(string="Recherche des projets technologiques")
 
     # ------------------------------------------------------------------
+    # Cloche de notification du portail
+    # ------------------------------------------------------------------
+
+    def _opex_owned_record_ids(self):
+        """Ajoute les dossiers Smart Crowdfunding au périmètre de la cloche.
+
+        `opex_membership` sert une cloche portail qui lit les `mail.message`
+        déjà posés sur les enregistrements d'un contact — les comptes portail
+        ne supportent pas la cloche native d'Odoo, interdite en base par
+        `CHECK (notification_type = 'email' OR NOT share)`. Ce module poste
+        bien ses messages, mais son modèle n'était pas dans le périmètre : rien
+        n'arrivait jusqu'à la cloche.
+
+        ⚠⚠ **INACTIVE EN L'ÉTAT — ne pas la croire sur parole.** Mesuré le
+        28/08 : le MRO de `res.partner` est
+        `opex_innovation → opex_membership → opex_crowdfunding`, et la méthode
+        d'`opex_membership` est l'implémentation d'origine : elle renvoie un
+        dictionnaire littéral **sans relayer `super()`**. La chaîne s'arrête
+        donc chez elle, et ce code n'est jamais atteint.
+
+        L'ordre du MRO suit l'ordre de chargement, lui-même issu du graphe de
+        dépendances : `opex_crowdfunding` ne dépendant de rien, il est chargé
+        en premier, donc placé en dernier dans le MRO. Le rendre effectif
+        demande de le charger **après** `opex_membership`, c'est-à-dire
+        d'ajouter cette dépendance au manifeste — ce que ce module refuse
+        explicitement (« Pas `opex_membership` (indépendance) »).
+
+        Le code est conservé parce qu'il est correct et devient actif le jour
+        où cette dépendance est acceptée. **Arbitrage à rendre** : accepter la
+        dépendance, ou assumer que les dossiers Smart Crowdfunding n'entrent
+        pas dans la cloche du portail.
+
+        `getattr` plutôt qu'un `super()` direct : sans `opex_membership`
+        installé, la méthode parente n'existe pas et un appel direct lèverait
+        un `AttributeError` sur un module qui doit rester installable seul.
+
+        ⚠ Ne donne accès à rien : le filtrage des messages reste celui du
+        Module 1, `_get_search_domain_share()`, qui écarte les `mt_note`. Les
+        29 `message_post()` internes de ce module n'entreront donc jamais dans
+        la cloche d'un porteur, quoi qu'il arrive ici.
+        """
+        self.ensure_one()
+        parent = getattr(super(), '_opex_owned_record_ids', None)
+        owned = parent() if parent else {}
+
+        # Seul le projet porte des messages : les modèles satellites
+        # (relation, accompagnement, closing) postent tous sur
+        # `relation.project_id` / le projet, jamais sur eux-mêmes.
+        owned['opex.crowdfunding.project'] = self.env[
+            'opex.crowdfunding.project'].sudo().search(
+                [('partner_id', '=', self.id)]).ids
+        return owned
+
+    def _opex_notification_url(self, message):
+        """Lien vers le dossier concerné. Même contrat que la méthode ci-dessus."""
+        self.ensure_one()
+        if message.model == 'opex.crowdfunding.project':
+            return '/my/crowdfunding/%s' % message.res_id
+        parent = getattr(super(), '_opex_notification_url', None)
+        return parent(message) if parent else '/my'
+
+    # ------------------------------------------------------------------
     # L'expert mandaté par le comité (sections 2.D et 11)
     # ------------------------------------------------------------------
     cf_is_expert = fields.Boolean(

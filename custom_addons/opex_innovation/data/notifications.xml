@@ -193,6 +193,80 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
+        <!--
+            ═══════════════════════════════════════════════════════════════
+            LES MOMENTS QUI NE DISAIENT RIEN
+            ═══════════════════════════════════════════════════════════════
+
+            Les quatorze notifications de la section 30 sont au-dessus. Les
+            suivantes comblent des transitions qui ne notifiaient personne :
+            le dossier avançait, et l'intéressé l'apprenait en rouvrant sa page.
+
+            ⚠ Sous-type : `comment` vers le porteur, `note` partout ailleurs.
+            Ce n'est pas une question d'email seulement. Un `message_post` en
+            `mt_comment` part **aussi aux followers** de l'enregistrement, et
+            le porteur en est un : une coordination interne postée en
+            `comment` lui arriverait. C'est le bug déjà corrigé une fois sur ce
+            projet.
+        -->
+
+        <record id="notify_controle_en_cours" model="opex.workflow.action">
+            <field name="name">Contrôle pris en charge</field>
+            <field name="code">innovation_notify_controle_en_cours</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Le Secrétariat a pris votre projet en charge : le contrôle administratif est en cours.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="notify_reevaluation_lancee" model="opex.workflow.action">
+            <field name="name">Nouvelle évaluation à mener</field>
+            <field name="code">innovation_notify_reevaluation_lancee</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Un projet corrigé revient devant le comité : une nouvelle évaluation est attendue.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
+        </record>
+
+        <record id="notify_financement_lance" model="opex.workflow.action">
+            <field name="name">Passage au financement</field>
+            <field name="code">innovation_notify_financement_lance</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Votre accompagnement est terminé : votre projet entre en phase de financement.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <record id="notify_industrialisation_lancee" model="opex.workflow.action">
+            <field name="name">Passage à l'industrialisation</field>
+            <field name="code">innovation_notify_industrialisation_lancee</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="body" type="html"><p>Votre projet entre en phase d'industrialisation.</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
+        </record>
+
+        <!--
+            ⚠ Le rôle `evaluateur` ne recevait rien, sur aucune définition.
+
+            Section 15 : « les évaluateurs apportent une expertise
+            complémentaire lorsque le Comité l'estime nécessaire ». Les
+            désigner sans les prévenir vidait l'Extension 13 de son sens — la
+            ligne d'acteur leur ouvrait le dossier, et rien ne le leur disait.
+
+            Déclenchée par `notify_event()` depuis `request_evaluation()` : la
+            désignation d'un évaluateur n'est pas un passage d'étape. Le Python
+            dit **quand**, ce fichier dit **quoi et à qui**.
+        -->
+        <record id="notify_evaluateur_sollicite" model="opex.workflow.action">
+            <field name="name">Évaluateur sollicité</field>
+            <field name="code">innovation_notify_evaluateur_sollicite</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="body" type="html"><p>Une évaluation vous est demandée sur ce projet. Retrouvez-la dans « Mes évaluations ».</p></field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_evaluateur')])]"/>
+        </record>
+
     </data>
 
     <!--
@@ -264,5 +338,51 @@
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_close')], {'action_ids': [
                   Command.set([ref('notify_projet_cloture')])]}]"/>
+
+    <!--
+        Les transitions qui ne notifiaient personne.
+
+        `Command.link` et non `Command.set` : ces transitions portent déjà,
+        pour certaines, des actions d'un autre type (`set_field`,
+        `launch_subworkflow`). Un `set` les effacerait au passage — c'est la
+        troisième face du piège documenté plus haut.
+    -->
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('ptr_take_in_charge')], {'action_ids': [
+                  Command.link(ref('notify_controle_en_cours'))]}]"/>
+
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('ptr_reevaluate')], {'action_ids': [
+                  Command.link(ref('notify_reevaluation_lancee'))]}]"/>
+
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('ptr_start_financement')], {'action_ids': [
+                  Command.link(ref('notify_financement_lance'))]}]"/>
+
+    <function model="opex.workflow.transition" name="write"
+              eval="[[ref('ptr_start_industrialisation')], {'action_ids': [
+                  Command.link(ref('notify_industrialisation_lancee'))]}]"/>
+
+    <!--
+        ═══════════════════════════════════════════════════════════════
+        Le canal par lequel le personnel reçoit
+        ═══════════════════════════════════════════════════════════════
+
+        Poster un message ne suffit pas : encore faut-il qu'il s'affiche
+        quelque part. Les comptes internes créés par un administrateur sont en
+        `notification_type = 'email'` par défaut — leurs notifications partent
+        par courriel et **le systray natif reste vide**. Le personnel ne voyait
+        donc aucune des notes qui lui sont adressées.
+
+        On réutilise la cloche **native** d'Odoo là où elle fonctionne, plutôt
+        que d'étendre la cloche maison du portail à un second public : celle-ci
+        n'existe que parce qu'Odoo interdit `inbox` aux comptes partagés
+        (`CHECK (notification_type = 'email' OR NOT share)`), contrainte qui ne
+        vise pas les internes.
+
+        Hors bloc `noupdate` : rejoué à chaque mise à jour, donc un membre du
+        personnel ajouté plus tard est réglé au déploiement suivant.
+    -->
+    <function model="res.users" name="_opex_innovation_enable_inbox"/>
 
 </odoo>
