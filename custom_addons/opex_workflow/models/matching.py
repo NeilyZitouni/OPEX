@@ -162,7 +162,7 @@ class MatchingCriteria(models.Model):
 class MatchingCandidate(models.Model):
     """Un candidat proposé sur un dossier, avec son score et son explication.
 
-    ⚠ **Une recommandation, jamais une décision.** Aucun état de ce modèle ne
+    **Une recommandation, jamais une décision.** Aucun état de ce modèle ne
     déclenche de transition, et rien dans le moteur ne lit un score pour
     décider. Les deux documents sources le disent noir sur blanc : « L'IA
     recommande. Elle ne doit pas automatiquement décider seule. » Le
@@ -232,7 +232,7 @@ class MatchingCandidate(models.Model):
              "proposition du moteur. Le distinguer permet de mesurer, plus "
              "tard, la pertinence réelle des recommandations.",
     )
-    # ⚠ Distinct de `state`, et ce n'est pas une redondance.
+    # Distinct de `state`, et ce n'est pas une redondance.
     #
     # `state` porte la décision du **responsable** — retenir ou écarter la
     # proposition. `candidate_response` porte celle du **candidat** — être
@@ -296,7 +296,7 @@ class MatchingCandidate(models.Model):
     def _respond(self, response):
         """Enregistre la réponse du candidat.
 
-        ⚠ Ne déclenche aucune transition, comme le reste du matching. Un
+        Ne déclenche aucune transition, comme le reste du matching. Un
         candidat qui se déclare intéressé n'engage pas le dossier : c'est le
         responsable qui décide de la suite.
         """

@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Le socle des certifications de PERSONNE, et les synonymes du
+        referentiel entier.
+
+        POURQUOI DEUX BLOCS
+
+        Le premier bloc, hors `noupdate`, requalifie les six normes semees par
+        le Module 1 : elles valent pour une organisation ET pour une personne.
+        ISO 27001 certifie une entreprise, et un auditeur se certifie sur la
+        meme norme. Sans cette requalification, aucune des six n'apparaitrait
+        au profil expert, et le critere eliminatoire n'aurait rien a comparer
+        le jour de son installation.
+
+        C'est le seul endroit ou ce module ecrit sur des enregistrements du
+        Module 1, et il n'y ecrit qu'un champ que ce module a lui-meme ajoute.
+
+        Le second bloc ajoute les certifications de personne proprement dites
+        - celles qui n'ont pas de sens pour une organisation : Lead Auditor,
+        CISA, PMP, CISSP.
+
+        LES SYNONYMES SONT LA MOITIE DU TRAVAIL
+
+        Sans eux, l'etape 1 ne reconnait que l'orthographe exacte et tout part
+        en arbitrage. Les ecritures retenues sont celles qu'un CV ecrit
+        reellement : le sigle seul, la forme collee, la forme anglaise.
+
+        ATTENTION : deux libelles qui se normalisent pareil rendent le
+        rapprochement ambigu, et `resolve_label()` refuse alors de choisir. Sur
+        un critere eliminatoire, cela veut dire qu'un candidat serait admis ou
+        ecarte selon l'ordre d'un index.
+        `test_the_seeded_certifications_have_no_normalisation_collision`
+        verifie que ce fichier n'en introduit aucune.
+    -->
+    <data>
+
+        <!-- ============================================================
+             LES SIX NORMES DU MODULE 1 : elles valent des deux cotes
+             ============================================================ -->
+
+        <!--
+            PAR `<function>` ET NON PAR `<record>`, ET C'EST UNE NECESSITE.
+
+            `opex_membership/data/certifications.xml` seme ces six normes dans
+            un bloc `noupdate="1"`. Le drapeau est porte par la ligne
+            `ir.model.data`, pas par le fichier qui l'ecrit : une fois pose,
+            **toute** mise a jour ulterieure de cet identifiant externe est
+            ignoree, y compris depuis un autre module.
+
+            Un `<record id="opex_membership.certification_iso_27001">` ecrit
+            ici ne fait donc rien. Silencieusement : pas d'erreur, pas
+            d'avertissement, et les six normes restent `porte = organisation`.
+
+            Mesure : sept tests rouges, dont
+            `test_a_close_but_different_certification_is_rejected`, avec
+            `opex.certification() != opex.certification(5,)` - le
+            rapprochement ne trouvait rien parce que la norme n'etait pas
+            declaree de portee personne.
+
+            `<function>` s'execute, elle, a chaque `-u` - a condition d'etre
+            hors d'un bloc `noupdate`, ce qui est le cas ici (regle 8).
+        -->
+        <function model="opex.certification" name="write">
+            <value eval="[ref('opex_membership.certification_iso_9001')]"/>
+            <value eval="{'code': 'ISO9001', 'porte': 'les_deux'}"/>
+        </function>
+        <function model="opex.certification" name="write">
+            <value eval="[ref('opex_membership.certification_iso_14001')]"/>
+            <value eval="{'code': 'ISO14001', 'porte': 'les_deux'}"/>
+        </function>
+        <function model="opex.certification" name="write">
+            <value eval="[ref('opex_membership.certification_iso_45001')]"/>
+            <value eval="{'code': 'ISO45001', 'porte': 'les_deux'}"/>
+        </function>
+        <function model="opex.certification" name="write">
+            <value eval="[ref('opex_membership.certification_iso_50001')]"/>
+            <value eval="{'code': 'ISO50001', 'porte': 'les_deux'}"/>
+        </function>
+        <function model="opex.certification" name="write">
+            <value eval="[ref('opex_membership.certification_iso_27001')]"/>
+            <value eval="{'code': 'ISO27001', 'porte': 'les_deux'}"/>
+        </function>
+        <function model="opex.certification" name="write">
+            <value eval="[ref('opex_membership.certification_iso_22000')]"/>
+            <value eval="{'code': 'ISO22000', 'porte': 'les_deux'}"/>
+        </function>
+
+        <!-- ============================================================
+             LES CERTIFICATIONS DE PERSONNE
+             ============================================================ -->
+
+        <record id="cert_la_27001" model="opex.certification">
+            <field name="name">ISO 27001 Lead Auditor</field>
+            <field name="code">LA27001</field>
+            <field name="porte">personne</field>
+            <field name="organisme">PECB / BSI</field>
+        </record>
+        <record id="cert_li_27001" model="opex.certification">
+            <field name="name">ISO 27001 Lead Implementer</field>
+            <field name="code">LI27001</field>
+            <field name="porte">personne</field>
+            <field name="organisme">PECB</field>
+        </record>
+        <record id="cert_la_9001" model="opex.certification">
+            <field name="name">ISO 9001 Lead Auditor</field>
+            <field name="code">LA9001</field>
+            <field name="porte">personne</field>
+            <field name="organisme">AFNOR / BSI</field>
+        </record>
+        <record id="cert_la_14001" model="opex.certification">
+            <field name="name">ISO 14001 Lead Auditor</field>
+            <field name="code">LA14001</field>
+            <field name="porte">personne</field>
+        </record>
+        <record id="cert_la_45001" model="opex.certification">
+            <field name="name">ISO 45001 Lead Auditor</field>
+            <field name="code">LA45001</field>
+            <field name="porte">personne</field>
+        </record>
+
+        <record id="cert_cisa" model="opex.certification">
+            <field name="name">Certified Information Systems Auditor</field>
+            <field name="code">CISA</field>
+            <field name="porte">personne</field>
+            <field name="organisme">ISACA</field>
+        </record>
+        <record id="cert_cissp" model="opex.certification">
+            <field name="name">Certified Information Systems Security Professional</field>
+            <field name="code">CISSP</field>
+            <field name="porte">personne</field>
+            <field name="organisme">ISC2</field>
+        </record>
+        <record id="cert_cism" model="opex.certification">
+            <field name="name">Certified Information Security Manager</field>
+            <field name="code">CISM</field>
+            <field name="porte">personne</field>
+            <field name="organisme">ISACA</field>
+        </record>
+        <record id="cert_ebios" model="opex.certification">
+            <field name="name">EBIOS Risk Manager</field>
+            <field name="code">EBIOSRM</field>
+            <field name="porte">personne</field>
+        </record>
+        <record id="cert_dpo" model="opex.certification">
+            <field name="name">Délégué à la protection des données certifié</field>
+            <field name="code">DPO</field>
+            <field name="porte">personne</field>
+        </record>
+
+        <record id="cert_pmp" model="opex.certification">
+            <field name="name">Project Management Professional</field>
+            <field name="code">PMP</field>
+            <field name="porte">personne</field>
+            <field name="organisme">PMI</field>
+        </record>
+        <record id="cert_prince2" model="opex.certification">
+            <field name="name">PRINCE2 Practitioner</field>
+            <field name="code">PRINCE2</field>
+            <field name="porte">personne</field>
+        </record>
+        <record id="cert_psm" model="opex.certification">
+            <field name="name">Professional Scrum Master</field>
+            <field name="code">PSM</field>
+            <field name="porte">personne</field>
+            <field name="organisme">Scrum.org</field>
+        </record>
+        <record id="cert_itil_found" model="opex.certification">
+            <field name="name">ITIL Foundation</field>
+            <field name="code">ITILF</field>
+            <field name="porte">personne</field>
+            <field name="organisme">AXELOS</field>
+        </record>
+        <record id="cert_cobit" model="opex.certification">
+            <field name="name">COBIT Foundation</field>
+            <field name="code">COBITF</field>
+            <field name="porte">personne</field>
+            <field name="organisme">ISACA</field>
+        </record>
+        <record id="cert_lean_six_sigma" model="opex.certification">
+            <field name="name">Lean Six Sigma Black Belt</field>
+            <field name="code">LSSBB</field>
+            <field name="porte">personne</field>
+        </record>
+
+        <!-- ============================================================
+             SYNONYMES — l'etape 1, celle qui est gratuite
+             ============================================================ -->
+
+        <record id="cert_syn_iso27001_colle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_27001"/>
+            <field name="name">ISO27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso27001_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_27001"/>
+            <field name="name">ISO 27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso27001_2022" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_27001"/>
+            <field name="name">ISO 27001:2022</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso9001_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_9001"/>
+            <field name="name">ISO 9001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso9001_colle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_9001"/>
+            <field name="name">ISO9001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso14001_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_14001"/>
+            <field name="name">ISO 14001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso45001_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_45001"/>
+            <field name="name">ISO 45001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso50001_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_50001"/>
+            <field name="name">ISO 50001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_iso22000_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="opex_membership.certification_iso_22000"/>
+            <field name="name">ISO 22000</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <!--
+            Les ecritures du Lead Auditor. C'est LE cas de D1 : un expert
+            declarant « ISO 27001 » ne doit PAS passer un critere exigeant
+            « ISO 27001 Lead Auditor ». Les deux sont des entrees distinctes
+            du referentiel, et aucun synonyme ne les relie.
+        -->
+        <record id="cert_syn_la27001_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_la_27001"/>
+            <field name="name">LA 27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_la27001_fr" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_la_27001"/>
+            <field name="name">Auditeur principal ISO 27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_la27001_long" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_la_27001"/>
+            <field name="name">Lead Auditor ISO 27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_li27001_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_li_27001"/>
+            <field name="name">LI 27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_la9001_long" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_la_9001"/>
+            <field name="name">Lead Auditor ISO 9001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_la9001_fr" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_la_9001"/>
+            <field name="name">Auditeur principal ISO 9001</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="cert_syn_cisa_long" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_cisa"/>
+            <field name="name">CISA</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_cissp_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_cissp"/>
+            <field name="name">CISSP</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_cism_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_cism"/>
+            <field name="name">CISM</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_ebios_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_ebios"/>
+            <field name="name">EBIOS RM</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_dpo_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_dpo"/>
+            <field name="name">DPO</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_dpo_long" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_dpo"/>
+            <field name="name">Data Protection Officer</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="cert_syn_pmp_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_pmp"/>
+            <field name="name">PMP</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_prince2_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_prince2"/>
+            <field name="name">PRINCE2</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_psm_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_psm"/>
+            <field name="name">PSM I</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_psm_scrum" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_psm"/>
+            <field name="name">Scrum Master certifié</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_itil_court" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_itil_found"/>
+            <field name="name">ITIL v4 Foundation</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="cert_syn_lssbb_sigle" model="opex.certification.synonyme">
+            <field name="certification_id" ref="cert_lean_six_sigma"/>
+            <field name="name">Black Belt Lean Six Sigma</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <!-- ============================================================
+             LE CRITERE ELIMINATOIRE, RECONFIGURE
+             ============================================================
+
+             `matching_criteria.xml` est en `noupdate="1"` - les ponderations
+             sont du parametrage que le cluster ajuste, et un `-u` ne doit pas
+             les ecraser. Le meme drapeau empeche donc de corriger le critere
+             sur une base deja installee : le `<record>` modifie ne s'applique
+             qu'a une installation neuve.
+
+             C'est le second endroit de cette extension ou `noupdate` masque
+             une modification, et les deux se reconnaissent au meme symptome :
+             aucune erreur, et le comportement d'avant.
+
+             Mesure : le critere continuait de comparer
+             `field('certifications_souhaitees')` a
+             `expert_certification_names` en mode `contains`, c'est-a-dire
+             exactement la dette D1 - avec tout le reste de l'extension en
+             place. Quatre tests rouges, dont celui qui compte.
+        -->
+        <function model="opex.matching.criteria" name="write">
+            <value eval="[ref('opex_intervenants.matching_certification_audit')]"/>
+            <value eval="{
+                'source_expression': &quot;field('certification_ids')&quot;,
+                'target_field': 'expert_certification_ref_ids',
+                'match_mode': 'intersect',
+                'is_conjonctif': True,
+            }"/>
+        </function>
+
+    </data>
+</odoo>

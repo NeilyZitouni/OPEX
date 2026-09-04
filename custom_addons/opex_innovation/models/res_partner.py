@@ -14,7 +14,7 @@ class ResPartner(models.Model):
     n'y a toujours qu'un seul `res.partner`, aucune duplication. Seul le module
     qui déclare les champs change, et c'est invisible du métier.
 
-    ⚠ **Trois booléens indépendants, jamais une Selection.** Un même compte
+    **Trois booléens indépendants, jamais une Selection.** Un même compte
     peut être Membre + Expert + Investisseur — c'est la Modification 2, écrite
     noir sur blanc. Une Selection exclusive obligerait à choisir, et c'est
     précisément ce que le portail refuse.
@@ -59,7 +59,7 @@ class ResPartner(models.Model):
     # Les données utiles vivent sur les profils ; ces `related` les exposent là
     # où le matching sait les lire, sans les dupliquer.
     #
-    # ⚠ **Non stockés**, et c'était une erreur de vouloir les stocker.
+    # **Non stockés**, et c'était une erreur de vouloir les stocker.
     #
     # Un `Many2many` à la fois `related` et `store=True` exige un nom de table
     # de liaison qu'Odoo ne sait pas déduire : le registre refuse de se charger
@@ -130,7 +130,7 @@ class ResPartner(models.Model):
     def _opex_sync_auto_profiles(self):
         """Ouvre les profils dus à la catégorie, pour les membres actifs.
 
-        ⚠ **N'active jamais rien à l'envers.** Un profil obtenu ne se retire
+        **N'active jamais rien à l'envers.** Un profil obtenu ne se retire
         pas parce qu'une catégorie a changé : la Modification 1 parle
         d'activation automatique, pas de révocation automatique. Retirer un
         profil est une décision, elle se prend à la main.
@@ -200,7 +200,7 @@ class ResPartner(models.Model):
     def opex_check_can_request(self, profile_type):
         """Vérification **serveur** avant création, avec un message lisible.
 
-        ⚠ Le `t-if` du gabarit masque le bouton ; il n'empêche rien. Une
+        Le `t-if` du gabarit masque le bouton ; il n'empêche rien. Une
         requête forgée sur la route de création n'a jamais vu le gabarit. Le
         bug symétrique est déjà arrivé sur le Module 1 — « Devenir membre »
         resté visible pour un membre actif — et c'est le contrôle serveur qui
@@ -234,7 +234,7 @@ class ResPartner(models.Model):
     def _opex_owned_record_ids(self):
         """Ajoute les enregistrements Innovation au périmètre de la cloche.
 
-        ⚠ **On n'écrit pas un second système de notification.** Le Module 1 en
+        **On n'écrit pas un second système de notification.** Le Module 1 en
         a un complet : il lit les `mail.message` déjà posés sur les
         enregistrements du contact, en écarte les notes internes par
         `_get_search_domain_share()`, et compare leur date à
@@ -252,7 +252,7 @@ class ResPartner(models.Model):
         règle transversale 1 bis — une méthode qui relaie `super()` s'exécute
         en chaîne, celle qui ne le fait pas efface la précédente.
 
-        ⚠ Ne donne accès à rien. Cette table décide de ce que le contact voit
+        Ne donne accès à rien. Cette table décide de ce que le contact voit
         dans sa cloche ; la visibilité réelle des messages reste tranchée par
         `_get_search_domain_share()` en amont, qui exclut les `mt_note`. Un
         message de coordination interne n'y entrera jamais, même si son

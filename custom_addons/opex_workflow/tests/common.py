@@ -4,7 +4,7 @@ from odoo.tests.common import TransactionCase
 class WorkflowCase(TransactionCase):
     """Socle des tests du moteur.
 
-    ⚠ Le modèle piloté par les workflows de test est **`res.partner`**, un
+    Le modèle piloté par les workflows de test est **`res.partner`**, un
     modèle natif d'Odoo que le moteur n'a jamais vu.
 
     Ce n'est pas un raccourci de test, c'est la démonstration : si le moteur

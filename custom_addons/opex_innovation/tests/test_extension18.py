@@ -20,9 +20,9 @@ BOUND = {
     'innovation_notify_projet_cloture': ['close'],
 }
 
-#: ⚠ **Vide depuis l'Extension 16.**
+#: **Vide depuis l'Extension 16.**
 #:
-#: Trois notifications — ⑩ Nouveau livrable, ⑪ Livrable validé, ⑫ Correction
+#: Trois notifications — 10. Nouveau livrable, 11. Livrable validé, 12. Correction
 #: demandée — étaient configurées et rattachées à rien, faute de transitions
 #: auxquelles les accrocher : `opex.innovation.deliverable` n'existait pas.
 #:
@@ -139,7 +139,7 @@ class TestNotificationInventory(Extension18Case):
                        or "rien"))
 
     def test_no_trigger_is_left_orphan(self):
-        """⚠ L'inventaire nomme ses trous plutôt que de les taire.
+        """L'inventaire nomme ses trous plutôt que de les taire.
 
         Trois des quatorze portaient sur `opex.innovation.deliverable` et
         n'étaient rattachées à rien tant que l'Extension 16 n'existait pas.
@@ -190,7 +190,7 @@ class TestNotificationInventory(Extension18Case):
                 "dossier, dont le porteur." % code)
 
     # ------------------------------------------------------------
-    # ⚠ Le sous-type — bug déjà rencontré, verrouillé ici
+    # Le sous-type — bug déjà rencontré, verrouillé ici
     # ------------------------------------------------------------
 
     #: Ce que chaque destinataire doit recevoir. Le porteur et le candidat sont
@@ -198,7 +198,7 @@ class TestNotificationInventory(Extension18Case):
     EXTERNAL_ROLES = {'Porteur'}
 
     def test_internal_messages_never_leave_by_email(self):
-        """⚠ `mail.mt_note` pour tout ce qui est interne.
+        """`mail.mt_note` pour tout ce qui est interne.
 
         Un message de coordination posté en `mt_comment` sur un enregistrement
         que le porteur suit lui part par courriel. Bug déjà rencontré et corrigé
@@ -280,7 +280,7 @@ class TestNotificationFiring(Extension18Case):
                       message.notified_partner_ids | message.partner_ids)
 
     def test_adjourning_fires_the_two_events_of_the_section(self):
-        """⑤ et ⑥ sur la même transition : le moteur les enchaîne."""
+        """5. et 6. sur la même transition : le moteur les enchaîne."""
         project = self._project()
         for code, actor in (('submit', 'porteur'),
                             ('take_in_charge', 'secretariat'),
@@ -294,7 +294,7 @@ class TestNotificationFiring(Extension18Case):
         self.assertIn("nécessite des améliorations", bodies)
 
     # ------------------------------------------------------------
-    # ⑬ Évolution du financement
+    # 13. Évolution du financement
     # ------------------------------------------------------------
 
     def test_a_real_change_of_amount_warns_the_holder(self):
@@ -307,7 +307,7 @@ class TestNotificationFiring(Extension18Case):
                       self._bodies(project))
 
     def test_rewriting_the_same_amount_warns_nobody(self):
-        """⚠ Sur le changement de valeur, pas sur la présence de la clé.
+        """Sur le changement de valeur, pas sur la présence de la clé.
 
         Un écran qui renvoie tous ses champs à chaque enregistrement écrit
         `financement_obtenu` sans y toucher. Notifier sur la clé enverrait un
@@ -342,7 +342,7 @@ class TestNotificationFiring(Extension18Case):
 
 @tagged('post_install', '-at_install')
 class TestNoHardcodedMessages(Extension18Case):
-    """⚠ La question posée : reste-t-il des `message_post()` en dur ?
+    """La question posée : reste-t-il des `message_post()` en dur ?
 
     Ce test répond, et surtout il **fige** la réponse. Sans lui, la règle de la
     section 30 tient tant que quelqu'un y pense ; avec lui, un quinzième
@@ -391,7 +391,7 @@ class TestNoHardcodedMessages(Extension18Case):
                                                         'message_notify')):
                             found.append((filename, node.name, inner.lineno))
 
-        # ⚠ Assertion positive d'abord : un `root` erroné donnerait zéro
+        # Assertion positive d'abord : un `root` erroné donnerait zéro
         # fichier, zéro trouvaille, et un test vert qui ne prouve rien.
         self.assertGreaterEqual(
             scanned, 10, "Le module n'a pas été parcouru (%s fichiers)."
@@ -474,7 +474,7 @@ class TestTraceability(Extension18Case):
         self.assertTrue([entry for entry in internal if entry['code']])
 
     def test_the_history_records_every_passage(self):
-        """⚠ En compréhension, pas avec `mapped()` : un dossier qui repasse par
+        """En compréhension, pas avec `mapped()` : un dossier qui repasse par
         la même étape doit apparaître deux fois."""
         project = self._project()
         for code, actor in (('submit', 'porteur'),

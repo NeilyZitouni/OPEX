@@ -57,9 +57,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Le canal par lequel le personnel reçoit
-        ═══════════════════════════════════════════════════════════════
 
         Ce module poste 29 messages internes (`mt_note`) à destination du
         Comité CEO et du Contrôle Qualité. Encore faut-il qu'ils s'affichent :

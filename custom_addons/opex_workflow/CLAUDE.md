@@ -4,7 +4,7 @@
 
 ---
 
-## ⚠️ LIRE INTÉGRALEMENT AVANT TOUTE MODIFICATION
+## LIRE INTÉGRALEMENT AVANT TOUTE MODIFICATION
 
 Ce document couvre **deux modules Odoo 19 distincts**, développés dans cet ordre :
 
@@ -343,7 +343,7 @@ interne partaient par email chez le candidat. Tout `message_post()` destiné au
 personnel utilise `mail.mt_note`. `mail.mt_comment` uniquement pour ce que le
 porteur doit réellement recevoir.
 
-⚠ **Le sous-type ne décide pas que de l'email.** Deux conséquences moins
+**Le sous-type ne décide pas que de l'email.** Deux conséquences moins
 évidentes, toutes deux mesurées le 28/08 :
 
 - un `mt_comment` part **aussi aux followers** de l'enregistrement, et le
@@ -357,7 +357,7 @@ porteur doit réellement recevoir.
   `note` — expert, évaluateur, acteur financier — ne voit rien à l'écran. Seul
   le porteur, servi en `comment`, est atteint par cette cloche.
 
-### 4 bis. ⚠ Aucune notification email n'est délivrée dans cet environnement
+### 4 bis. Aucune notification email n'est délivrée dans cet environnement
 
 **À annoncer avant toute démonstration.** Le canal email est correctement câblé
 côté application — sous-types, destinataires, followers — mais rien ne sort de
@@ -451,7 +451,7 @@ Tout `search()` d'un test se borne à son propre périmètre :
 
 ```python
 self.Criteria.search([
-    ('definition_id', '=', self.definition.id),   # ⚠ la borne
+    ('definition_id', '=', self.definition.id),   # la borne
     ('code', '=', 'competences'),
 ])
 ```
@@ -466,7 +466,7 @@ supposer qu'il n'existe pas.
 expert_competence_ids = fields.Many2many(
     'opex.innovation.competence',
     related='expert_profile_id.competence_ids',
-    store=True,          # ⚠ le registre ne se charge plus
+    store=True,          # le registre ne se charge plus
 )
 ```
 
@@ -496,7 +496,7 @@ jour de la démonstration.
 ```python
 def _tag_function(self, rec):
     if self.noupdate and self.mode != 'init':
-        return                     # ⚠ silencieusement sauté
+        return                     # silencieusement sauté
 ```
 
 Une définition de workflow publiée depuis l'intérieur de son bloc `noupdate`
@@ -607,7 +607,7 @@ bouton** : « Valider », « Demander un complément », « Ajourner »), `code`
 `sequence`, `allowed_role_ids`, `condition_ids` (Many2many rule), `action_ids`
 (Many2many action), `requires_comment` (Boolean).
 
-⚠️ **Plusieurs transitions partent d'une même étape.** C'est ce qui produit le
+**Plusieurs transitions partent d'une même étape.** C'est ce qui produit le
 GO / À CLARIFIER / NO GO / ORIENTATION de la pré-analyse et le
 ACCEPTÉ / AJOURNÉ / REFUSÉ du comité d'évaluation. Ne jamais supposer qu'une étape
 n'a qu'une sortie.
@@ -651,7 +651,7 @@ Aide contextuelle et exemples d'expressions dans le `help` du champ `expression`
 Graphe valide accepté · deux étapes de départ refusé · étape orpheline refusée avec
 son nom dans le message · transition inter-définitions refusée.
 
-⚠️ **Les tests vivent dans `tests/` versionné dès le premier jour.** C'est le fil
+**Les tests vivent dans `tests/` versionné dès le premier jour.** C'est le fil
 resté ouvert sur `opex_membership`, où ils vivaient dans un répertoire temporaire
 effacé à chaque session. Ne pas reproduire l'erreur.
 
@@ -761,7 +761,7 @@ historique immuable · expression invalide qui ne casse rien.
 
 **Objectif** : rendre les transitions utilisables dans l'interface, sans JavaScript.
 
-⚠️ **Piège Odoo à ne pas contourner par de l'OWL.** Des boutons dont le nombre et le
+**Piège Odoo à ne pas contourner par de l'OWL.** Des boutons dont le nombre et le
 libellé dépendent de la donnée ne se déclarent pas statiquement en XML. Un composant
 OWL custom coûterait une journée et demie sur quatre et serait fragile en démo.
 
@@ -798,7 +798,7 @@ d'autre.
 
 | Type | Effet |
 |---|---|
-| `notify` | `message_post()` sur l'objet métier, destinataires = acteurs portant `target_role_ids`. ⚠️ `mail.mt_note` pour l'interne |
+| `notify` | `message_post()` sur l'objet métier, destinataires = acteurs portant `target_role_ids`. `mail.mt_note` pour l'interne |
 | `set_field` | Écrit une valeur sur l'objet métier (`field_id` + `value_expression` évaluée comme une règle) |
 | `create_task` | Crée un `opex.workflow.task` assigné à un rôle, avec échéance |
 | `send_email` | Via un `mail.template` |
@@ -846,7 +846,7 @@ Sur `instance`, `history` et `task`, pour le groupe portail :
 "[('actor_ids.user_id', '=', user.id)]"
 ```
 
-⚠️ **Teste avec un vrai compte non-admin.** Les `ir.rule` ne se voient pas en
+**Teste avec un vrai compte non-admin.** Les `ir.rule` ne se voient pas en
 administrateur — exactement le piège qui a coûté du temps sur le Module 1.
 
 ---
@@ -998,7 +998,7 @@ Les deux profils héritent donc de `opex.workflow.mixin`.
 Modification 3 : affichés dans l'espace personnel après validation de l'adhésion,
 **masqués si le profil existe déjà**.
 
-⚠️ Bug symétrique déjà rencontré sur le Module 1 (« Devenir membre » resté visible
+Bug symétrique déjà rencontré sur le Module 1 (« Devenir membre » resté visible
 pour un membre actif). Le `t-if` conditionne l'affichage, mais la route vérifie
 **aussi** côté serveur qu'un second profil n'est pas créé en doublon.
 
@@ -1018,7 +1018,7 @@ class InnovationProject(models.Model):
     _inherit = ['mail.thread', 'mail.activity.mixin', 'opex.workflow.mixin']
 ```
 
-⚠️ **N'hérite PAS de `project.project`**, malgré le Product Backlog. Raisons :
+**N'hérite PAS de `project.project`**, malgré le Product Backlog. Raisons :
 `project.project` apporte ses propres `stage_id`, tâches et vues Kanban, qui entrent
 en collision frontale avec nos étapes de workflow (règle transversale 1). À la place,
 un champ `project_id` (Many2one `project.project`, optionnel), alimenté **au
@@ -1162,7 +1162,7 @@ Le workflow doit supporter **deux scénarios** (schéma 6) : avec évaluateurs
 (Scénario A) et sans (Scénario B, évaluation directe par le comité). Deux transitions
 depuis `qualified`, pas une seule avec un `if` dedans.
 
-⚠️ **Expert ≠ évaluateur.** Le rôle « Expert » sur le portail est un profil du vivier.
+**Expert ≠ évaluateur.** Le rôle « Expert » sur le portail est un profil du vivier.
 Une personne devient évaluateur uniquement quand elle est **désignée pour un projet
 donné** — c'est-à-dire quand une ligne `opex.workflow.instance.actor` est créée avec
 le rôle `evaluateur` sur cette instance. C'est exactement l'usage des droits
@@ -1200,7 +1200,7 @@ que lit la condition `field('score') >= 70`** du test Demo Day.
 "['|', ('evaluator_id', '=', user.partner_id.id), ('state', '=', 'submitted')]"
 ```
 
-⚠️ Et **côté template** : ne jamais rendre les autres avis dans le HTML de la page
+Et **côté template** : ne jamais rendre les autres avis dans le HTML de la page
 d'un évaluateur, même masqués. Règle transversale 3 à l'envers — ici, « présent dans
 le HTML » suffirait à violer la confidentialité, quand bien même rien ne s'afficherait.
 C'est le point de sécurité le plus sensible de tout le module.
@@ -1249,7 +1249,7 @@ maturité, besoins d'accompagnement, besoin de financement, technologies.
 Résultat, trois catégories de candidats : **Experts recommandés**, **Mentors**,
 **Investisseurs**, avec leur score et son explication.
 
-> ⚠️ « L'IA recommande. Elle ne doit pas automatiquement décider seule. »
+> « L'IA recommande. Elle ne doit pas automatiquement décider seule. »
 > Le responsable OPEX doit pouvoir **Accepter / Modifier / Ignorer**.
 
 Le matching est déclenché par une action `run_matching` sur la transition
@@ -1347,7 +1347,7 @@ Chacun est une **action `notify` configurée sur une transition**, pas un
 maintenable et un module où il faut chercher à quinze endroits pourquoi un email
 part.
 
-⚠️ `mail.mt_note` pour tout ce qui est interne. Bug déjà rencontré et corrigé sur le
+`mail.mt_note` pour tout ce qui est interne. Bug déjà rencontré et corrigé sur le
 Module 1.
 
 ### Historique (31)
@@ -1383,13 +1383,13 @@ techniques :
 
 ```
 Smart Factory
-✓ Déposé
-✓ Contrôle terminé
-● Évaluation en cours
-○ Décision
-○ Accompagnement
-○ Financement
-○ Industrialisation
+Déposé
+Contrôle terminé
+Évaluation en cours
+Décision
+Accompagnement
+Financement
+Industrialisation
 
 Dernière action : « Votre projet est actuellement évalué. »
 [ Consulter mon projet ]
@@ -1434,28 +1434,28 @@ Suite complète : **443 tests, 0 échec** sur les deux modules.
 
 | Extension | État | Preuve |
 |---|---|---|
-| 1 — Configurateur | ✅ | `models/workflow_definition.py`, `_stage.py`, `_transition.py`, `_rule.py`, `_role.py`, `_action.py` |
-| 2 — Exécution | ✅ | `models/workflow_instance.py`, `_history.py`, `_mixin.py` |
-| 3 — Wizard et UI générique | ✅ | `wizard/workflow_transition_wizard.py` |
-| 4 — Actions et work queue | ✅ | dispatch par `getattr`, `models/workflow_task.py` |
-| 5 — Droits dynamiques | ✅ | `instance.actor`, `security/ir_rule.xml` |
-| 6 — Formulaires dynamiques | ✅ | `models/workflow_form.py` |
-| 7 — Smart Matching | ✅ | `models/matching.py` |
-| 8 — Sous-workflows, SLA, portail | ✅ | `start_subworkflow()`, `_cron_check_sla()` |
-| 9 — Profils Expert / Investisseur | ✅ | `opex_innovation/models/expert_profile.py`, `investor_profile.py` |
-| 10 — Modèle projet | ✅ | `innovation_project.py`, `data/project_workflow.xml` (15 étapes) |
-| 11 — Parcours de dépôt | ✅ | `controllers/project_portal.py` |
-| 12 — Contrôle et qualification | ✅ | `controllers/staff_portal.py` |
-| 13 — Évaluateurs | ✅ | `models/evaluation.py` |
-| 14 — Décision et remédiation | ✅ | `models/remediation.py` |
-| 15 — Matching IA configuré | ✅ | `data/matching_criteria.xml` |
-| 16 — Accompagnement, roadmap, livrables | ✅ | `accompagnement.py`, `deliverable.py`, `data/deliverable_workflow.xml`, `data/roadmap_phases.xml` |
-| 17 — Financement, investisseur, industrialisation, clôture | ✅ | `financement.py`, `industrialisation.py`, `closure.py`, `final_evaluation.py`, `investor_portal.py` |
-| 18 — Notifications, historique, droits | ✅ | `data/notifications.xml` (14 déclencheurs), `models/notifications.py` |
-| 19 — Portail et tableaux de bord | ✅ | `models/milestone.py`, `controllers/dashboard.py` |
-| 20 — Smart Crowdfunding, seconde instance | ✅ | `data/smart_crowdfunding.xml` — 14 étapes, 23 transitions, 0 ligne de Python au moteur |
+| 1 — Configurateur | | `models/workflow_definition.py`, `_stage.py`, `_transition.py`, `_rule.py`, `_role.py`, `_action.py` |
+| 2 — Exécution | | `models/workflow_instance.py`, `_history.py`, `_mixin.py` |
+| 3 — Wizard et UI générique | | `wizard/workflow_transition_wizard.py` |
+| 4 — Actions et work queue | | dispatch par `getattr`, `models/workflow_task.py` |
+| 5 — Droits dynamiques | | `instance.actor`, `security/ir_rule.xml` |
+| 6 — Formulaires dynamiques | | `models/workflow_form.py` |
+| 7 — Smart Matching | | `models/matching.py` |
+| 8 — Sous-workflows, SLA, portail | | `start_subworkflow()`, `_cron_check_sla()` |
+| 9 — Profils Expert / Investisseur | | `opex_innovation/models/expert_profile.py`, `investor_profile.py` |
+| 10 — Modèle projet | | `innovation_project.py`, `data/project_workflow.xml` (15 étapes) |
+| 11 — Parcours de dépôt | | `controllers/project_portal.py` |
+| 12 — Contrôle et qualification | | `controllers/staff_portal.py` |
+| 13 — Évaluateurs | | `models/evaluation.py` |
+| 14 — Décision et remédiation | | `models/remediation.py` |
+| 15 — Matching IA configuré | | `data/matching_criteria.xml` |
+| 16 — Accompagnement, roadmap, livrables | | `accompagnement.py`, `deliverable.py`, `data/deliverable_workflow.xml`, `data/roadmap_phases.xml` |
+| 17 — Financement, investisseur, industrialisation, clôture | | `financement.py`, `industrialisation.py`, `closure.py`, `final_evaluation.py`, `investor_portal.py` |
+| 18 — Notifications, historique, droits | | `data/notifications.xml` (14 déclencheurs), `models/notifications.py` |
+| 19 — Portail et tableaux de bord | | `models/milestone.py`, `controllers/dashboard.py` |
+| 20 — Smart Crowdfunding, seconde instance | | `data/smart_crowdfunding.xml` — 14 étapes, 23 transitions, 0 ligne de Python au moteur |
 
-## ✅ Extension 16 — les trois coutures, refermées
+## Extension 16 — les trois coutures, refermées
 
 Les trois manques que les Extensions 17, 18 et 19 signalaient — et **affichaient
 à l'écran** plutôt que de les masquer — sont refermés, exactement comme annoncé :
@@ -1463,7 +1463,7 @@ Les trois manques que les Extensions 17, 18 et 19 signalaient — et **affichaie
 1. **§28, bilan de clôture** — `livrable_count` comptait les
    `opex.innovation.document` du projet. Il compte désormais les livrables
    **validés**, et eux seuls. Un livrable déposé mais refusé n'a pas été réalisé.
-2. **§30, notifications** — ⑩ Nouveau livrable, ⑪ Livrable validé, ⑫ Correction
+2. **§30, notifications** — 10. Nouveau livrable, 11. Livrable validé, 12. Correction
    demandée étaient configurées et rattachées à rien. Elles sont branchées sur
    le workflow des livrables par trois `<function>`, **sans qu'aucune ait été
    réécrite** : mêmes enregistrements, même corps, même sous-type. Il ne reste
@@ -1493,7 +1493,7 @@ Sept définitions tournent maintenant sur six modèles distincts :
 `smart_crowdfunding`, `innovation_industrialisation`, `innovation_deliverable`,
 `demo_dossier`. Zéro ligne de Python ajoutée au moteur pour aucune.
 
-⚠ **La phase de roadmap, elle, garde un champ `state`**, et c'est la ligne de
+**La phase de roadmap, elle, garde un champ `state`**, et c'est la ligne de
 partage à retenir : une phase est une case à trois positions, sans acteur, sans
 condition, sans notification, sans chemin de refus et sans historique. Lui donner
 une instance de workflow serait de la cérémonie pour un compteur d'avancement. Un

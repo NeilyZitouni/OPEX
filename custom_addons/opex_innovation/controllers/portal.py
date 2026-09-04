@@ -74,7 +74,7 @@ class InnovationProfilePortal(CustomerPortal):
     def portal_profile_new(self, profile_type, **post):
         """Dépose une demande de profil.
 
-        ⚠ **La vérification serveur est faite ici, avant toute création.**
+        **La vérification serveur est faite ici, avant toute création.**
 
         Le `t-if` du gabarit masque le bouton ; il n'empêche rien. Une requête
         forgée sur cette route n'a jamais vu le gabarit. Le bug symétrique est
@@ -134,7 +134,7 @@ class InnovationProfilePortal(CustomerPortal):
     def _innovation_profile_values(self, profile, profile_type, error=None):
         """Ce que l'écran de suivi doit savoir pour être utilisable.
 
-        ⚠ Les transitions sont demandées **au moteur**, sous l'identité du
+        Les transitions sont demandées **au moteur**, sous l'identité du
         visiteur, et rendues **toutes** — y compris celles qu'une condition
         bloque. `transition_options()` porte pour chacune sa disponibilité et,
         si elle est bloquée, la raison rédigée par la règle. Une transition
@@ -189,7 +189,7 @@ class InnovationProfilePortal(CustomerPortal):
     def portal_innovation_profile_document(self, profile_type, **post):
         """Joint une pièce à sa propre demande.
 
-        ⚠ Nom de méthode préfixé du module, conformément à la règle
+        Nom de méthode préfixé du module, conformément à la règle
         transversale 1 bis : `_generate_routing_rules()` fusionne toutes les
         classes filles de `CustomerPortal` en une seule, et deux modules qui
         définiraient `portal_profile_document` n'en garderaient qu'un — sans
@@ -246,7 +246,7 @@ class InnovationProfilePortal(CustomerPortal):
     def portal_innovation_profile_transition(self, profile_type, **post):
         """Franchit une transition, **sans juger si elle est permise**.
 
-        ⚠ Aucun contrôle de droit ici, et c'est délibéré (règle transversale
+        Aucun contrôle de droit ici, et c'est délibéré (règle transversale
         2). `workflow_do_transition()` mène à
         `opex.workflow.instance._check_transition_allowed()`, l'unique juge :
         appartenance de la transition au workflow, cohérence de l'étape de

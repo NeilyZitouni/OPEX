@@ -9,14 +9,14 @@ from odoo.http import request
 class CrowdfundingStaffPortal(http.Controller):
     """Espace de traitement du Smart Crowdfunding, côté site web.
 
-    ⚠ **Écran de démonstration, pas remplacement du back-office.** Il porte la
+    **Écran de démonstration, pas remplacement du back-office.** Il porte la
     file de travail et les décisions qui tiennent en un bouton, pour qu'une
     démonstration ne quitte jamais le site. Ce qu'il ne couvre pas
     délibérément — matching financier, accompagnement, closing, chatter,
     filtres, et toute saisie riche — est listé dans le CLAUDE.md du module, et
     chaque fiche porte un lien vers le back-office pour ces cas-là.
 
-    ⚠ **Contrôle d'accès, deux niveaux, tous deux côté serveur :**
+    **Contrôle d'accès, deux niveaux, tous deux côté serveur :**
 
     1. `res.users._is_crowdfunding_staff()` en première ligne de **chaque**
        route — le point de contrôle de rôle unique du module (règle
@@ -52,7 +52,7 @@ class CrowdfundingStaffPortal(http.Controller):
     def _crowdfunding_staff_queues(self):
         """Les files du rôle connecté : libellé, domaine, et compteur.
 
-        ⚠ Les domaines ne sont **pas réécrits ici**. Ils viennent des six files
+        Les domaines ne sont **pas réécrits ici**. Ils viennent des six files
         de `opex.crowdfunding.work.queue`, celles-là mêmes que la Smart Work
         Queue du back-office compte et ouvre. Une seconde définition finirait
         par diverger, et le portail annoncerait autre chose que le back-office
@@ -244,7 +244,7 @@ class CrowdfundingStaffPortal(http.Controller):
     def staff_crowdfunding_action(self, project_id, **post):
         """Exécute une décision, en déléguant au modèle.
 
-        ⚠ Trois barrières, dans cet ordre : le rôle, l'appartenance du dossier
+        Trois barrières, dans cet ordre : le rôle, l'appartenance du dossier
         à la file du rôle, puis la méthode du modèle elle-même. Le nom de
         méthode reçu du navigateur n'est jamais appelé tel quel : il est
         cherché dans la table des actions ouvertes à ce rôle à cette étape.

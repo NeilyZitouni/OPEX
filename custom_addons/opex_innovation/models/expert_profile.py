@@ -10,7 +10,7 @@ PROFILE_WORKFLOW_CODE = 'profile_request'
 class ExpertProfile(models.Model):
     """Demande de profil Expert — Modification 4 du PDF.
 
-    ⚠ **Aucun champ `state`.** L'avancement de la demande, c'est
+    **Aucun champ `state`.** L'avancement de la demande, c'est
     `workflow_stage_id`, piloté par une définition configurée en données. C'est
     la démonstration entière du projet : la première personne qui ajoute ici un
     `state = fields.Selection(...)` « juste pour aller plus vite » l'annule.
@@ -59,7 +59,7 @@ class ExpertProfile(models.Model):
     # quelque chose ne va pas.
     motif_complement = fields.Text(string="Complément demandé", readonly=True)
 
-    # ⚠ Ce n'est **pas** un champ d'état, malgré les apparences.
+    # Ce n'est **pas** un champ d'état, malgré les apparences.
     #
     # C'est le point de contact entre le workflow et le métier : l'action
     # `set_field` de la transition « Valider » l'écrit, et le `write()`

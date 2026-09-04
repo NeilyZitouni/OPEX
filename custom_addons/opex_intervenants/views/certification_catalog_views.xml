@@ -1,0 +1,334 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         LE RÉFÉRENTIEL — celui du Module 1, vu avec sa portée
+         ============================================================ -->
+
+    <record id="view_opex_certification_list" model="ir.ui.view">
+        <field name="name">opex.certification.list.catalogue</field>
+        <field name="model">opex.certification</field>
+        <field name="arch" type="xml">
+            <list string="Référentiel des certifications">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="porte"/>
+                <field name="organisme" optional="show"/>
+                <field name="synonyme_count" string="Synonymes"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_opex_certification_form" model="ir.ui.view">
+        <field name="name">opex.certification.form.catalogue</field>
+        <field name="model">opex.certification</field>
+        <field name="arch" type="xml">
+            <form string="Certification">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_synonymes" type="object"
+                                class="oe_stat_button" icon="fa-tags">
+                            <field name="synonyme_count" widget="statinfo"
+                                   string="Synonymes"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"
+                                   placeholder="ISO 27001 Lead Auditor"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="LA27001"/>
+                            <field name="porte"/>
+                        </group>
+                        <group>
+                            <field name="organisme" placeholder="PECB / BSI"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <div class="alert alert-info" role="alert">
+                        Ce référentiel décide de l'éligibilité aux appels qui
+                        exigent une certification. Deux entrées proches — « ISO
+                        27001 » et « ISO 27001 Lead Auditor » — sont deux
+                        certifications distinctes, et aucun synonyme ne doit
+                        les relier : ce sont deux qualifications différentes.
+                    </div>
+                    <notebook>
+                        <page string="Synonymes" name="synonymes">
+                            <div class="text-muted mb-2">
+                                Les écritures rencontrées dans un CV. C'est
+                                l'étape 1 du rapprochement, gratuite et
+                                déterministe. Un synonyme manquant n'est pas
+                                une panne : le libellé part en arbitrage.
+                            </div>
+                            <field name="synonyme_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="origine"/>
+                                    <field name="normalised" readonly="1"
+                                           optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_opex_certification_search" model="ir.ui.view">
+        <field name="name">opex.certification.search.catalogue</field>
+        <field name="model">opex.certification</field>
+        <field name="arch" type="xml">
+            <search string="Certifications">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="organisme"/>
+                <filter name="personne" string="Certifications de personne"
+                        domain="[('porte', 'in', ['personne', 'les_deux'])]"/>
+                <filter name="organisation" string="Certifications d'organisation"
+                        domain="[('porte', 'in', ['organisation', 'les_deux'])]"/>
+                <separator/>
+                <filter name="sans_synonyme" string="Sans synonyme"
+                        domain="[('synonyme_ids', '=', False)]"/>
+                <filter name="sans_code" string="Sans code"
+                        domain="[('code', '=', False)]"/>
+                <group name="group_by">
+                    <filter name="group_porte" string="Portée"
+                            context="{'group_by': 'porte'}"/>
+                    <filter name="group_organisme" string="Organisme"
+                            context="{'group_by': 'organisme'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_opex_certification_catalogue" model="ir.actions.act_window">
+        <field name="name">Référentiel des certifications</field>
+        <field name="res_model">opex.certification</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_opex_certification_list"/>
+        <field name="search_view_id" ref="view_opex_certification_search"/>
+        <field name="context">{'search_default_group_porte': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Le référentiel partagé avec le Module 1</p>
+            <p>Un seul référentiel, deux portées. En créer un second ici serait
+               exactement la dette D1 : deux ensembles qui ne se croisent que
+               par coïncidence de libellé.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         LA FILE D'ARBITRAGE
+         ============================================================ -->
+
+    <record id="view_certification_arbitrage_list" model="ir.ui.view">
+        <field name="name">opex.certification.arbitrage.list</field>
+        <field name="model">opex.certification.arbitrage</field>
+        <field name="arch" type="xml">
+            <list string="Certifications à arbitrer" create="false"
+                  decoration-muted="decision != 'pending'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="source_document" optional="show"/>
+                <field name="suggestion_id"/>
+                <field name="suggestion_confiance" optional="show"/>
+                <field name="decision"/>
+                <field name="certification_id" optional="hide"/>
+                <field name="decided_by" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_certification_arbitrage_form" model="ir.ui.view">
+        <field name="name">opex.certification.arbitrage.form</field>
+        <field name="model">opex.certification.arbitrage</field>
+        <field name="arch" type="xml">
+            <form string="Certification à arbitrer" create="false">
+                <header>
+                    <button name="action_link" type="object"
+                            string="Rattacher" class="btn-primary"
+                            invisible="decision != 'pending'"
+                            groups="opex_intervenants.group_mission_manager"/>
+                    <button name="action_add_to_catalogue" type="object"
+                            string="Ajouter au référentiel" class="btn-secondary"
+                            invisible="decision != 'pending'"
+                            groups="opex_intervenants.group_mission_manager"/>
+                    <button name="action_discard" type="object"
+                            string="Écarter" class="btn-secondary"
+                            invisible="decision != 'pending'"
+                            groups="opex_intervenants.group_mission_manager"/>
+                    <field name="decision" widget="statusbar"
+                           statusbar_visible="pending,linked,added,discarded"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+                    <group>
+                        <group string="D'où vient la question">
+                            <field name="partner_id" readonly="1"/>
+                            <field name="source_document" readonly="1"/>
+                            <field name="normalised" readonly="1"/>
+                        </group>
+                        <group string="Ce que l'IA propose">
+                            <!-- Proposé, jamais appliqué. Une proposition à
+                                 99 % reste une proposition : le référentiel
+                                 décide de l'éligibilité, il ne s'enrichit pas
+                                 tout seul. -->
+                            <field name="suggestion_id" readonly="1"/>
+                            <field name="suggestion_confiance" readonly="1"/>
+                        </group>
+                    </group>
+                    <field name="suggestion_motif" readonly="1"
+                           placeholder="Aucune justification."/>
+                    <group string="Décision" invisible="decision == 'pending'">
+                        <field name="certification_id" readonly="1"/>
+                        <field name="decided_by" readonly="1"/>
+                        <field name="decided_on" readonly="1"/>
+                    </group>
+                    <field name="decision_note"
+                           placeholder="Pourquoi cette décision."/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_certification_arbitrage_search" model="ir.ui.view">
+        <field name="name">opex.certification.arbitrage.search</field>
+        <field name="model">opex.certification.arbitrage</field>
+        <field name="arch" type="xml">
+            <search string="Certifications à arbitrer">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <filter name="en_attente" string="En attente"
+                        domain="[('decision', '=', 'pending')]"/>
+                <filter name="avec_suggestion" string="Avec proposition de l'IA"
+                        domain="[('suggestion_id', '!=', False)]"/>
+                <group name="group_by">
+                    <filter name="group_decision" string="Décision"
+                            context="{'group_by': 'decision'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_certification_arbitrage" model="ir.actions.act_window">
+        <field name="name">Certifications à arbitrer</field>
+        <field name="res_model">opex.certification.arbitrage</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_en_attente': 1}</field>
+    </record>
+
+    <!-- ============================================================
+         GREFFES — l'exigence sur l'appel, la ligne sur le profil
+         ============================================================ -->
+
+    <record id="view_mission_request_form_certification" model="ir.ui.view">
+        <field name="name">opex.mission.request.form.certification</field>
+        <field name="model">opex.mission.request</field>
+        <field name="inherit_id" ref="opex_intervenants.view_mission_request_form"/>
+        <field name="arch" type="xml">
+            <field name="certifications_souhaitees" position="before">
+                <!-- L'exigence qui ecarte. Le champ texte qui suit reste, et
+                     porte ce que le client demande en toutes lettres - ce
+                     qu'aucun referentiel ne saura exprimer. Ce qu'il ne fait
+                     plus, c'est decider qui entre dans le vivier. -->
+                <field name="certification_ids" widget="many2many_tags"
+                       options="{'no_quick_create': True}"/>
+            </field>
+        </field>
+    </record>
+
+    <record id="view_expert_certification_list_axes" model="ir.ui.view">
+        <field name="name">opex.expert.certification.list.axes</field>
+        <field name="model">opex.expert.certification</field>
+        <field name="arch" type="xml">
+            <list string="Certifications de l'intervenant"
+                  decoration-muted="not is_eligible">
+                <field name="partner_id" optional="hide"/>
+                <field name="certification_id"/>
+                <field name="name" string="Intitulé lu"/>
+                <field name="organisme" optional="hide"/>
+                <field name="date_expiration"/>
+                <field name="is_valid" optional="hide"/>
+                <field name="source"/>
+                <field name="confiance"/>
+                <field name="is_eligible" string="Comptée"/>
+                <field name="is_confirmed" column_invisible="1"/>
+                <button name="action_confirm" type="object"
+                        string="Confirmer" icon="fa-check"
+                        invisible="is_confirmed"/>
+                <button name="action_verify" type="object"
+                        string="Vérifier (OPEX)" icon="fa-shield"
+                        invisible="confiance == 'opex'"
+                        groups="opex_intervenants.group_mission_manager"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_expert_certification_search_axes" model="ir.ui.view">
+        <field name="name">opex.expert.certification.search.axes</field>
+        <field name="model">opex.expert.certification</field>
+        <field name="arch" type="xml">
+            <search string="Certifications des intervenants">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="certification_id"/>
+                <!-- La file de travail : les lignes saisies avant D1, qui ne
+                     comptent pour aucun critere tant qu'elles ne sont pas
+                     rapprochees. -->
+                <filter name="non_rapprochees" string="Non rapprochées"
+                        domain="[('certification_id', '=', False)]"/>
+                <filter name="comptees" string="Comptées par le matching"
+                        domain="[('is_eligible', '=', True)]"/>
+                <filter name="issues_cv" string="Issues d'un CV"
+                        domain="[('source', '=', 'cv')]"/>
+                <group name="group_by">
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_certification" string="Certification"
+                            context="{'group_by': 'certification_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_expert_certification_axes" model="ir.actions.act_window">
+        <field name="name">Certifications des intervenants</field>
+        <field name="res_model">opex.expert.certification</field>
+        <field name="view_mode">list</field>
+        <field name="view_id" ref="view_expert_certification_list_axes"/>
+        <field name="search_view_id" ref="view_expert_certification_search_axes"/>
+        <field name="context">{'search_default_non_rapprochees': 1}</field>
+    </record>
+
+    <!-- ============================================================
+         MENUS
+         ============================================================ -->
+
+    <menuitem id="menu_certification_root"
+              name="Certifications"
+              parent="menu_intervenants_config"
+              sequence="35"/>
+
+    <menuitem id="menu_certification_catalogue"
+              name="Référentiel"
+              parent="menu_certification_root"
+              action="action_opex_certification_catalogue"
+              sequence="10"/>
+
+    <menuitem id="menu_certification_expert"
+              name="Certifications des intervenants"
+              parent="menu_certification_root"
+              action="action_expert_certification_axes"
+              sequence="20"/>
+
+    <menuitem id="menu_certification_arbitrage"
+              name="À arbitrer"
+              parent="menu_certification_root"
+              action="action_certification_arbitrage"
+              sequence="30"/>
+
+</odoo>

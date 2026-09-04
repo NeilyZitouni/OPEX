@@ -8,7 +8,7 @@ from odoo.addons.portal.controllers.portal import CustomerPortal
 class EvaluationPortal(CustomerPortal):
     """Espace de l'évaluateur — section 15.
 
-    ⚠ **Le point de sécurité le plus sensible du module.**
+    **Le point de sécurité le plus sensible du module.**
 
     Aucune de ces pages ne rend l'avis d'un autre évaluateur. Pas masqué en
     CSS, pas dans un bloc replié, pas dans un attribut de données : absent. Ici,
@@ -74,7 +74,7 @@ class EvaluationPortal(CustomerPortal):
     def portal_evaluation(self, evaluation_id, **post):
         """La grille d'évaluation.
 
-        ⚠ Le contexte de rendu ne contient **que** l'avis de l'évaluateur. Le
+        Le contexte de rendu ne contient **que** l'avis de l'évaluateur. Le
         projet est passé pour qu'il puisse lire le dossier ; ses
         `evaluation_ids` ne sont jamais parcourus par le gabarit.
         """

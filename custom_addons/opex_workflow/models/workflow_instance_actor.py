@@ -9,7 +9,7 @@ class WorkflowInstanceActor(models.Model):
     une ligne ici. Un rôle porté par un groupe Odoo vaut pour tous les dossiers ;
     un rôle porté par une ligne d'acteur ne vaut que pour celui-ci.
 
-    ⚠ Extension 2 : **modèle seul.** Les `ir.rule` qui s'appuient dessus pour
+    Extension 2 : **modèle seul.** Les `ir.rule` qui s'appuient dessus pour
     restreindre la visibilité des instances, de l'historique et des tâches sont
     l'Extension 5. Le modèle est posé maintenant parce que
     `_check_transition_allowed()` en a besoin dès l'exécution : sans lui, seuls

@@ -19,7 +19,7 @@
                     de l'Innovation (26/08). Les deux tuiles disent maintenant
                     de quel parcours il s'agit et qui l'instruit.
 
-                    ⚠ Ne jamais faire apparaître ici le vocabulaire de
+                    Ne jamais faire apparaître ici le vocabulaire de
                     l'architecture — « workflow en dur », « moteur générique »,
                     « module texto ». La comparaison des deux approches est un
                     sujet de soutenance, pas une information pour le porteur.
@@ -380,15 +380,15 @@
                             <ul class="list-unstyled mb-0">
                                 <li t-foreach="progress" t-as="jalon" class="py-1">
                                     <t t-if="jalon['status'] == 'done'">
-                                        <span class="text-success me-2">✓</span>
+                                        <span class="text-success me-2"></span>
                                         <span t-out="jalon['label']"/>
                                     </t>
                                     <t t-elif="jalon['status'] == 'current'">
-                                        <span class="text-primary me-2">●</span>
+                                        <span class="text-primary me-2"></span>
                                         <strong t-out="jalon['label']"/>
                                     </t>
                                     <t t-else="">
-                                        <span class="text-muted me-2">○</span>
+                                        <span class="text-muted me-2"></span>
                                         <span class="text-muted" t-out="jalon['label']"/>
                                     </t>
                                 </li>
@@ -1050,13 +1050,13 @@
                     <input type="hidden" name="csrf_token" t-att-value="request.csrf_token()"/>
                     <div class="d-flex flex-wrap gap-2">
                         <button type="submit" name="choix" value="interesse"
-                                class="btn btn-primary">★ Intéressé</button>
+                                class="btn btn-primary">Intéressé</button>
                         <button type="submit" name="choix" value="accompagnement"
                                 class="btn btn-outline-primary">
                             ↗ Demander un accompagnement CEO
                         </button>
                         <button type="submit" name="choix" value="non_interesse"
-                                class="btn btn-outline-secondary">✕ Non intéressé</button>
+                                class="btn btn-outline-secondary">Non intéressé</button>
                     </div>
                 </form>
 

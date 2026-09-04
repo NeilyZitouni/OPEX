@@ -1,0 +1,541 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+         LE LIVRABLE — §22, §24, §25
+          -->
+
+    <record id="view_mission_deliverable_form" model="ir.ui.view">
+        <field name="name">opex.mission.deliverable.form</field>
+        <field name="model">opex.mission.deliverable</field>
+        <field name="arch" type="xml">
+            <form string="Livrable">
+                <header>
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_versions" type="object"
+                                class="oe_stat_button" icon="fa-history"
+                                invisible="version_count == 0">
+                            <field name="version_count" widget="statinfo"
+                                   string="Versions"/>
+                        </button>
+                    </div>
+
+                    <!--
+                        Un livrable en retard le dit en haut de la fiche.
+                        Le §43 le veut en Urgent ; le masquer dans une
+                        colonne de liste reviendrait à ne pas le signaler.
+                    -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="not en_retard">
+                        Ce livrable a dépassé son échéance et n'est pas déposé.
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Rapport de vulnérabilités"/></h1>
+                        <h5 class="text-muted">
+                            <field name="workflow_stage_label" readonly="1"/>
+                        </h5>
+                    </div>
+
+                    <group>
+                        <group string="Rattachement">
+                            <field name="mission_id" readonly="1"/>
+                            <field name="assignment_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="jalon" placeholder="Phase 2 — Analyse"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group string="Attendu">
+                            <field name="deliverable_type"/>
+                            <field name="is_required"/>
+                            <field name="deadline"/>
+                            <field name="en_retard" invisible="1"/>
+                            <field name="version" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Contenu attendu" name="attendu">
+                            <group>
+                                <field name="description"
+                                       placeholder="Ce que le livrable doit contenir."/>
+                                <!--
+                                    §22 — écrits avant le dépôt, ils évitent le
+                                    « ce n'est pas ce que j'attendais » auquel
+                                    l'intervenant n'a pas de réponse.
+                                -->
+                                <field name="criteres_acceptation"
+                                       placeholder="Ce sur quoi le validateur se prononcera."/>
+                            </group>
+                        </page>
+                        <page string="Fichier" name="fichier">
+                            <group>
+                                <field name="file" filename="filename"/>
+                                <field name="filename" invisible="1"/>
+                            </group>
+                        </page>
+                        <page string="Versions précédentes" name="versions"
+                              invisible="version_count == 0">
+                            <!--
+                                Le motif est porté par la **version**, pas par
+                                le livrable : sur le livrable, il serait écrasé
+                                au refus suivant, et on perdrait la raison du
+                                premier — c'est-à-dire justement ce que le §25
+                                demande de conserver.
+                            -->
+                            <field name="version_ids" readonly="1">
+                                <list>
+                                    <field name="version"/>
+                                    <field name="date"/>
+                                    <field name="author_id"/>
+                                    <field name="filename"/>
+                                    <field name="motif_correction"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mission_deliverable_list" model="ir.ui.view">
+        <field name="name">opex.mission.deliverable.list</field>
+        <field name="model">opex.mission.deliverable</field>
+        <field name="arch" type="xml">
+            <list string="Livrables" decoration-danger="en_retard">
+                <field name="sequence" widget="handle"/>
+                <field name="mission_id"/>
+                <field name="jalon" optional="show"/>
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="deliverable_type" optional="hide"/>
+                <field name="is_required"/>
+                <field name="deadline"/>
+                <field name="en_retard" optional="hide"/>
+                <field name="version"/>
+                <field name="workflow_stage_label" string="Étape"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mission_deliverable_search" model="ir.ui.view">
+        <field name="name">opex.mission.deliverable.search</field>
+        <field name="model">opex.mission.deliverable</field>
+        <field name="arch" type="xml">
+            <!-- Tous les `<field>` avant les filtres, et un
+                 `<group name="group_by">` **nu** : une vue `search` refuse
+                 `expand` et `string` sur son `<group>`, et le module ne se
+                 charge plus. Payé à l'Extension 1. -->
+            <search string="Livrables">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="partner_id"/>
+                <field name="jalon"/>
+                <filter name="a_valider" string="À valider"
+                        domain="[('workflow_stage_id.code', '=', 'submitted')]"/>
+                <filter name="en_retard" string="En retard"
+                        domain="[('en_retard', '=', True)]"/>
+                <filter name="obligatoires" string="Obligatoires"
+                        domain="[('is_required', '=', True)]"/>
+                <separator/>
+                <filter name="non_valides" string="Non validés"
+                        domain="[('workflow_stage_id.code', '!=', 'validated')]"/>
+                <group name="group_by">
+                    <filter name="group_mission" string="Mission"
+                            context="{'group_by': 'mission_id'}"/>
+                    <filter name="group_jalon" string="Jalon"
+                            context="{'group_by': 'jalon'}"/>
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mission_deliverable" model="ir.actions.act_window">
+        <field name="name">Livrables</field>
+        <field name="res_model">opex.mission.deliverable</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun livrable.</p>
+            <p>
+                Le plan de mission du §22 se dessine ici : un livrable par
+                attendu, regroupés par jalon. Chacun suit son propre petit
+                workflow — À faire, En cours, Soumis, Validé.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_deliverable_version_list" model="ir.ui.view">
+        <field name="name">opex.mission.deliverable.version.list</field>
+        <field name="model">opex.mission.deliverable.version</field>
+        <field name="arch" type="xml">
+            <list string="Versions" create="false" edit="false">
+                <field name="deliverable_id"/>
+                <field name="version"/>
+                <field name="date"/>
+                <field name="author_id"/>
+                <field name="filename"/>
+                <field name="motif_correction"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_deliverable_version_form" model="ir.ui.view">
+        <field name="name">opex.mission.deliverable.version.form</field>
+        <field name="model">opex.mission.deliverable.version</field>
+        <field name="arch" type="xml">
+            <form string="Version archivée" create="false" edit="false">
+                <sheet>
+                    <div class="alert alert-info" role="status">
+                        Une version archivée n'est pas modifiable : c'est ce qui
+                        donne sa valeur à l'historique du §25.
+                    </div>
+                    <group>
+                        <group>
+                            <field name="deliverable_id"/>
+                            <field name="version"/>
+                            <field name="date"/>
+                            <field name="author_id"/>
+                        </group>
+                        <group>
+                            <field name="file" filename="filename"/>
+                            <field name="filename" invisible="1"/>
+                        </group>
+                    </group>
+                    <group string="Motif de la correction demandée">
+                        <field name="motif_correction" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--
+         LE POINT D'AVANCEMENT — §21
+          -->
+
+    <record id="view_progress_report_form" model="ir.ui.view">
+        <field name="name">opex.mission.progress.report.form</field>
+        <field name="model">opex.mission.progress.report</field>
+        <field name="arch" type="xml">
+            <form string="Point d'avancement">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="mission_id"/></h1>
+                        <h5 class="text-muted">
+                            Point du <field name="date" class="oe_inline"/>
+                        </h5>
+                    </div>
+                    <group>
+                        <group string="Période et charge">
+                            <field name="partner_id"/>
+                            <field name="periode_debut"/>
+                            <field name="periode_fin"/>
+                            <field name="temps_passe_jours"/>
+                            <field name="avancement" widget="percentpie"/>
+                        </group>
+                        <group string="Livrables concernés">
+                            <field name="deliverable_ids" widget="many2many_tags"
+                                   nolabel="1" colspan="2"/>
+                            <field name="assignment_id" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="travaux_realises"
+                               placeholder="Ce qui a été fait sur la période."/>
+                        <field name="problemes"
+                               placeholder="Ce qui bloque ou risque de bloquer."/>
+                        <field name="prochaine_etape"
+                               placeholder="Ce qui vient ensuite."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_progress_report_list" model="ir.ui.view">
+        <field name="name">opex.mission.progress.report.list</field>
+        <field name="model">opex.mission.progress.report</field>
+        <field name="arch" type="xml">
+            <list string="Points d'avancement">
+                <field name="date"/>
+                <field name="mission_id"/>
+                <field name="partner_id"/>
+                <field name="temps_passe_jours" sum="Total"/>
+                <field name="avancement"/>
+                <field name="prochaine_etape" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_progress_report" model="ir.actions.act_window">
+        <field name="name">Points d'avancement</field>
+        <field name="res_model">opex.mission.progress.report</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!--
+         L'INCIDENT — §26
+          -->
+
+    <record id="view_mission_incident_form" model="ir.ui.view">
+        <field name="name">opex.mission.incident.form</field>
+        <field name="model">opex.mission.incident</field>
+        <field name="arch" type="xml">
+            <form string="Incident">
+                <header>
+                    <button name="action_take_over" type="object"
+                            string="Prendre en charge" class="btn-primary"
+                            invisible="traitement != 'ouvert'"/>
+                    <button name="action_resolve" type="object"
+                            string="Marquer résolu" class="btn-primary"
+                            invisible="traitement == 'resolu'"/>
+                    <button name="action_reopen" type="object"
+                            string="Rouvrir" class="btn-secondary"
+                            invisible="traitement != 'resolu'"/>
+                    <!--
+                        Une `statusbar` sur un champ `Selection`, et non sur
+                        une étape de workflow. C'est assumé : le Schéma 10 du
+                        §26 donne un cycle linéaire — Ouvert → En traitement →
+                        Résolu — sans acteur, sans condition et sans chemin de
+                        refus. C'est la ligne de partage que le CLAUDE.md du
+                        moteur pose pour `roadmap.phase` : un compteur à trois
+                        positions n'est pas un processus.
+                    -->
+                    <field name="traitement" widget="statusbar"
+                           options="{'clickable': false}"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <h2><field name="name" readonly="1" class="text-muted"/></h2>
+                        <h1><field name="incident_type"/></h1>
+                    </div>
+                    <group>
+                        <group string="Contexte">
+                            <field name="mission_id"/>
+                            <field name="deliverable_id"/>
+                            <field name="priorite" widget="priority"/>
+                        </group>
+                        <group string="Traitement">
+                            <field name="reporter_id" readonly="1"/>
+                            <field name="assignee_id"/>
+                            <field name="date_ouverture" readonly="1"/>
+                            <field name="date_resolution" readonly="1"
+                                   invisible="traitement != 'resolu'"/>
+                            <field name="is_open" invisible="1"/>
+                        </group>
+                    </group>
+                    <group>
+                        <field name="description"
+                               placeholder="Livrable intermédiaire non reçu."/>
+                        <field name="resolution"
+                               invisible="traitement == 'ouvert'"
+                               placeholder="Ce qui a été fait pour lever le blocage."/>
+                    </group>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mission_incident_list" model="ir.ui.view">
+        <field name="name">opex.mission.incident.list</field>
+        <field name="model">opex.mission.incident</field>
+        <field name="arch" type="xml">
+            <list string="Incidents" decoration-danger="priorite == '2' and is_open"
+                  decoration-muted="not is_open">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="incident_type"/>
+                <field name="priorite" widget="priority"/>
+                <field name="traitement"/>
+                <field name="date_ouverture"/>
+                <field name="assignee_id" optional="show"/>
+                <field name="is_open" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mission_incident_search" model="ir.ui.view">
+        <field name="name">opex.mission.incident.search</field>
+        <field name="model">opex.mission.incident</field>
+        <field name="arch" type="xml">
+            <search string="Incidents">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="description"/>
+                <filter name="ouverts" string="Ouverts"
+                        domain="[('is_open', '=', True)]"/>
+                <filter name="haute" string="Priorité haute"
+                        domain="[('priorite', '=', '2')]"/>
+                <group name="group_by">
+                    <filter name="group_mission" string="Mission"
+                            context="{'group_by': 'mission_id'}"/>
+                    <filter name="group_type" string="Type"
+                            context="{'group_by': 'incident_type'}"/>
+                    <filter name="group_traitement" string="Traitement"
+                            context="{'group_by': 'traitement'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mission_incident" model="ir.actions.act_window">
+        <field name="name">Incidents</field>
+        <field name="res_model">opex.mission.incident</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_ouverts': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun incident ouvert.</p>
+            <p>
+                Le §26 réserve le signalement au responsable. L'intervenant
+                décrit ses difficultés dans « Problèmes rencontrés » de son
+                point d'avancement ; c'est le responsable qui en fait un
+                incident.
+            </p>
+        </field>
+    </record>
+
+    <!--
+         GREFFE SUR LA FICHE DE L'APPEL — §21
+          -->
+
+    <record id="view_mission_request_form_execution" model="ir.ui.view">
+        <field name="name">opex.mission.request.form.execution</field>
+        <field name="model">opex.mission.request</field>
+        <field name="inherit_id" ref="view_mission_request_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_deliverables" type="object"
+                        class="oe_stat_button" icon="fa-check-square-o">
+                    <field name="deliverable_count" widget="statinfo"
+                           string="Livrables"/>
+                </button>
+                <button name="action_view_incidents" type="object"
+                        class="oe_stat_button" icon="fa-exclamation-triangle"
+                        invisible="incident_open_count == 0">
+                    <field name="incident_open_count" widget="statinfo"
+                           string="Incidents"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Suivi d'exécution" name="execution">
+
+                    <!--
+                        §43 — la priorisation. Les deux alertes qui méritent le
+                        rouge sont celles qui coûtent du temps si on les
+                        découvre tard.
+                    -->
+                    <div class="alert alert-danger" role="alert"
+                         invisible="deliverable_late_count == 0">
+                        <strong><field name="deliverable_late_count" class="oe_inline" readonly="1"/></strong>
+                        livrable(s) ont dépassé leur échéance sans être déposés.
+                    </div>
+                    <div class="alert alert-warning" role="alert"
+                         invisible="deliverable_to_validate_count == 0">
+                        <strong><field name="deliverable_to_validate_count" class="oe_inline" readonly="1"/></strong>
+                        livrable(s) attendent votre validation.
+                    </div>
+
+                    <group>
+                        <group string="Avancement déclaré">
+                            <field name="avancement_declare" widget="percentpie"/>
+                            <field name="temps_passe_total"/>
+                        </group>
+                        <group string="Garde-fous des règles 5 et 6 du §39">
+                            <!--
+                                Ils ne comptent que les livrables
+                                **obligatoires**. Le §39 dit « les livrables
+                                obligatoires » : un document de confort déposé
+                                en plus ne doit bloquer aucune transition.
+                            -->
+                            <field name="deliverable_pending_count" readonly="1"/>
+                            <field name="deliverable_unvalidated_count" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <separator string="Livrables — le plan de mission du §22"/>
+                    <field name="deliverable_ids" context="{'default_mission_id': id}">
+                        <list>
+                            <field name="sequence" widget="handle"/>
+                            <field name="jalon"/>
+                            <field name="name"/>
+                            <field name="is_required"/>
+                            <field name="deadline"/>
+                            <field name="version"/>
+                            <field name="workflow_stage_label" string="Étape"/>
+                        </list>
+                    </field>
+
+                    <separator string="Points d'avancement — §21"/>
+                    <field name="progress_report_ids" context="{'default_mission_id': id}">
+                        <list>
+                            <field name="date"/>
+                            <field name="partner_id"/>
+                            <field name="temps_passe_jours" sum="Total"/>
+                            <field name="avancement"/>
+                            <field name="problemes"/>
+                            <field name="prochaine_etape"/>
+                        </list>
+                    </field>
+
+                    <separator string="Incidents — §26"/>
+                    <field name="incident_ids" context="{'default_mission_id': id}">
+                        <list>
+                            <field name="name"/>
+                            <field name="incident_type"/>
+                            <field name="priorite" widget="priority"/>
+                            <field name="traitement"/>
+                            <field name="description"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+         MENUS
+          -->
+
+    <menuitem id="menu_mission_deliverable"
+              name="Livrables"
+              parent="menu_intervenants_root"
+              action="action_mission_deliverable"
+              sequence="60"
+              groups="group_mission_manager,opex_membership.group_secretariat"/>
+
+    <menuitem id="menu_mission_incident"
+              name="Incidents"
+              parent="menu_intervenants_root"
+              action="action_mission_incident"
+              sequence="70"
+              groups="group_mission_manager,opex_membership.group_secretariat"/>
+
+    <menuitem id="menu_progress_report"
+              name="Points d'avancement"
+              parent="menu_intervenants_root"
+              action="action_progress_report"
+              sequence="80"
+              groups="group_mission_manager,opex_membership.group_secretariat"/>
+
+</odoo>

@@ -12,7 +12,7 @@ class InnovationProjectPortal(CustomerPortal):
     `write()` partiel, et l'identifiant ne circule que dans l'URL des écrans
     suivants — jamais dans un champ caché du formulaire.
 
-    ⚠ **Écart au principe du module, assumé et signalé.**
+    **Écart au principe du module, assumé et signalé.**
 
     Ces écrans sont des gabarits QWeb écrits à la main, non les formulaires
     dynamiques de l'Extension 6. Le moteur en est capable ; ce n'est pas lui qui
@@ -346,7 +346,7 @@ class InnovationProjectPortal(CustomerPortal):
     def portal_project_recap(self, project_id, **post):
         """Récapitulatif, avertissement, puis soumission.
 
-        ⚠ La soumission passe par `workflow_do_transition()`, donc par l'unique
+        La soumission passe par `workflow_do_transition()`, donc par l'unique
         contrôle d'accès du moteur et par les conditions configurées. Le
         controller ne décide pas que le projet peut partir : il le demande, et
         rend le refus lisible.
@@ -440,7 +440,7 @@ class InnovationRemediationPortal(CustomerPortal):
     def portal_remediation(self, project_id, **post):
         """Affiche les points à corriger, puis resoumet en versionnant.
 
-        ⚠ La resoumission passe par le moteur : la transition est cherchée
+        La resoumission passe par le moteur : la transition est cherchée
         dans celles qu'il propose au porteur. Le controller ne décide pas que
         le dossier peut repartir.
         """

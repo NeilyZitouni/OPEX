@@ -1,0 +1,718 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Même principe que sur `opex.membership.file` du Module 1 et
+        `opex.innovation.project` du Module 2 : les droits du CSV portent sur le
+        **modèle**, ces règles portent sur l'**enregistrement**. Sans elles, un
+        client portail lirait — et modifierait — les demandes de tous les autres.
+
+        Le contrôle applicatif des controllers viendra aux Extensions 2 et 5 ;
+        celui-ci est le second verrou, celui qui s'applique à toutes les
+        requêtes, y compris celles qu'on n'a pas écrites.
+
+        Les domaines s'appuient sur `workflow_stage_id.code`, c'est-à-dire sur
+        **la configuration**, jamais sur un champ d'état du modèle métier. Le
+        processus peut donc changer sans qu'une seule de ces règles bouge.
+    -->
+
+    <!--
+         L'APPEL À MISSION
+          -->
+
+    <record id="rule_mission_request_portal" model="ir.rule">
+        <field name="name">Appel à mission : le client n'accède qu'aux siens</field>
+        <field name="model_id" ref="model_opex_mission_request"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Écriture bornée à l'étape où le client est réellement attendu : son
+        brouillon, et lui seul.
+
+        La boucle du Schéma 3 — « Informations manquantes → retour au client » —
+        renvoie le dossier en `draft` plutôt que dans une étape dédiée, et c'est
+        précisément ce qui lui rend le droit d'écrire. Une fois la demande
+        soumise, il ne la réécrit plus sous le secrétariat.
+    -->
+    <record id="rule_mission_request_portal_write" model="ir.rule">
+        <field name="name">Appel à mission : modifiable tant que le client est attendu</field>
+        <field name="model_id" ref="model_opex_mission_request"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('client_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['draft'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le brouillon d'un client n'appartient qu'à lui : un employé ordinaire
+        n'a pas à lire une demande qui n'a pas encore été soumise.
+
+        Rappel de sémantique Odoo : les règles portées par les différents
+        groupes d'un même utilisateur sont **unies** (OR), pas intersectées. Le
+        responsable de mission, qui est aussi `base.group_user`, retrouve donc
+        l'accès complet par sa propre règle ci-dessous — celle des employés ne
+        le lui retire pas.
+    -->
+    <record id="rule_mission_request_internal" model="ir.rule">
+        <field name="name">Appel à mission : les internes ne voient pas les brouillons</field>
+        <field name="model_id" ref="model_opex_mission_request"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('workflow_stage_id.code', '!=', 'draft')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_request_staff" model="ir.rule">
+        <field name="name">Appel à mission : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_request"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+         LA CANDIDATURE
+          -->
+
+    <!--
+        §14 : « L'intervenant peut consulter uniquement l'état de sa propre
+        candidature selon les règles de confidentialité. » Il ne voit donc pas
+        les candidatures concurrentes, et c'est ce qui rend la comparaison du
+        §16 défendable.
+    -->
+    <record id="rule_mission_application_portal" model="ir.rule">
+        <field name="name">Candidature : l'intervenant n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_mission_application"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        `interested` est la seule étape où l'intervenant remplit quoi que ce
+        soit : c'est là que se saisit la candidature Lean du §9. Une fois
+        déposée, il ne la réécrit plus sous le responsable — la version examinée
+        doit être celle qui a été lue.
+    -->
+    <record id="rule_mission_application_portal_write" model="ir.rule">
+        <field name="name">Candidature : modifiable tant que l'intervenant est attendu</field>
+        <field name="model_id" ref="model_opex_mission_application"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['interested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Une candidature qui n'a pas encore été déposée — `invited`, `viewed`,
+        `interested` — n'est pas une candidature reçue : c'est une intention.
+        Le §15 parle des « candidatures reçues », et un employé ordinaire n'a
+        pas à lire un brouillon d'intervenant.
+
+        Le personnel des missions, lui, doit les voir : le §19 de la
+        spécification prévoit la « relance des experts invités n'ayant pas
+        répondu », qui suppose de les avoir sous les yeux. C'est la règle
+        suivante qui la lui donne.
+    -->
+    <record id="rule_mission_application_internal" model="ir.rule">
+        <field name="name">Candidature : les internes ne voient pas les candidatures non déposées</field>
+        <field name="model_id" ref="model_opex_mission_application"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('workflow_stage_id.code', 'not in', ['invited', 'viewed', 'interested'])]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_application_staff" model="ir.rule">
+        <field name="name">Candidature : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_application"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+         LES PIÈCES JOINTES
+          -->
+
+    <record id="rule_mission_document_portal" model="ir.rule">
+        <field name="name">Pièce de l'appel : limitée aux appels du client</field>
+        <field name="model_id" ref="model_opex_mission_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('mission_id.client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Déposées et retirées tant que la demande est au brouillon, comme la
+         demande elle-même. Une pièce qu'on peut remplacer après soumission
+         n'est plus celle que le contrôleur a lue. -->
+    <record id="rule_mission_document_portal_write" model="ir.rule">
+        <field name="name">Pièce de l'appel : déposable tant que le client est attendu</field>
+        <field name="model_id" ref="model_opex_mission_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('mission_id.client_id', '=', user.partner_id.id), ('mission_id.workflow_stage_id.code', 'in', ['draft'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_mission_document_internal" model="ir.rule">
+        <field name="name">Pièce de l'appel : les internes ne voient pas celles des brouillons</field>
+        <field name="model_id" ref="model_opex_mission_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('mission_id.workflow_stage_id.code', '!=', 'draft')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_document_staff" model="ir.rule">
+        <field name="name">Pièce de l'appel : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_document"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_application_document_portal" model="ir.rule">
+        <field name="name">Pièce de candidature : l'intervenant n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_mission_application_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('application_id.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_application_document_portal_write" model="ir.rule">
+        <field name="name">Pièce de candidature : déposable tant que l'intervenant est attendu</field>
+        <field name="model_id" ref="model_opex_mission_application_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('application_id.partner_id', '=', user.partner_id.id), ('application_id.workflow_stage_id.code', 'in', ['interested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_application_document_internal" model="ir.rule">
+        <field name="name">Pièce de candidature : les internes ne voient que les candidatures déposées</field>
+        <field name="model_id" ref="model_opex_mission_application_document"/>
+        <field name="groups" eval="[Command.link(ref('base.group_user'))]"/>
+        <field name="domain_force">[('application_id.workflow_stage_id.code', 'not in', ['invited', 'viewed', 'interested'])]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_application_document_staff" model="ir.rule">
+        <field name="name">Pièce de candidature : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_application_document"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+         EXTENSION 3 — LE CAPITAL DE L'INTERVENANT
+
+         Les cinq modèles suivent la même règle : **l'intervenant n'accède
+         qu'au sien**, le personnel des missions lit tout.
+
+         Le domaine s'appuie sur `partner_id`, un `related` **stocké** depuis
+         `profile_id.partner_id`. Une `ir.rule` a besoin d'une colonne : sans
+         le stockage, le domaine serait inexploitable et il faudrait traverser
+         `profile_id.partner_id` à chaque ligne.
+
+         Le personnel a le droit de **lire** ce capital, pas de l'écrire.
+         C'est celui de l'intervenant : le cluster le consulte pour décider,
+         il ne le corrige pas à sa place. Seul le gestionnaire peut intervenir,
+         et c'est tracé par le chatter du profil.
+    -->
+
+    <record id="rule_expert_skill_portal" model="ir.rule">
+        <field name="name">Compétence : l'intervenant n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_expert_skill"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_expert_experience_portal" model="ir.rule">
+        <field name="name">Expérience : l'intervenant n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_expert_experience"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_expert_certification_portal" model="ir.rule">
+        <field name="name">Certification : l'intervenant n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_expert_certification"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_expert_availability_portal" model="ir.rule">
+        <field name="name">Disponibilité : l'intervenant n'accède qu'aux siennes</field>
+        <field name="model_id" ref="model_opex_expert_availability"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!--
+        L'évaluation est la seule des cinq que l'intervenant **lit sans
+        pouvoir l'écrire**, et l'ACL le dit déjà (`1,0,0,0`). C'est le §33 :
+        « Selon les droits, certaines informations peuvent être visibles
+        publiquement et d'autres rester confidentielles » — un intervenant qui
+        pourrait corriger sa propre note viderait la réputation de son sens.
+    -->
+    <record id="rule_expert_rating_portal" model="ir.rule">
+        <field name="name">Évaluation : l'intervenant lit les siennes, sans les modifier</field>
+        <field name="model_id" ref="model_opex_expert_rating"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le personnel des missions lit tout le capital : c'est ce qu'il compare
+        au §16, et ce que le Smart Matching interrogera à l'Extension 4.
+        Un employé ordinaire, lui, ne le lit pas — le CSV ne lui donne la
+        lecture que sur `base.group_user`, et cette règle-ci ne l'élargit pas.
+    -->
+    <record id="rule_expert_capital_staff" model="ir.rule">
+        <field name="name">Compétence : le personnel des missions lit tout</field>
+        <field name="model_id" ref="model_opex_expert_skill"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_expert_experience_staff" model="ir.rule">
+        <field name="name">Expérience : le personnel des missions lit tout</field>
+        <field name="model_id" ref="model_opex_expert_experience"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_expert_certification_staff" model="ir.rule">
+        <field name="name">Certification : le personnel des missions lit tout</field>
+        <field name="model_id" ref="model_opex_expert_certification"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_expert_availability_staff" model="ir.rule">
+        <field name="name">Disponibilité : le personnel des missions lit tout</field>
+        <field name="model_id" ref="model_opex_expert_availability"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_expert_rating_staff" model="ir.rule">
+        <field name="name">Évaluation : le personnel des missions lit tout</field>
+        <field name="model_id" ref="model_opex_expert_rating"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+         EXTENSION 7 — AFFECTATION ET PIÈCES CONTRACTUELLES
+
+         Deux parties concernées, et une seule règle portail pour chacun des
+         deux modèles : le domaine nomme **les deux** côtés du contrat.
+
+         En lecture seule pour le portail, et c'est délibéré. La signature
+         est aujourd'hui enregistrée depuis le back-office, horodatée et
+         nominative ; l'écran de signature portail relève de l'Extension 11.
+         Ouvrir l'écriture avant que cet écran existe donnerait un droit que
+         rien n'utilise et que rien ne borne à ce qu'il faut signer.
+    -->
+
+    <record id="rule_mission_assignment_portal" model="ir.rule">
+        <field name="name">Affectation : le client et l'intervenant concernés</field>
+        <field name="model_id" ref="model_opex_mission_assignment"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('mission_id.client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_assignment_staff" model="ir.rule">
+        <field name="name">Affectation : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_assignment"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_contract_portal" model="ir.rule">
+        <field name="name">Pièce contractuelle : le client et l'intervenant concernés</field>
+        <field name="model_id" ref="model_opex_mission_contract"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('mission_id.client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_contract_staff" model="ir.rule">
+        <field name="name">Pièce contractuelle : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_contract"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+         EXTENSION 8 — L'EXÉCUTION
+
+         Deux parties portail concernées, et pas de la même façon :
+         l'**intervenant** produit, le **client** suit (§21). Le domaine
+         nomme les deux, les droits d'écriture ne concernent que le premier.
+    -->
+
+    <record id="rule_mission_deliverable_portal" model="ir.rule">
+        <field name="name">Livrable : l'intervenant qui le produit, le client qui le suit</field>
+        <field name="model_id" ref="model_opex_mission_deliverable"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('mission_id.client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        L'écriture est bornée aux deux étapes où l'intervenant est réellement
+        attendu, et au seul intervenant — le client, lui, ne dépose rien.
+
+        Le motif est celui des Extensions 2 et 5 : une fois le livrable soumis,
+        il ne le réécrit plus sous le valideur. La version examinée doit être
+        celle qui a été lue, et c'est aussi ce qui donne son sens à l'archive
+        du §25 — un fichier qu'on peut remplacer après coup rendrait
+        l'historique des versions décoratif.
+    -->
+    <record id="rule_mission_deliverable_portal_write" model="ir.rule">
+        <field name="name">Livrable : modifiable tant que l'intervenant est attendu</field>
+        <field name="model_id" ref="model_opex_mission_deliverable"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', 'in', ['todo', 'in_progress', 'correction_requested'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_deliverable_staff" model="ir.rule">
+        <field name="name">Livrable : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_deliverable"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_deliverable_version_portal" model="ir.rule">
+        <field name="name">Version : celles des livrables auxquels on a accès</field>
+        <field name="model_id" ref="model_opex_mission_deliverable_version"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('deliverable_id.partner_id', '=', user.partner_id.id), ('deliverable_id.mission_id.client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_deliverable_version_staff" model="ir.rule">
+        <field name="name">Version : le personnel des missions lit tout</field>
+        <field name="model_id" ref="model_opex_mission_deliverable_version"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        Le point d'avancement : l'intervenant l'écrit, le client et le
+        responsable le lisent (§21). L'écriture n'est pas bornée à une étape —
+        un point d'avancement se rédige tant que la mission tourne — mais elle
+        est bornée à **son auteur** : personne ne réécrit le compte rendu d'un
+        autre, sinon la série de dates ne veut plus rien dire.
+    -->
+    <record id="rule_progress_report_portal" model="ir.rule">
+        <field name="name">Point d'avancement : l'auteur et le client de la mission</field>
+        <field name="model_id" ref="model_opex_mission_progress_report"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('partner_id', '=', user.partner_id.id), ('mission_id.client_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_progress_report_portal_write" model="ir.rule">
+        <field name="name">Point d'avancement : chacun le sien</field>
+        <field name="model_id" ref="model_opex_mission_progress_report"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_progress_report_staff" model="ir.rule">
+        <field name="name">Point d'avancement : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_progress_report"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        L'incident est en **lecture seule** pour le portail, et seulement
+        celui de sa propre mission.
+
+        Le §26 est explicite : « Pendant une mission, **le responsable** peut
+        signaler : retard, blocage… ». Ce n'est pas un canal de réclamation
+        ouvert. L'intervenant signale ses difficultés dans le champ
+        « Problèmes rencontrés » de son point d'avancement, et c'est le
+        responsable qui décide d'en faire un incident.
+    -->
+    <record id="rule_mission_incident_portal" model="ir.rule">
+        <field name="name">Incident : ceux de sa propre mission, en lecture</field>
+        <field name="model_id" ref="model_opex_mission_incident"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('mission_id.client_id', '=', user.partner_id.id), ('mission_id.assignment_ids.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_incident_staff" model="ir.rule">
+        <field name="name">Incident : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_incident"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+         EXTENSION 9 — LE CONSTAT DE SERVICE FAIT
+
+         Les deux parties portail y figurent, et pour des raisons différentes :
+         le **client** parce qu'il prononce la validation finale (§28), et
+         l'**intervenant** parce que ce constat conditionne son paiement — il
+         doit pouvoir voir où il en est sans avoir à le demander.
+
+         En **lecture seule** pour les deux, et c'est le même arbitrage qu'à
+         l'Extension 7 sur la signature du contrat : la validation du client est
+         aujourd'hui enregistrée depuis le back-office, horodatée et nominative
+         par le journal du moteur ; l'écran portail relève de l'Extension 11.
+         Ouvrir l'écriture avant que cet écran existe donnerait un droit que
+         rien n'utilise et que rien ne borne — un client pourrait cocher
+         lui-même les quatre points du §28, qui sont ceux du cluster.
+    -->
+
+    <record id="rule_service_acceptance_portal" model="ir.rule">
+        <field name="name">Service fait : le client qui valide, l'intervenant qui attend son paiement</field>
+        <field name="model_id" ref="model_opex_service_acceptance"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', ('mission_id.client_id', '=', user.partner_id.id), ('assignment_ids.partner_id', '=', user.partner_id.id)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_service_acceptance_staff" model="ir.rule">
+        <field name="name">Service fait : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_service_acceptance"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        EXTENSION 10 - LES ÉVALUATIONS
+
+        Le §33 demande une visibilité contrôlée, et elle ne se règle pas de la
+        même façon pour les deux parties portail.
+
+        Le client accède aux évaluations qu'il rend, et à celles-là seules : la
+        grille opérationnelle du cluster juge aussi le respect des procédures
+        internes, ce qui ne le regarde pas.
+
+        L'intervenant accède aux évaluations qui le concernent une fois
+        qu'elles sont validées, les deux sources confondues. Une note qui
+        alimente sa réputation doit lui être connue ; la délibération qui y
+        mène, non. C'est la ligne entre ce qui est décidé et ce qui est en
+        cours de discussion.
+    -->
+
+    <record id="rule_mission_evaluation_portal" model="ir.rule">
+        <field name="name">Évaluation : celles qu'on rend, celles qui nous notent une fois validées</field>
+        <field name="model_id" ref="model_opex_mission_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">['|', '&amp;', ('partner_id', '=', user.partner_id.id), ('workflow_stage_id.code', '=', 'validated'), '&amp;', ('mission_id.client_id', '=', user.partner_id.id), ('evaluateur', '=', 'client')]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!--
+        L'écriture est bornée à l'auteur et aux deux étapes où il est attendu.
+        Une fois la grille rendue, il ne la réécrit plus sous le valideur : la
+        note examinée doit être celle qui a été lue, et c'est aussi ce qui
+        donne son sens au renvoi pour complément.
+    -->
+    <record id="rule_mission_evaluation_portal_write" model="ir.rule">
+        <field name="name">Évaluation : modifiable par son auteur tant qu'elle n'est pas rendue</field>
+        <field name="model_id" ref="model_opex_mission_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('base.group_portal'))]"/>
+        <field name="domain_force">[('mission_id.client_id', '=', user.partner_id.id), ('evaluateur', '=', 'client'), ('workflow_stage_id.code', 'in', ['pending', 'returned'])]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_mission_evaluation_staff" model="ir.rule">
+        <field name="name">Évaluation : le personnel des missions voit tout</field>
+        <field name="model_id" ref="model_opex_mission_evaluation"/>
+        <field name="groups" eval="[Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee')),
+                                    Command.link(ref('opex_membership.group_secretariat'))]"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+</odoo>

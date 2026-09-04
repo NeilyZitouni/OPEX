@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        LES PROMPTS, EN DONNEES
+
+        Pas de bloc `noupdate`, et c'est délibéré.
+
+        Les définitions de workflow en portent un parce qu'elles conservent un
+        état d'exécution : compteur de séquence, drapeau de publication,
+        instances en cours. Un prompt ne conserve rien. Le fichier est la
+        référence, et un `-u` doit le redéployer - c'est ce que veut dire
+        « versionné ».
+
+        Corollaire à connaître : une retouche faite à l'écran est écrasée à la
+        mise à jour suivante. L'écran sert à essayer, ce fichier sert à
+        décider.
+
+        CONVENTION D'ECRITURE
+
+        - le code ne change jamais : c'est la seule partie du prompt que du
+          Python cite ;
+        - `version` s'incrémente à chaque modification du corps, et elle est
+          journalisée avec l'appel. C'est ce qui permettra de savoir quelle
+          formulation a produit quelle extraction, six mois plus tard ;
+        - les variables s'écrivent `{nom}`. Une variable non fournie fait
+          **refuser** le rendu plutôt qu'envoyer l'accolade au modèle.
+    -->
+
+    <record id="prompt_connection_test" model="opex.ai.prompt">
+        <field name="code">connection_test</field>
+        <field name="name">Essai de connexion</field>
+        <field name="version">1</field>
+        <field name="expected_keys">ok</field>
+        <field name="description">Le prompt du bouton « Tester la connexion ». Il demande explicitement du JSON pour que l'essai vérifie la chaîne entière - réseau, authentification, modèle, et format de réponse - et non seulement que le serveur répond quelque chose.
+
+Sans variable : c'est le seul prompt du module qui n'en ait pas, et c'est ce qui en fait un bon essai. Une variable non fournie ferait échouer le rendu avant même l'appel, et on ne saurait pas si la connexion fonctionne.</field>
+        <field name="body">Réponds uniquement par le JSON {"ok": true}, sans autre texte et sans bloc de code.</field>
+    </record>
+
+</odoo>

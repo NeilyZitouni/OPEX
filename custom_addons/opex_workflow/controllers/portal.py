@@ -9,7 +9,7 @@ class WorkflowFormPortal(http.Controller):
     ne nomme ni « projet » ni « dossier » : elle prend une instance et un
     formulaire, et rend ce que la configuration décrit.
 
-    ⚠ Aucun contrôle d'accès réécrit ici. La visibilité passe par
+    Aucun contrôle d'accès réécrit ici. La visibilité passe par
     `instance._has_access()`, l'unique fonction de l'Extension 5. Un second
     contrôle, même correct au moment où on l'écrit, finirait par diverger.
     """

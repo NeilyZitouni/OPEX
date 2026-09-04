@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LES DÉCLENCHEURS DU §13 — DES ACTIONS, PAS DU PYTHON MÉTIER
+
+                « Le passage d'une candidature à SELECTED déclenche, selon
+                  configuration : notification, collecte de pièces, NDA,
+                  génération du contrat, ordre de mission, création du
+                  projet/tâches, calendrier et accès documentaire. »
+
+            « Selon configuration » : c'est la spécification elle-même qui
+            laisse le **placement** au réglage. Les huit actions ci-dessous
+            sont réparties sur trois transitions, et le tableau tient en trois
+            lignes :
+
+            | atr_select             | notification, affectation, acteur    |
+            | (candidature)          | sur la mission, contrat + ordre de   |
+            |                        | mission, pièces et NDA               |
+            | mtr_start_contracting  | sous-workflow de validation du       |
+            | (mission)              | contrat, report des acteurs          |
+            | mtr_start_mission      | projet, tâches, échéances            |
+            | (mission)              | gardée par la règle 5                |
+
+            Pourquoi le projet n'est pas créé à la sélection, alors que le §13
+            l'y range : une contractualisation échouée
+            (`mission_contracting_failed`, posée à l'Extension 1) laisserait
+            un projet orphelin par tentative. Placé après la règle 5, il n'est
+            créé que pour une mission dont le contrat est validé.
+        -->
+
+        <!-- Sur la candidature — atr_select -->
+
+        <record id="action_app_notify_selected" model="opex.workflow.action">
+            <field name="name">Annoncer la sélection à l'intervenant</field>
+            <field name="code">application_notify_selected</field>
+            <field name="action_type">notify</field>
+            <!--
+                `comment` et non `note` : c'est exactement le cas que le
+                sous-type distingue. L'intéressé doit le recevoir, et la
+                cloche portail écarte les `mt_note` via
+                `_get_search_domain_share()`. En `note`, un compte portail ne
+                verrait rien — ni email, ni cloche.
+            -->
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Votre candidature est retenue. Le contrat et l'ordre de mission vous seront transmis pour signature.</p></field>
+        </record>
+
+        <!--
+            L'action qui porte tout le reste du §13 pour cette transition.
+
+            `set_field` écrit `operational_trigger = 'selection'` sur la
+            candidature ; l'inverse du champ dispatche vers `_trigger_selection`
+            par `getattr`, exactement comme le moteur dispatche vers
+            `_execute_<action_type>` (`workflow_action.py:159`).
+
+            C'est le seul levier disponible sans modifier le moteur : aucun de
+            ses six types d'actions ne sait créer une affectation, et lui
+            apprendre à le faire lui apprendrait le métier.
+        -->
+        <record id="action_app_trigger_selection" model="opex.workflow.action">
+            <field name="name">Créer l'affectation et générer les pièces</field>
+            <field name="code">application_trigger_selection</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">20</field>
+            <field name="field_id" ref="field_opex_mission_application__operational_trigger"/>
+            <field name="value_expression">'selection'</field>
+            <field name="description">Affectation (§15), rôle `intervenant` sur l'instance de la mission, contrat et ordre de mission (§18), NDA si l'appel l'exige, et signalement des candidatures restées ouvertes.</field>
+        </record>
+
+        <record id="action_app_task_contract" model="opex.workflow.action">
+            <field name="name">Compléter et faire signer le contrat</field>
+            <field name="code">application_task_contract</field>
+            <field name="action_type">create_task</field>
+            <field name="sequence">30</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="deadline_days">7</field>
+        </record>
+
+        <!-- Sur la mission — mtr_start_contracting -->
+
+        <!--
+            L'ordre des trois actions ci-dessous est porté par `sequence`, et
+            il compte : `_execute_actions()` les trie
+            (`workflow_instance.py:803`). Le report des acteurs ne peut pas
+            précéder la création de l'instance à laquelle il les ajoute.
+        -->
+        <record id="action_mis_launch_contract" model="opex.workflow.action">
+            <field name="name">Ouvrir le cycle de validation du contrat</field>
+            <field name="code">mission_launch_contract</field>
+            <field name="action_type">launch_subworkflow</field>
+            <field name="sequence">10</field>
+            <field name="sub_definition_id" ref="wf_mission_contract"/>
+        </record>
+
+        <record id="action_mis_trigger_contracting" model="opex.workflow.action">
+            <field name="name">Reporter client et intervenant sur la contractualisation</field>
+            <field name="code">mission_trigger_contracting</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">20</field>
+            <field name="field_id" ref="field_opex_mission_request__operational_trigger"/>
+            <field name="value_expression">'contracting'</field>
+            <field name="description">`start_subworkflow()` crée une instance neuve sans acteur. Sans ce report, « Signature refusée » n'apparaîtrait à personne et la notification de validation ne partirait nulle part.</field>
+        </record>
+
+        <record id="action_mis_notify_contracting" model="opex.workflow.action">
+            <field name="name">Signaler l'ouverture de la contractualisation</field>
+            <field name="code">mission_notify_contracting</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">30</field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>La contractualisation est ouverte. Le contrat et l'ordre de mission sont à compléter, puis à soumettre à relecture.</p></field>
+        </record>
+
+        <!-- Sur la mission — mtr_start_mission -->
+
+        <record id="action_mis_trigger_execution" model="opex.workflow.action">
+            <field name="name">Créer le projet d'exécution et ses tâches</field>
+            <field name="code">mission_trigger_execution</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">10</field>
+            <field name="field_id" ref="field_opex_mission_request__operational_trigger"/>
+            <field name="value_expression">'execution'</field>
+            <field name="description">§13 — création du projet et des tâches. Les échéances portent le « calendrier » : une tâche datée apparaît dans la vue calendrier native du projet.</field>
+        </record>
+
+        <record id="action_mis_notify_start" model="opex.workflow.action">
+            <field name="name">Annoncer le démarrage de la mission</field>
+            <field name="code">mission_notify_start</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_client')])]"/>
+            <field name="body" type="html"><p>La mission démarre. Le projet d'exécution et ses tâches sont ouverts ; le suivi se fait depuis votre espace.</p></field>
+        </record>
+
+    </data>
+
+    <!--
+        LE RATTACHEMENT — HORS DU BLOC `noupdate`, ET C'EST OBLIGATOIRE
+
+        Les trois transitions visées ont été créées par l'Extension 1, dans un
+        bloc `noupdate="1"`. Le drapeau est stocké **par enregistrement** dans
+        `ir_model_data` : un `<record id="atr_select">` qui les redéfinirait
+        serait purement ignoré à la mise à jour, sans erreur ni avertissement.
+        Seul un `<function name="write">` hors bloc les modifie. Règle 8 du
+        CLAUDE.md du moteur, ses trois faces payées aux Extensions 10, 12, 15,
+        17 et 20 du Module 2.
+
+        `Command.link` et non `Command.set` : `set` remplacerait ce qu'un autre
+        fichier aurait posé sur la même transition. Aucune de ces trois n'en
+        porte aujourd'hui, mais c'est l'ajout suivant qui découvrirait la
+        différence — et il la découvrirait par une notification disparue.
+    -->
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('atr_select')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_app_notify_selected')),
+            Command.link(ref('action_app_trigger_selection')),
+            Command.link(ref('action_app_task_contract')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_start_contracting')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_launch_contract')),
+            Command.link(ref('action_mis_trigger_contracting')),
+            Command.link(ref('action_mis_notify_contracting')),
+        ]}"/>
+    </function>
+
+    <!--
+        LA RÈGLE 5 DU §39 — UNE CONDITION, PAS UN `if`
+
+            « Contrat non validé → Mission non démarrée »
+
+        `rule_mission_contract_validated` a été **déclarée** à l'Extension 1 et
+        laissée rattachée à rien, faute d'une définition `mission_contract` :
+        `subworkflow_done()` aurait renvoyé `False` pour toujours et rendu
+        « Démarrer la mission » définitivement infranchissable. La définition
+        existe désormais ; la règle prend sa place.
+
+        Elle est **la** garde de la règle 5. Il n'y a et il n'y aura aucun
+        `if contract_validated` dans une méthode : la condition est ici, le
+        moteur la lit, l'utilisateur en lit le message quand elle bloque, et
+        `_evaluate_conditions()` la consigne dans l'historique du dossier.
+    -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_start_mission')]"/>
+        <value eval="{
+            'condition_ids': [Command.link(ref('rule_mission_contract_validated'))],
+            'action_ids': [
+                Command.link(ref('action_mis_trigger_execution')),
+                Command.link(ref('action_mis_notify_start')),
+            ],
+        }"/>
+    </function>
+</odoo>

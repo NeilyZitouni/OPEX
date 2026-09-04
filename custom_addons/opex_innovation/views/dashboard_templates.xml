@@ -2,23 +2,21 @@
 <odoo>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Section 35 — la carte « MON PROJET »
-        ═══════════════════════════════════════════════════════════════
 
             Smart Factory
-            ✓ Déposé
-            ✓ Contrôle terminé
-            ● Évaluation en cours
-            ○ Décision
-            ○ Accompagnement
-            ○ Financement
-            ○ Industrialisation
+            Déposé
+            Contrôle terminé
+            Évaluation en cours
+            Décision
+            Accompagnement
+            Financement
+            Industrialisation
 
             Dernière action : « Votre projet est actuellement évalué. »
             [ Consulter mon projet ]
 
-        ⚠ Sept lignes, jamais quinze. Les jalons viennent de
+        Sept lignes, jamais quinze. Les jalons viennent de
         `project.milestones()`, qui lit la correspondance configurée dans
         `data/milestones.xml`. Aucun code d'étape n'entre dans ce gabarit — ni
         pour afficher, ni pour décider quoi afficher.
@@ -34,9 +32,9 @@
                             'text-success' if step['state'] == 'done'
                             else 'fw-bold' if step['state'] == 'current'
                             else 'text-muted'}">
-                        <span t-if="step['state'] == 'done'">✓</span>
-                        <span t-elif="step['state'] == 'current'">●</span>
-                        <span t-else="">○</span>
+                        <span t-if="step['state'] == 'done'"></span>
+                        <span t-elif="step['state'] == 'current'"></span>
+                        <span t-else=""></span>
                         <t t-esc="step['label']"/>
                         <t t-if="step['state'] == 'current'"> en cours</t>
                     </li>
@@ -71,9 +69,7 @@
     </template>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Dashboard expert — « mes missions, mes livrables »
-        ═══════════════════════════════════════════════════════════════
     -->
     <template id="portal_missions" name="Mes missions">
         <t t-call="portal.portal_layout">
@@ -81,7 +77,7 @@
                 <h3>OPEX Innovation — mes missions</h3>
 
                 <!--
-                    ⚠ Comme l'espace investisseur : le gabarit itère sur les
+                    Comme l'espace investisseur : le gabarit itère sur les
                     dictionnaires de `_matching_teaser()`, jamais sur les
                     projets. L'expert voit ce à quoi il a droit, et rien
                     d'autre ne peut être rendu par inadvertance.
@@ -127,7 +123,7 @@
                 </div>
 
                 <!--
-                    ✅ « Mes livrables » — section 24. Cet encart annonçait
+                    « Mes livrables » — section 24. Cet encart annonçait
                     jusqu'ici que la fonctionnalité relevait de l'Extension 16,
                     non réalisée. Elle l'est.
 
@@ -169,9 +165,7 @@
     </template>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Dashboard gestionnaire — projets par étape, délais, alertes
-        ═══════════════════════════════════════════════════════════════
 
         Le back-office peut être aussi détaillé qu'on veut : c'est ici que la
         complexité a le droit d'être visible. Les codes techniques d'étape y
@@ -187,8 +181,8 @@
                     </a>
                 </div>
 
-                <!-- ══════════ Alertes, en tête : c'est ce qui demande une
-                     action, pas ce qui décrit l'existant. ══════════ -->
+                <!-- Alertes, en tête : c'est ce qui demande une
+                     action, pas ce qui décrit l'existant. -->
                 <h5>Alertes</h5>
                 <div t-if="alertes">
                     <div t-foreach="alertes" t-as="alerte"
@@ -209,7 +203,7 @@
                 </div>
 
                 <div class="row mt-4">
-                    <!-- ══════════ Projets par étape ══════════ -->
+                    <!-- Projets par étape -->
                     <div class="col-lg-6">
                         <h5>Projets par étape</h5>
                         <table t-if="par_etape" class="table table-sm">
@@ -233,7 +227,7 @@
                         </div>
                     </div>
 
-                    <!-- ══════════ Délais ══════════ -->
+                    <!-- Délais -->
                     <div class="col-lg-6">
                         <h5>Délais</h5>
                         <table t-if="delais" class="table table-sm">

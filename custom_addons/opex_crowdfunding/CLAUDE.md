@@ -4,7 +4,7 @@
 
 ---
 
-## ⚠️ LIRE AVANT TOUTE MODIFICATION
+## LIRE AVANT TOUTE MODIFICATION
 
 Ce module implémente **littéralement** le processus décrit dans
 `../opex_membership/docs/Instance Smart Crowdfunding - CEO Smart Workflow (1).md` :
@@ -37,7 +37,7 @@ Deux modules construisent le **même** processus par deux chemins opposés :
 changera pas. C'est en le construisant honnêtement — et pas en le sabotant — que la
 comparaison finale a une valeur.
 
-### ⛔ Règle d'isolation — la plus importante de ce fichier
+### Règle d'isolation — la plus importante de ce fichier
 
 Le même développeur construit les deux modules. Le risque est donc la
 contamination, dans les deux sens.
@@ -52,7 +52,7 @@ contamination, dans les deux sens.
 
    doit ne rien renvoyer.
 
-   ⚠ La commande est **bornée au code**. Écrite sans `--include`, elle
+   La commande est **bornée au code**. Écrite sans `--include`, elle
    remonterait les quatre occurrences de ce fichier-ci — celles de la règle
    qu'elle est censée vérifier — et renverrait donc toujours quelque chose. Une
    vérification qui ne peut jamais passer au vert est une vérification qu'on
@@ -77,7 +77,7 @@ sécurise la présentation quoi qu'il arrive ensuite.
 
 ## Documents de référence
 
-⚠ **Il n'y a pas de `docs/` dans ce module.** Les documents sont partagés et
+**Il n'y a pas de `docs/` dans ce module.** Les documents sont partagés et
 vivent dans `../opex_membership/docs/`. Fais `ls ../opex_membership/docs/` et lis
 ce qui s'y trouve avant de coder — les noms exacts, espaces et parenthèses
 compris :
@@ -92,7 +92,7 @@ compris :
   que le Quality Gate a quatre avis mais trois branches, et que l'étape 6 se
   dédouble en 6A (matching direct) et 6B (recommandation maturation).
 
-  ⚠ Son panneau central « STRUCTURE DE DONNÉES » contient une colonne intitulée
+  Son panneau central « STRUCTURE DE DONNÉES » contient une colonne intitulée
   **« WORKFLOW (MOTEUR GÉNÉRIQUE) »** — Workflow Definition, Stage, Transition,
   Rule, Instance History, Task. **Cette colonne décrit l'autre module.** La lire
   comme un modèle à implémenter ici tuerait l'expérience. Les colonnes qui
@@ -157,7 +157,7 @@ Payées cher sur le module précédent. Elles s'appliquent ici aussi.
    `_is_ceo()`, `_is_quality_control()`, `_project_access_denied()`. Une
    vérification dupliquée finit par en oublier une occurrence.
 
-   ✅ **Écart refermé le 26/08.** Ce qui manquait n'était pas la fusion des
+   **Écart refermé le 26/08.** Ce qui manquait n'était pas la fusion des
    trois helpers d'appartenance — `_crowdfunding_own_project()`,
    `_crowdfunding_relation_du_partenaire()`,
    `_crowdfunding_mission_de_l_expert()` répondent à trois questions
@@ -203,7 +203,7 @@ Payées cher sur le module précédent. Elles s'appliquent ici aussi.
    n'échouait pas mais supprimait ACL *et* `ir.rule` sans laisser de trace.
    Elles comptent maintenant sans `sudo()`.
 
-   ⚠ Ne jamais corriger ce genre de 403 en élargissant l'ACL : si un rôle n'a
+   Ne jamais corriger ce genre de 403 en élargissant l'ACL : si un rôle n'a
    pas accès au modèle, c'est en général qu'il ne devrait pas y toucher.
    **2 ter — le contrat de `/my/counters` est une condition de fonctionnement.**
    Payé le 26/08, dans la foulée du correctif précédent. Un compteur de tuile se
@@ -251,7 +251,7 @@ Payées cher sur le module précédent. Elles s'appliquent ici aussi.
 4. **`mail.mt_note` pour tout message interne.** `mail.mt_comment` uniquement pour
    ce que le porteur doit recevoir par email. Bug déjà rencontré et corrigé.
 
-   **4 bis — ⚠ Ce module est HORS de la cloche portail, et c'est un choix.**
+   **4 bis — Ce module est HORS de la cloche portail, et c'est un choix.**
 
    Le portail a une cloche de notification, servie par `opex_membership` : les
    comptes portail ne supportent pas la cloche native d'Odoo, interdite en base
@@ -289,7 +289,7 @@ Payées cher sur le module précédent. Elles s'appliquent ici aussi.
    qu'il devient actif sans une ligne de plus le jour où la dépendance serait
    acceptée.
 
-   **4 ter — ⚠ Aucune notification email n'est délivrée dans cet
+   **4 ter — Aucune notification email n'est délivrée dans cet
    environnement.** `odoo.conf` pointe `smtp_server = localhost:25`, où rien
    n'écoute. Mesuré le 28/08 : 48 `mail.notification` et 68 `mail.mail` en
    `exception`. À annoncer avant toute démonstration. Ce qui fonctionne côté
@@ -349,7 +349,7 @@ test final s'appuie dessus : **`score`** (Integer, /100) et **`ceo_approval`**
 
 # Les extensions
 
-## Extension 1 — Socle et Dépôt Express ✅
+## Extension 1 — Socle et Dépôt Express
 
 **Section 5 du document.** — *Faite le 24/08. 14 tests dans
 `tests/test_extension1.py`, tous verts, vérifiés falsifiables.*
@@ -361,7 +361,7 @@ groupe, association, autre personne morale), `name` (titre du projet), `probleme
 financement, accompagnement, partenariat…), `montant_indicatif` (Monetary),
 `pitch_document` (Binary, **facultatif**).
 
-⚠️ Le principe du *progressive commitment* est le cœur du document : on ne demande
+Le principe du *progressive commitment* est le cœur du document : on ne demande
 que le minimum nécessaire pour décider de l'étape suivante. Ne pas ajouter ici les
 champs du dossier complet « puisqu'on y sera de toute façon » — ce serait passer à
 côté de la spécification.
@@ -375,12 +375,12 @@ côté de la spécification.
 
 ---
 
-## Extension 2 — Portail porteur ✅
+## Extension 2 — Portail porteur
 
 **Sections 5 (UX) et 16.** — *Faite le 25/08. 23 tests dans
 `tests/test_extension2.py` (portail + sécurité), 37 au total, tous verts.*
 
-⚠️ Piège du portail confirmé dans le code d'Odoo 19 : `portal.portal_docs_entry`
+Piège du portail confirmé dans le code d'Odoo 19 : `portal.portal_docs_entry`
 rend la tuile avec `d-none`, et `portal_home_counters.js` ne la réaffiche que si
 le compteur revient **strictement positif**. Une tuile posée avec
 `placeholder_count` est donc invisible pour qui n'a encore rien déposé —
@@ -389,14 +389,14 @@ dans le gabarit, et un test qui vérifie l'absence de `d-none` sur la carte.
 
 Routes : `/my/crowdfunding`, `/my/crowdfunding/new`, `/my/crowdfunding/<id>`.
 
-⚠️ **Renommées le 26/08** (correctif du 404, cf. règle transversale 1 bis). Tout
+**Renommées le 26/08** (correctif du 404, cf. règle transversale 1 bis). Tout
 l'espace de noms du portail est passé sous `/my/crowdfunding/…` : les projets à
 la racine, `/my/crowdfunding/opportunities/…` pour l'acteur financier,
 `/my/crowdfunding/missions/…` pour l'expert. Les anciens chemins `/my/projects`,
 `/my/opportunities` et `/my/missions` ne sont **pas** conservés en redirection —
 ils appartiennent à l'espace de noms générique qui a causé la collision.
 
-⚠️ Le CTA est **« Présenter mon projet »**, jamais « Constituer mon dossier de
+Le CTA est **« Présenter mon projet »**, jamais « Constituer mon dossier de
 financement ». Le document insiste explicitement dessus : le libellé conditionne le
 taux de dépôt.
 
@@ -411,22 +411,22 @@ prochaine action attendue**, pas les codes d'états.
 
 ---
 
-## Extension 3 — Pré-analyse et Go / No Go ✅
+## Extension 3 — Pré-analyse et Go / No Go
 
 **Section 6.** La première étape où la nature « multi-sorties » du processus
 apparaît. — *Faite le 25/08. 23 tests dans `tests/test_extension3.py`, 60 au
 total, tous verts.*
 
-⚠️ Ajouté hors liste, parce que l'étape n'avait pas de porte d'entrée :
+Ajouté hors liste, parce que l'étape n'avait pas de porte d'entrée :
 `action_start_pre_analyse()` (`depot_express` → `pre_analyse`). Sans elle un
 dossier déposé restait indéfiniment en « Demande déposée ».
 
-⚠️ Piège Odoo rencontré : le nom de table auto-généré du Many2many
+Piège Odoo rencontré : le nom de table auto-généré du Many2many
 préqualification ↔ critères fait 64 caractères, une de trop pour PostgreSQL, et
 **le registre refuse de démarrer** avec un message sans rapport apparent. Table
 nommée à la main (`opex_cf_prequalification_criteria_rel`).
 
-📌 **Deuxième zone paramétrable imposée par la spécification** : « selon des
+**Deuxième zone paramétrable imposée par la spécification** : « selon des
 critères configurables » (§6). Les sept critères sont semés en données, pas
 écrits dans le code — comme la contrepartie de l'Extension 8. À faire figurer
 tel quel dans le document de comparaison : le module texto n'est pas 100 % en
@@ -451,19 +451,19 @@ maturité minimale, besoin identifiable, crédibilité du porteur.
 `opex.crowdfunding.clarification` : `project_id`, `question`, `reponse`, `state`.
 Le porteur répond, le dossier revient en `pre_analyse`.
 
-⚠️ Écris bien quatre méthodes distinctes, pas une méthode avec un paramètre
+Écris bien quatre méthodes distinctes, pas une méthode avec un paramètre
 `resultat`. C'est la manière texto, et c'est aussi ce qui rendra visible, à la fin,
 le coût d'une cinquième issue.
 
 ---
 
-## Extension 4 — Dossier progressif ✅
+## Extension 4 — Dossier progressif
 
 **Section 7.** Le formulaire complémentaire, demandé **uniquement après un GO**.
 — *Faite le 25/08. 17 tests dans `tests/test_extension4.py`, 77 au total, tous
 verts.*
 
-📌 Le décompte du **coût d'un quatrième type de besoin** est dans la docstring de
+Le décompte du **coût d'un quatrième type de besoin** est dans la docstring de
 `_champs_dossier_requis()` : **cinq fichiers, ≈ 114 lignes**, chiffres comptés
 sur la branche « sponsor » et non estimés. Les questionnaires sponsor et
 financement public sont des déductions — le document ne les détaille pas.
@@ -483,22 +483,22 @@ de besoin. Ce commentaire servira au document de comparaison final.
 
 ---
 
-## Extension 5 — Quality Gate ✅
+## Extension 5 — Quality Gate
 
 **Section 8.** — *Faite le 25/08. 23 tests dans `tests/test_extension5.py`, 100
 au total, tous verts.*
 
-📌 **Quatre avis, trois sorties** : `alerte` et `non_conforme` empruntent la même
+**Quatre avis, trois sorties** : `alerte` et `non_conforme` empruntent la même
 transition (`action_quality_alerte`), conformément au bloc RÉSULTAT de
 l'infographie qui les réunit en une seule sortie rouge. Le contrôle qualité
 signale, il n'écarte jamais un projet lui-même.
 
-📌 La contrainte « remplaçable par un agent IA » est tenue par `_avis_suggere()`,
+La contrainte « remplaçable par un agent IA » est tenue par `_avis_suggere()`,
 seule méthode qui juge, et par l'absence totale de contrôle d'identité dans les
 trois transitions. Un test le prouve : la fiche remplie par un contrôleur peut
 être conclue par un autre.
 
-⚠️ Sortie d'une alerte : le dossier reste en `quality_gate` et un **second
+Sortie d'une alerte : le dossier reste en `quality_gate` et un **second
 contrôle** le débloque. Le document ne dit pas ce que le comité fait d'une
 alerte ; c'est le seul chemin de sortie implémenté.
 
@@ -512,7 +512,7 @@ Avis structuré à **quatre valeurs** : `ok` / `a_completer` / `alerte` /
 Transitions : Conforme → `etude_decision` · À compléter → `quality_complement`
 (retour porteur) · Alerte → notification CEO, dossier maintenu en `quality_gate`.
 
-⚠️ Le document précise que le contrôleur humain sera un jour remplacé par un agent
+Le document précise que le contrôleur humain sera un jour remplacé par un agent
 IA « sans modification du workflow métier ». En version texto, ça veut dire une
 chose concrète : `action_quality_ok()` ne doit pas vérifier *qui* l'appelle au-delà
 du groupe. Isole la logique de contrôle dans une méthode dédiée pour que le
@@ -520,22 +520,22 @@ remplacement reste possible.
 
 ---
 
-## Extension 6 — Étude et décision CEO ✅
+## Extension 6 — Étude et décision CEO
 
 **Section 9.** Trois routes, trois méthodes. — *Faite le 25/08. 17 tests dans
 `tests/test_extension6.py`, 117 au total, tous verts.*
 
-📌 « Reste dans le pipeline » a été rendu mesurable : champ `in_pipeline`
+« Reste dans le pipeline » a été rendu mesurable : champ `in_pipeline`
 (calculé, stocké) dérivé de `_ETATS_HORS_PIPELINE`, et le filtre « En cours » de
 la vue de recherche s'appuie dessus au lieu de recopier une liste d'états. Un
 test vérifie le filtre lui-même — c'est le seul moyen d'empêcher un futur
 tableau de bord de ranger la maturation avec les refus.
 
-📌 `test_aucune_route_n_en_appelle_une_autre` lit le source des trois méthodes et
+`test_aucune_route_n_en_appelle_une_autre` lit le source des trois méthodes et
 échoue si l'une cite le nom d'une autre. C'est la forme testable de « les routes
 B et C ne partagent aucun code ».
 
-⚠️ Seul `_ensure_ceo()` est commun aux trois routes — la règle transversale n°2
+Seul `_ensure_ceo()` est commun aux trois routes — la règle transversale n°2
 interdit de recopier un contrôle d'accès. Les préconditions d'état, elles, sont
 écrites trois fois.
 
@@ -545,34 +545,34 @@ interdit de recopier un contrôle d'accès. Les préconditions d'état, elles, s
 | B — Maturation nécessaire | `action_route_maturation()` | → `accompagnement` |
 | C — Non retenu | `action_route_rejected()` | → `rejected`, motif obligatoire |
 
-⚠️ « Le rejet ne doit pas être confondu avec la maturation. Un projet intéressant
+« Le rejet ne doit pas être confondu avec la maturation. Un projet intéressant
 mais insuffisamment mature reste dans le pipeline. » Les routes B et C ne partagent
 aucun code, et un projet en route B reste visible dans tous les tableaux de bord.
 
 ---
 
-## Extension 7 — Smart Matching financier ✅
+## Extension 7 — Smart Matching financier
 
 **Section 10.** — *Faite le 25/08, alors qu'elle avait été sacrifiée le 24/08.
 Le périmètre arrêté plus haut est donc dépassé d'une extension : la boucle de 8
 et le benchmark (12) restent à faire. 22 tests dans `tests/test_extension7.py`,
 139 au total, tous verts.*
 
-📌 Dix critères pondérés (20/15/15/10/8/8/6/6/6/6 = 100), une méthode
+Dix critères pondérés (20/15/15/10/8/8/6/6/6/6 = 100), une méthode
 `_critere_*` chacun, rendant sa contribution **et son explication**. Aucun
 apprentissage : `detail` reconstitue le score ligne par ligne, et un test vérifie
 que la somme des contributions écrites égale bien le score affiché.
 
-📌 Le profil d'acteur financier vit sur `res.partner`, tous champs préfixés
+Le profil d'acteur financier vit sur `res.partner`, tous champs préfixés
 `cf_` : Membership étend le même modèle, et une collision y serait silencieuse
 au chargement puis fatale au runtime.
 
-📌 Deux critères sont **déduits du secteur** (impact, technologie) faute de champ
+Deux critères sont **déduits du secteur** (impact, technologie) faute de champ
 dédié dans le dépôt express — ajouter ces champs aurait alourdi le formulaire du
 porteur pour deux critères sur dix. Simplification assumée, à mentionner si le
 jury creuse.
 
-⚠️ « Le matching est une recommandation » : aucune méthode du modèle candidat ne
+« Le matching est une recommandation » : aucune méthode du modèle candidat ne
 touche à l'état du projet. Seul `action_validate_matching()`, geste explicite du
 comité, met en relation.
 
@@ -585,7 +585,7 @@ Critères pondérés, codés en dur : type de financement, secteur, ticket
 d'investissement, stade du projet, localisation, appétence au risque, type de
 porteur, impact, technologie, historique.
 
-⚠️ « Le matching est une **recommandation**. » Le CEO peut Valider / Modifier /
+« Le matching est une **recommandation**. » Le CEO peut Valider / Modifier /
 Exclure / Ajouter un acteur. Aucune transition automatique sur la base d'un score.
 
 Le champ `detail` est obligatoire : un score de 91 % sans explication n'est pas
@@ -593,27 +593,27 @@ défendable devant un jury.
 
 ---
 
-## Extension 8 — Accompagnement CEO ✅
+## Extension 8 — Accompagnement CEO
 
 **Sections 11 et 12.** La partie la plus riche du module — c'est un sous-processus
 complet. — *Faite en entier le 25/08 (et pas seulement sa boucle, comme le
 périmètre du 24/08 le prévoyait). 32 tests dans `tests/test_extension8.py`, 171
 au total, tous verts.*
 
-📌 **Les trois déclencheurs ne se comportent pas de la même façon**, et c'est
+**Les trois déclencheurs ne se comportent pas de la même façon**, et c'est
 délibéré : la recommandation du comité (route B) fait basculer le dossier dans
 l'étape « Accompagnement CEO » du parcours principal ; la condition d'un acteur
 financier et la demande du porteur ouvrent un **sous-workflow qui tourne à
 côté**, sans dérouter le dossier. Un porteur qui demande de l'aide pendant que
 son dossier est au contrôle qualité ne doit pas sortir du contrôle qualité.
 
-📌 La boucle est complète et testée de bout en bout : étude → route B →
+La boucle est complète et testée de bout en bout : étude → route B →
 accompagnement → service fait → réévaluation → **retour au matching financier**.
 
-📌 Le « service fait » a un sens vérifié : toutes les missions terminées, tous
+Le « service fait » a un sens vérifié : toutes les missions terminées, tous
 les livrables validés. Sinon la formule ne voudrait rien dire.
 
-⚠️ **Zone paramétrable imposée** (la seconde après les critères de pré-analyse) :
+**Zone paramétrable imposée** (la seconde après les critères de pré-analyse) :
 `opex.crowdfunding.compensation.type`, neuf types semés en données. Un test
 structurel vérifie que le champ reste un Many2one vers ce référentiel — si
 quelqu'un le remplace un jour par un `Selection` « c'est plus simple », il aura
@@ -632,7 +632,7 @@ Modèles : `opex.crowdfunding.accompagnement`, `opex.crowdfunding.mission`
 (`expert_id`, `objectif`, `dates`, `contrepartie`), `opex.crowdfunding.jalon`,
 `opex.crowdfunding.livrable`, `opex.crowdfunding.evaluation`.
 
-### ⚠️ La contrepartie ne se code pas en dur
+### La contrepartie ne se code pas en dur
 
 Le document est catégorique : « Le workflow ne doit pas coder en dur le modèle
 économique. » Crée `opex.crowdfunding.compensation.type` semé en data — forfait,
@@ -652,24 +652,24 @@ processus d'une séquence linéaire.
 
 ---
 
-## Extension 9 — Mise en relation contrôlée ✅
+## Extension 9 — Mise en relation contrôlée
 
 **Section 13.** Le point le plus sensible du module côté confidentialité. —
 *Faite le 25/08. 23 tests dans `tests/test_extension9.py`, 194 au total, tous
 verts.*
 
-📌 **Le contrôle vit dans une seule méthode**, `relation._portal_payload()`, qui
+**Le contrôle vit dans une seule méthode**, `relation._portal_payload()`, qui
 renvoie `(gabarit, valeurs)`. Les trois niveaux ne se distinguent pas par des
 `t-if` : chaque gabarit ne reçoit que les valeurs de son niveau. Ni la relation
 ni le projet ne sont passés au gabarit — avec l'enregistrement en main, un
 `t-out="relation.project_id.name"` contournerait tout le filtrage.
 
-📌 Aucun droit d'écriture portail sur `opex.crowdfunding.relation` : avec
+Aucun droit d'écriture portail sur `opex.crowdfunding.relation` : avec
 `perm_write` à 1, une requête forgée poserait `niveau_acces = 'full'` sur sa
 propre relation. Les deux gestes autorisés passent par des méthodes appelées par
 le contrôleur après vérification d'appartenance.
 
-⚠️ **Piège n°6, variante coûteuse — trouvée en falsifiant, pas en relisant.**
+**Piège n°6, variante coûteuse — trouvée en falsifiant, pas en relisant.**
 Le test central cherchait les données réservées dans le HTML brut… avec des
 chaînes contenant une apostrophe. QWeb rend `'` en `&#39;` : l'assertion ne
 pouvait donc jamais échouer. Une fuite volontaire (`titre` passé au gabarit puis
@@ -690,7 +690,7 @@ Séquence : match → teaser anonymisé → expression d'intérêt → autorisat
 (`teaser`/`limited`/`full`), `autorise_par_id`, `nda_signe` (Boolean),
 `date_autorisation`.
 
-⚠️ Le teaser est **anonymisé** : ne rends jamais dans le HTML de la page teaser les
+Le teaser est **anonymisé** : ne rends jamais dans le HTML de la page teaser les
 informations réservées au niveau supérieur, même masquées par CSS. Ici, « présent
 dans le HTML » suffirait à violer la confidentialité.
 
@@ -699,24 +699,24 @@ routes concernées (règle transversale 2).
 
 ---
 
-## Extension 10 — Décision de l'acteur financier, closing et suivi ✅
+## Extension 10 — Décision de l'acteur financier, closing et suivi
 
 **Sections 14 et 15.** — *Faite le 25/08. 28 tests dans
 `tests/test_extension10.py`, 222 au total, tous verts.*
 
-📌 Cinq méthodes sur `opex.crowdfunding.relation`, une par bouton. Un test vérifie
+Cinq méthodes sur `opex.crowdfunding.relation`, une par bouton. Un test vérifie
 qu'**aucun code d'état** n'apparaît dans le HTML de l'écran acteur (recherche sur
 le HTML déséchappé, leçon de l'Extension 9). Les boutons n'apparaissent qu'à
 partir du dossier limité : au teaser, l'acteur n'a rien lu qui permette de
 décider.
 
-📌 « Demander accompagnement CEO » rebranche sur le déclencheur n°2 de
+« Demander accompagnement CEO » rebranche sur le déclencheur n°2 de
 l'Extension 8. **Défaut trouvé en le branchant** : `action_accompagnement_
 demande_financeur()` cherchait le demandeur parmi les candidats au matching, et
 ne le trouvait pas quand la demande venait d'une relation. La méthode accepte
 maintenant le `partner` que l'appelant connaît.
 
-📌 La nature de l'opération commande ses exigences (`EXIGENCES_PAR_TYPE`) :
+La nature de l'opération commande ses exigences (`EXIGENCES_PAR_TYPE`) :
 documents, échéancier, reporting. `action_close()` refuse tant qu'elles ne sont
 pas satisfaites — « clôturé » veut dire quelque chose. Une huitième nature = une
 entrée dans la table + une valeur de Selection + un redéploiement.
@@ -725,8 +725,8 @@ Cinq actions simples côté acteur financier — il ne doit pas avoir à compren
 workflow interne :
 
 ```
-★ Intéressé   ? Besoin d'informations   ↗ Demander accompagnement CEO
-↔ Proposer un rendez-vous   ✕ Non intéressé
+Intéressé   ? Besoin d'informations   ↗ Demander accompagnement CEO
+↔ Proposer un rendez-vous   Non intéressé
 ```
 
 Chacune est une méthode qui traduit le choix en transition appropriée.
@@ -742,28 +742,28 @@ post-financement.
 
 ---
 
-## Extension 11 — Les quatre interfaces et la Smart Work Queue ✅
+## Extension 11 — Les quatre interfaces et la Smart Work Queue
 
 **Section 16.** — *Faite le 26/08. 25 tests dans `tests/test_extension11.py`,
 247 au total, tous verts. **Fin du module fonctionnel** : reste l'Extension 12,
 le benchmark.*
 
-📌 Les quatre écrans sont vérifiés avec **un compte de chaque acteur**, et un
+Les quatre écrans sont vérifiés avec **un compte de chaque acteur**, et un
 garde commun (`_assert_aucun_code_etat`) balaye chaque page à la recherche des
 onze codes d'états — sur le HTML déséchappé, attributs `href`/`action` retirés
 (une route nommée `/accompagnement/demander` n'expose pas un état).
 
-📌 Six décisions passées en `mt_comment` (GO, orientation, routes A et B,
+Six décisions passées en `mt_comment` (GO, orientation, routes A et B,
 clarifications, refus). Le **motif** d'un refus reste en `mt_note` : le porteur
 reçoit la décision, pas l'argumentaire d'instruction. Choix réversible d'une
 ligne, signalé dans le code.
 
-📌 Smart Work Queue : six compteurs, six domaines définis **une seule fois** et
+Smart Work Queue : six compteurs, six domaines définis **une seule fois** et
 utilisés pour compter et pour ouvrir. Le test compare le compteur au domaine que
 le **bouton** ouvre — première version tautologique, corrigée — et garnit chaque
 file, sans quoi il passerait au vert avec six zéros.
 
-⚠️ **Deux pièges Odoo 19 découverts ici :**
+**Deux pièges Odoo 19 découverts ici :**
 1. `target="inline"` n'existe plus sur `ir.actions.act_window` : le module refuse
    de s'installer, avec un `ParseError` qui ne nomme pas la valeur fautive.
 2. **Odoo désactive le suivi des champs pour un enregistrement créé dans la
@@ -818,7 +818,7 @@ Puis la même demande dans le module générique, mesurée de la même façon.
 Le tableau comparatif des deux colonnes **est** le résultat du travail. C'est lui
 qui répond à la question que l'encadrant a posée en écrivant la section 18.
 
-⚠️ Fais cette mesure **honnêtement**. Ne gonfle pas artificiellement le coût côté
+Fais cette mesure **honnêtement**. Ne gonfle pas artificiellement le coût côté
 texto : le résultat est déjà suffisamment net sans être forcé, et un jury repère
 immédiatement une comparaison arrangée.
 
@@ -854,7 +854,7 @@ Le budget réel a été tranché : **1, 2, 3, 4, 5, 6, la boucle de réévaluati
 | **12 non sacrifiable** | C'est elle qui fait de ce module la moitié d'une expérience plutôt qu'un second module métier. |
 | **9, 10, 11 hors périmètre** | Conformément à l'ordre de sacrifice ci-dessus. |
 
-⚠️ La zone paramétrable de l'Extension 8 — `compensation.type`, la contrepartie
+La zone paramétrable de l'Extension 8 — `compensation.type`, la contrepartie
 que le document interdit de coder en dur — **reste dans le périmètre et ira telle
 quelle dans le document de comparaison**. C'est le seul endroit où la
 spécification impose du paramétrable dans le module texto ; le taire rendrait la
@@ -864,7 +864,7 @@ comparaison moins honnête.
 
 # `/staff/crowdfunding` — un écran de démonstration, et ce qu'il ne couvre pas
 
-⚠ **À dire tel quel en soutenance.** Ajouté le 27/08, après avoir d'abord
+**À dire tel quel en soutenance.** Ajouté le 27/08, après avoir d'abord
 tranché l'inverse (tuile pointant sur le back-office) : la démonstration ne doit
 pas quitter le site. Trois routes, calquées sur `/staff/innovation` :
 
@@ -924,7 +924,7 @@ quel : il est cherché dans la table des actions ouvertes à ce rôle à cette
 Chaque fiche porte en bas un lien discret **« Ouvrir dans le back-office »**
 vers ces huit cas. Le jury ne le verra pas si la démonstration se déroule bien.
 
-⚠ **Coût accepté** : un second jeu de contrôles d'accès à tenir d'accord avec
+**Coût accepté** : un second jeu de contrôles d'accès à tenir d'accord avec
 les ACL et les groupes des menus. Il est réduit au minimum — le controller
 délègue toute décision au modèle — mais il existe, et c'est l'argument qui
 avait fait préférer le back-office le 26/08.

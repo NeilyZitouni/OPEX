@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LE CYCLE D'UNE ÉVALUATION - §30, §31, règles 7 et 8 du §39
+
+            Cinquième définition du module, onzième du projet.
+
+            Le document ne donne pas de schéma pour ce cycle, contrairement aux
+            livrables ou au service fait. Il en faut pourtant un, et pour une
+            raison précise : la règle 7 est une condition, et la règle 8 un
+            effet. Écrites en Python, elles seraient deux `if` de plus dans une
+            méthode ; écrites ici, elles sont lisibles dans le configurateur et
+            leur refus est journalisé.
+
+            Quatre étapes, quatre transitions, et une seule étape finale : une
+            évaluation renvoyée à son auteur doit pouvoir revenir, sans quoi un
+            commentaire maladroit condamnerait la note.
+        -->
+
+        <record id="rule_evaluation_after_final_validation" model="opex.workflow.rule">
+            <field name="name">La validation finale a été prononcée</field>
+            <field name="code">evaluation_after_final_validation</field>
+            <field name="expression">bool(field('mission_validee'))</field>
+            <field name="message">L'évaluation ne peut être rendue qu'après la validation finale de la mission (règle 7 du §39).</field>
+            <field name="description">La règle 7 nomme le client, mais son titre est général - « L'évaluation intervient après la mission ». La condition garde donc les deux grilles : une évaluation opérationnelle rendue avant le service fait serait tout aussi prématurée. `mission_validee` traverse jusqu'au constat du §28, la « validation finale » du document étant celle-là et non la clôture administrative.</field>
+        </record>
+
+        <record id="rule_evaluation_complete" model="opex.workflow.rule">
+            <field name="name">Les six critères sont notés</field>
+            <field name="code">evaluation_complete</field>
+            <field name="expression">bool(field('grille_complete'))</field>
+            <field name="message">Les six critères de la grille doivent être notés de 1 à 5 avant de soumettre l'évaluation.</field>
+        </record>
+
+        <record id="action_ev_notify_submitted" model="opex.workflow.action">
+            <field name="name">Prévenir le cluster de l'évaluation reçue</field>
+            <field name="code">evaluation_notify_submitted</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Une évaluation de fin de mission vient d'être rendue et attend votre validation.</p></field>
+        </record>
+
+        <!--
+            La règle 8 du §39, sous sa forme configurée. `set_field` écrit
+            `operational_trigger = 'reputation'` sur l'évaluation ; l'inverse
+            du champ crée la ligne `opex.expert.rating` et le profil se
+            recalcule seul.
+
+            Aucun des six types d'actions du moteur ne sait porter une note sur
+            un profil, et lui apprendre à le faire lui apprendrait le métier.
+        -->
+        <record id="action_ev_trigger_reputation" model="opex.workflow.action">
+            <field name="name">Porter la note au profil de l'intervenant</field>
+            <field name="code">evaluation_trigger_reputation</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">10</field>
+            <field name="field_id" ref="field_opex_mission_evaluation__operational_trigger"/>
+            <field name="value_expression">'reputation'</field>
+        </record>
+
+        <record id="action_ev_notify_validated" model="opex.workflow.action">
+            <field name="name">Annoncer la note à l'intervenant</field>
+            <field name="code">evaluation_notify_validated</field>
+            <field name="action_type">notify</field>
+            <!-- L'intervenant est un compte portail, et la cloche écarte les
+                 notes internes. En `note`, il n'apprendrait jamais qu'il a été
+                 évalué. -->
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Une évaluation de mission a été validée et ajoutée à votre profil.</p></field>
+        </record>
+
+        <record id="action_ev_notify_returned" model="opex.workflow.action">
+            <field name="name">Renvoyer l'évaluation à son auteur</field>
+            <field name="code">evaluation_notify_returned</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Votre évaluation vous est renvoyée pour complément. Le motif figure dans l'historique du dossier.</p></field>
+        </record>
+
+        <!--
+            `initiator_role_id` est laissé vide, comme sur les quatre autres
+            définitions du module. Les évaluations sont créées par le
+            déclencheur de « Facturer et clôturer », donc sous l'identité du
+            secrétariat : le moteur lui donnerait le rôle `client` en accès
+            complet, et il noterait l'intervenant à la place du client.
+        -->
+        <record id="wf_mission_evaluation" model="opex.workflow.definition">
+            <field name="name">Évaluation de fin de mission</field>
+            <field name="code">mission_evaluation</field>
+            <field name="model_id" ref="model_opex_mission_evaluation"/>
+            <field name="description">Grille du client (§30) ou du cluster (§31), rendue après la validation finale, validée par le cluster, puis portée au profil de l'intervenant (règle 8 du §39).</field>
+        </record>
+
+        <record id="evst_pending" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">pending</field>
+            <field name="name">À remplir</field>
+            <field name="user_label">Action requise : évaluer la mission</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="sla_days">15</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_client'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="evst_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">submitted</field>
+            <field name="name">Rendue</field>
+            <field name="user_label">En attente de validation</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">7</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="evst_returned" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">returned</field>
+            <field name="name">Renvoyée à son auteur</field>
+            <field name="user_label">À compléter</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_client'), ref('role_mission_manager')])]"/>
+            <field name="description">Volontairement non finale. Une évaluation écartée sans retour possible ferait perdre la note d'une mission pour une phrase mal tournée, et le §32 compte sur ces notes.</field>
+        </record>
+
+        <record id="evst_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">validated</field>
+            <field name="name">Validée</field>
+            <field name="user_label">Évaluation validée</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="evtr_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">evaluation_submit</field>
+            <field name="name">Soumettre l'évaluation</field>
+            <field name="source_stage_id" ref="evst_pending"/>
+            <field name="target_stage_id" ref="evst_submitted"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_client'), ref('role_mission_manager')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_evaluation_after_final_validation'), ref('rule_evaluation_complete')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ev_notify_submitted')])]"/>
+        </record>
+
+        <record id="evtr_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">evaluation_validate</field>
+            <field name="name">Valider l'évaluation</field>
+            <field name="source_stage_id" ref="evst_submitted"/>
+            <field name="target_stage_id" ref="evst_validated"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ev_trigger_reputation'), ref('action_ev_notify_validated')])]"/>
+        </record>
+
+        <record id="evtr_return" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">evaluation_return</field>
+            <field name="name">Renvoyer pour complément</field>
+            <field name="source_stage_id" ref="evst_submitted"/>
+            <field name="target_stage_id" ref="evst_returned"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="evtr_resume" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_evaluation"/>
+            <field name="code">evaluation_resume</field>
+            <field name="name">Reprendre l'évaluation</field>
+            <field name="source_stage_id" ref="evst_returned"/>
+            <field name="target_stage_id" ref="evst_pending"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_client'), ref('role_mission_manager')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ev_notify_returned')])]"/>
+        </record>
+
+        <record id="action_mis_trigger_evaluation" model="opex.workflow.action">
+            <field name="name">Ouvrir les évaluations de fin de mission</field>
+            <field name="code">mission_trigger_evaluation</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">30</field>
+            <field name="field_id" ref="field_opex_mission_request__operational_trigger"/>
+            <field name="value_expression">'evaluation'</field>
+            <field name="description">§30 et §31 : une grille client et une grille cluster par intervenant affecté.</field>
+        </record>
+
+    </data>
+
+    <!--
+        Hors du bloc `noupdate` : la transition visée a été créée par
+        l'Extension 1, et le drapeau est stocké par enregistrement dans
+        `ir_model_data`. Un `<record>` qui la redéfinirait serait ignoré à la
+        mise à jour, sans erreur.
+
+        `Command.link` et non `Command.set` : « Facturer et clôturer » porte
+        déjà les deux actions de facturation posées par l'Extension 9, et un
+        `set` les retirerait sans rien dire.
+    -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_close')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_trigger_evaluation')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_mission_evaluation')]]"/>
+</odoo>

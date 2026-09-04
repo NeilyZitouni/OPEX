@@ -24,7 +24,7 @@ class FinalEvaluation(models.Model):
     l'intérêt d'interroger les deux parties est de pouvoir les mettre en regard.
     L'écart entre les deux est le renseignement, pas les notes prises isolément.
 
-    ⚠ Ce modèle porte un champ `state`, contrairement au projet. Ce n'est pas
+    Ce modèle porte un champ `state`, contrairement au projet. Ce n'est pas
     une entorse : `state` décrit ici l'état d'un **formulaire** — brouillon ou
     remis — pas l'avancement d'un dossier dans un processus. La règle interdit
     de décrire un parcours métier autrement que par le moteur ; elle
@@ -187,7 +187,7 @@ class ProjectFinalEvaluation(models.Model):
     def submit_final_evaluation(self, notes, commentaire=False, user=None):
         """Enregistre et remet l'évaluation, après contrôle du droit.
 
-        ⚠ Le côté (`porteur` / `cluster`) n'est **jamais** pris dans le
+        Le côté (`porteur` / `cluster`) n'est **jamais** pris dans le
         formulaire : il est déduit de l'identité par `can_evaluate_finally()`.
         Un champ caché dans la page serait modifiable par qui sait ouvrir les
         outils de développement, et un porteur pourrait déposer l'avis du

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        LE PROMPT DE PARSING D'UN CV - §6
+
+        Trois informations par element extrait, et les trois sont exigees :
+
+          - valeur       : ce qui a ete lu
+          - confidence   : un flottant 0..1, ce que le modele en pense
+          - source_quote : le passage exact du CV d'ou vient l'information
+
+        La troisieme est celle qui fait la tracabilite du §24. Une competence
+        proposee sans citation est une affirmation ; avec sa citation, c'est
+        une lecture qu'on peut verifier en rouvrant le document.
+
+        Les neuf destinations du tableau du §6 sont les neuf cles de l'objet
+        rendu. Le validateur les connait ; tout le reste est ignore.
+
+        Le corps contient un exemple de JSON, avec ses accolades. C'est
+        volontaire et c'est la seule facon fiable d'obtenir du JSON d'un
+        modele de langage. Le rendu de `opex.ai.prompt` ne substitue que les
+        variables `{en_minuscules}` et laisse ces accolades tranquilles -
+        `str.format()` aurait leve dessus.
+    -->
+
+    <record id="prompt_cv_parsing" model="opex.ai.prompt">
+        <field name="code">cv_parsing</field>
+        <field name="name">Parsing d'un CV</field>
+        <field name="version">1</field>
+        <field name="expected_keys">titre, resume, experience, competence, diplome, certification, langue, secteur, annees</field>
+        <field name="description">Le prompt du §6. Il lit le document joint et rend les neuf destinations du tableau, chacune sous forme de liste d'elements portant valeur, confidence et source_quote.
+
+Il ne rapproche rien du referentiel de competences : le libelle est rendu tel qu'il figure au CV. Le rapprochement se fait ailleurs, en deux temps.
+
+La consigne qui compte le plus est celle qui interdit d'inventer. Un modele de langage comble volontiers un CV incomplet, et une annee d'experience inventee est indetectable une fois en base. La demande de source_quote sert aussi a cela : un modele qui doit citer le passage invente moins.</field>
+        <field name="body">Tu analyses le curriculum vitae joint pour un cluster d'entreprises qui reference des experts.
+
+Rends UNIQUEMENT un objet JSON, sans aucun texte autour et sans bloc de code.
+
+Chaque element extrait est un objet de la forme :
+
+{"valeur": "", "confidence": 0.0, "source_quote": ""}
+
+ou :
+- "valeur" est l'information lue, en une chaine de caracteres ;
+- "confidence" est un nombre entre 0.0 et 1.0 qui dit a quel point tu es sur de cette lecture ;
+- "source_quote" est le passage EXACT du CV d'ou vient l'information, recopie mot pour mot.
+
+L'objet rendu a exactement ces neuf cles, chacune contenant une LISTE de tels elements :
+
+{
+  "titre": [],
+  "resume": [],
+  "experience": [],
+  "competence": [],
+  "diplome": [],
+  "certification": [],
+  "langue": [],
+  "secteur": [],
+  "annees": []
+}
+
+Regles imperatives :
+
+1. N'INVENTE RIEN. Si une information n'est pas dans le document, n'ajoute pas d'element. Un CV incomplet doit produire une extraction incomplete. Une liste vide est une reponse correcte.
+2. "source_quote" est recopie du document, jamais reformule. Si tu ne peux pas citer le passage, c'est que l'information n'y est pas : n'ajoute pas l'element.
+3. "confidence" descend quand la lecture est incertaine : information implicite, texte ambigu, mise en page confuse. Une confiance basse est utile ; une confiance haute injustifiee ne l'est pas.
+4. "titre" et "resume" contiennent au plus un element chacun.
+5. "annees" contient au plus un element : le nombre total d'annees d'experience professionnelle, en chiffres, dans "valeur".
+6. "competence" reprend les mots du CV. Ne traduis pas, ne normalise pas, ne regroupe pas deux competences en une.
+7. "experience" met dans "valeur" l'intitule du poste et l'organisation, separes par un tiret.
+8. N'ajoute aucune cle en dehors des neuf listees. Aucune cle supplementaire ne sera lue.
+
+Si le document n'est pas un curriculum vitae, rends les neuf cles avec des listes vides.</field>
+    </record>
+
+</odoo>

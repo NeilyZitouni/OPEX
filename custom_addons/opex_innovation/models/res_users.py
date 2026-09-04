@@ -47,10 +47,10 @@ class ResUsers(models.Model):
         partent alors par courriel et **rien ne s'affiche dans le systray** :
         le personnel ne voit passer aucune des notes qui lui sont adressées.
 
-        ⚠ `share = False` en garde dure. Écrire `inbox` sur un compte portail
+        `share = False` en garde dure. Écrire `inbox` sur un compte portail
         violerait la contrainte et ferait échouer la mise à jour du module.
 
-        ⚠ Ne touche que les comptes **déjà en `email`** : un compte qu'un
+        Ne touche que les comptes **déjà en `email`** : un compte qu'un
         administrateur aurait délibérément remis en `email` est réécrit au
         prochain `-u`. C'est le prix d'un réglage porté par les données ; il
         est assumé, et c'est pour cela que la méthode journalise ce qu'elle

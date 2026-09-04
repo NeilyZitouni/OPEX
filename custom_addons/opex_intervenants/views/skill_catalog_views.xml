@@ -1,0 +1,316 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ============================================================
+         DOMAINES
+         ============================================================ -->
+
+    <record id="view_skill_domain_list" model="ir.ui.view">
+        <field name="name">opex.skill.domain.list</field>
+        <field name="model">opex.skill.domain</field>
+        <field name="arch" type="xml">
+            <list string="Domaines de compétence">
+                <field name="sequence" widget="handle"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="family_count"/>
+                <field name="competence_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_skill_domain_form" model="ir.ui.view">
+        <field name="name">opex.skill.domain.form</field>
+        <field name="model">opex.skill.domain</field>
+        <field name="arch" type="xml">
+            <form string="Domaine de compétence">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_competences" type="object"
+                                class="oe_stat_button" icon="fa-list">
+                            <field name="competence_count" widget="statinfo"
+                                   string="Compétences"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Audit et contrôle"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="AUD"/>
+                            <field name="sequence"/>
+                        </group>
+                        <group>
+                            <field name="active" widget="boolean_toggle"/>
+                            <field name="family_count"/>
+                        </group>
+                    </group>
+                    <field name="description" placeholder="Ce que ce domaine recouvre."/>
+                    <notebook>
+                        <page string="Familles" name="familles">
+                            <field name="family_ids">
+                                <list editable="bottom">
+                                    <field name="sequence" widget="handle"/>
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="competence_count"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_skill_domain" model="ir.actions.act_window">
+        <field name="name">Domaines de compétence</field>
+        <field name="res_model">opex.skill.domain</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Le premier niveau de la taxonomie du §8</p>
+            <p>Un domaine sert à orienter l'arbitrage. Peu nombreux et stables :
+               s'il y en a soixante, personne ne cherche plus et les doublons
+               s'installent.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         FAMILLES
+         ============================================================ -->
+
+    <record id="view_skill_family_list" model="ir.ui.view">
+        <field name="name">opex.skill.family.list</field>
+        <field name="model">opex.skill.family</field>
+        <field name="arch" type="xml">
+            <list string="Familles de compétences">
+                <field name="domain_id"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="competence_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_skill_family_form" model="ir.ui.view">
+        <field name="name">opex.skill.family.form</field>
+        <field name="model">opex.skill.family</field>
+        <field name="arch" type="xml">
+            <form string="Famille de compétences">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="domain_id"/>
+                            <field name="code"/>
+                        </group>
+                        <group>
+                            <field name="sequence"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <field name="description"/>
+                    <notebook>
+                        <page string="Compétences" name="competences">
+                            <!-- Voir côte à côte les compétences d'une même
+                                 famille est ce qui fait repérer un doublon.
+                                 Dispersées dans un catalogue de six cents
+                                 lignes, « Audit SI » et « Audit des systèmes
+                                 d'information » ne se croisent jamais. -->
+                            <field name="competence_ids">
+                                <list>
+                                    <field name="code"/>
+                                    <field name="name"/>
+                                    <field name="synonyme_count"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_skill_family_search" model="ir.ui.view">
+        <field name="name">opex.skill.family.search</field>
+        <field name="model">opex.skill.family</field>
+        <field name="arch" type="xml">
+            <search string="Familles">
+                <field name="name"/>
+                <field name="code"/>
+                <field name="domain_id"/>
+                <filter name="vide" string="Sans compétence"
+                        domain="[('competence_ids', '=', False)]"/>
+                <group name="group_by">
+                    <filter name="group_domain" string="Domaine"
+                            context="{'group_by': 'domain_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_skill_family" model="ir.actions.act_window">
+        <field name="name">Familles de compétences</field>
+        <field name="res_model">opex.skill.family</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_group_domain': 1}</field>
+    </record>
+
+    <!-- ============================================================
+         LE CATALOGUE — la compétence canonique, rangée
+         ============================================================
+
+         Le référentiel reste unique : ce sont les compétences du Module 2,
+         vues avec leur rangement et leurs synonymes.
+    -->
+
+    <!-- Le Module 2 ne declare aucune vue nommee pour ce modele : Odoo lui
+         en genere une par defaut. Il n'y a donc rien a heriter, et ces vues
+         sont ecrites en propre. Elles ne remplacent pas celles du Module 2 -
+         elles sont portees par l'action du catalogue ci-dessous, et l'ecran
+         du Module 2 continue d'afficher sa vue generee. -->
+
+    <record id="view_competence_catalogue_form" model="ir.ui.view">
+        <field name="name">opex.innovation.competence.catalogue.form</field>
+        <field name="model">opex.innovation.competence</field>
+        <field name="arch" type="xml">
+            <form string="Compétence du catalogue">
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_synonymes" type="object"
+                                class="oe_stat_button" icon="fa-tags">
+                            <field name="synonyme_count" widget="statinfo"
+                                   string="Synonymes"/>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name"/></h1>
+                    </div>
+                    <group>
+                        <group string="Rangement — §8">
+                            <field name="family_id"
+                                   options="{'no_quick_create': True}"/>
+                            <field name="skill_domain_id" readonly="1"/>
+                            <field name="code"/>
+                        </group>
+                        <group string="Hérité du Module 2">
+                            <field name="domaine" readonly="1"
+                                   help="Champ texte du Module 2, alimenté par la famille."/>
+                            <field name="niveau"/>
+                            <field name="active" widget="boolean_toggle"/>
+                        </group>
+                    </group>
+                    <field name="description"/>
+                    <notebook>
+                        <page string="Synonymes" name="synonymes">
+                            <!-- L'etape 1 du rapprochement ne reconnait que
+                                 ce qui est ici. Un synonyme manquant envoie
+                                 le libelle en arbitrage - ce qui est le bon
+                                 comportement, mais coute un geste humain. -->
+                            <field name="synonyme_ids">
+                                <list editable="bottom">
+                                    <field name="name"/>
+                                    <field name="origine"/>
+                                    <field name="normalised" readonly="1"
+                                           optional="hide"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_competence_catalogue_list" model="ir.ui.view">
+        <field name="name">opex.innovation.competence.catalogue.list</field>
+        <field name="model">opex.innovation.competence</field>
+        <field name="arch" type="xml">
+            <list string="Catalogue des compétences">
+                <field name="skill_domain_id"/>
+                <field name="family_id"/>
+                <field name="code"/>
+                <field name="name"/>
+                <field name="synonyme_count" string="Synonymes"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_competence_catalogue_search" model="ir.ui.view">
+        <field name="name">opex.innovation.competence.catalogue.search</field>
+        <field name="model">opex.innovation.competence</field>
+        <field name="arch" type="xml">
+            <search string="Catalogue">
+                <!-- Les `field` d'une vue `search` se déclarent tous avant
+                     les filtres, et le `group` s'écrit nu : `expand` et
+                     `string` y sont refusés et le module ne charge plus.
+                     Règle 8 du CLAUDE.md. -->
+                <field name="name"/>
+                <field name="code"/>
+                <field name="family_id"/>
+                <field name="skill_domain_id"/>
+                <filter name="a_classer" string="À classer"
+                        domain="[('family_id', '=', False)]"/>
+                <filter name="sans_synonyme" string="Sans synonyme"
+                        domain="[('synonyme_ids', '=', False)]"/>
+                <separator/>
+                <filter name="actives" string="Actives"
+                        domain="[('active', '=', True)]"/>
+                <group name="group_by">
+                    <filter name="group_domain" string="Domaine"
+                            context="{'group_by': 'skill_domain_id'}"/>
+                    <filter name="group_family" string="Famille"
+                            context="{'group_by': 'family_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_skill_catalogue" model="ir.actions.act_window">
+        <field name="name">Catalogue des compétences</field>
+        <field name="res_model">opex.innovation.competence</field>
+        <field name="view_mode">list,form</field>
+        <field name="view_id" ref="view_competence_catalogue_list"/>
+        <field name="search_view_id" ref="view_competence_catalogue_search"/>
+        <field name="context">{'search_default_group_domain': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">La taxonomie canonique du §8</p>
+            <p>C'est le référentiel partagé avec le Module 2 : celui que le
+               Smart Matching interroge. Un second catalogue le rendrait faux
+               sans que rien ne le signale.</p>
+        </field>
+    </record>
+
+    <!-- ============================================================
+         MENUS
+         ============================================================ -->
+
+    <menuitem id="menu_skill_taxonomy_root"
+              name="Taxonomie des compétences"
+              parent="menu_intervenants_config"
+              sequence="30"/>
+
+    <menuitem id="menu_skill_catalogue"
+              name="Catalogue"
+              parent="menu_skill_taxonomy_root"
+              action="action_skill_catalogue"
+              sequence="10"/>
+
+    <menuitem id="menu_skill_domain"
+              name="Domaines"
+              parent="menu_skill_taxonomy_root"
+              action="action_skill_domain"
+              sequence="20"/>
+
+    <menuitem id="menu_skill_family"
+              name="Familles"
+              parent="menu_skill_taxonomy_root"
+              action="action_skill_family"
+              sequence="30"/>
+
+</odoo>

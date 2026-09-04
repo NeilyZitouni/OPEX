@@ -63,7 +63,7 @@ class DeliverableVersion(models.Model):
 class Deliverable(models.Model):
     """Sections 23 et 24 — un livrable, et son cycle de vie.
 
-    ⚠ **Aucun champ `state` ici.** Le cycle de vie d'un livrable est un petit
+    **Aucun champ `state` ici.** Le cycle de vie d'un livrable est un petit
     processus — quatre étapes, un chemin de refus, un valideur désigné, des
     notifications à chaque passage — et c'est le moteur qui le porte, comme
     pour le projet et pour l'industrialisation.
@@ -138,7 +138,7 @@ class Deliverable(models.Model):
     def _grant_actors(self):
         """Le porteur dépose, l'expert valide — chacun acteur de ce livrable-ci.
 
-        ⚠ Sur **ce** livrable, pas sur tous. C'est le principe de visibilité des
+        Sur **ce** livrable, pas sur tous. C'est le principe de visibilité des
         documents sources : être expert du cluster ne donne accès à rien ; c'est
         la ligne d'acteur qui donne accès à celui-là.
         """
@@ -171,7 +171,7 @@ class Deliverable(models.Model):
     def submit_new_version(self, file=False, filename=False, user=None):
         """Archive la version refusée, dépose la nouvelle, franchit l'étape.
 
-        ⚠ L'ordre compte. On fige **avant** d'écrire : après, le champ `file`
+        L'ordre compte. On fige **avant** d'écrire : après, le champ `file`
         porte déjà le nouveau contenu et la version archivée serait un double
         de la version courante. L'historique existerait, et ne contiendrait
         rien d'utile.
@@ -246,7 +246,7 @@ class Deliverable(models.Model):
     def correction_history(self):
         """Les corrections demandées, dans l'ordre, avec leur motif.
 
-        ⚠ Construit en compréhension sur l'historique, jamais avec `mapped()` :
+        Construit en compréhension sur l'historique, jamais avec `mapped()` :
         un livrable refusé deux fois repasse par la même étape, et `mapped()`
         sur un Many2one dédoublonne — le second refus disparaîtrait du
         résultat.

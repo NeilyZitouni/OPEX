@@ -162,7 +162,7 @@ class TestDefinition(WorkflowCase):
         self.assertTrue(new._check_graph())
 
     def test_new_version_takes_the_code_offline_until_published(self):
-        """⚠ Comportement à connaître, conforme à la spécification.
+        """Comportement à connaître, conforme à la spécification.
 
         `action_new_version()` archive l'ancienne version **immédiatement**.
         Entre cet instant et la publication de la v2, aucune version n'est
@@ -218,7 +218,7 @@ class TestDefinition(WorkflowCase):
     #: Termes métier des documents sources. Aucun ne doit apparaître comme
     #: identifiant ou comme littéral exact dans le code exécutable du moteur.
     #:
-    #: ⚠ `score` a été **retiré** de cette liste en Extension 7, et c'est une
+    #: `score` a été **retiré** de cette liste en Extension 7, et c'est une
     #: distinction de fond, pas un assouplissement : le score d'un candidat de
     #: matching est une primitive du moteur — tout système de scoring en a un —
     #: alors que le score du *projet*, celui que lit `field('score') >= 70`,
@@ -231,7 +231,7 @@ class TestDefinition(WorkflowCase):
         'investisseur', 'porteur', 'remediation', 'evaluateur',
     }
 
-    #: ⚠ Brèche connue et assumée, à rouvrir si elle gêne.
+    #: Brèche connue et assumée, à rouvrir si elle gêne.
     #:
     #: Le périmètre de l'Extension 7 impose `candidate_type` en Selection avec
     #: les valeurs expert / mentor / investisseur / sponsor. « Investisseur »

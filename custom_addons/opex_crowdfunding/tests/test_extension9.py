@@ -263,7 +263,7 @@ class TestExtension9Confidentialite(HttpCase, RelationCommon):
     def _assert_aucun_secret(self, page, url, autorises=()):
         """Aucune donnée réservée dans le HTML — ni masquée, ni en attribut.
 
-        ⚠️ Le HTML est **déséchappé** avant la recherche, et ce détail décide
+        Le HTML est **déséchappé** avant la recherche, et ce détail décide
         de tout : QWeb rend « Supervision d'atelier » en
         « Supervision d&#39;atelier ». Chercher la chaîne brute dans la réponse
         ne la trouve jamais — l'assertion passerait au vert quoi qu'il arrive,

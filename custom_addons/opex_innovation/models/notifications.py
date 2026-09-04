@@ -9,11 +9,11 @@ class ProjectNotifications(models.Model):
     normal. Trois ne le sont pas, parce que l'événement qui les déclenche n'est
     pas un passage d'étape :
 
-    - ⑨ « Expert intéressé » : la réponse d'un candidat à une proposition. Le
+    - 9. « Expert intéressé » : la réponse d'un candidat à une proposition. Le
       dossier ne bouge pas — « l'IA recommande, elle ne décide pas », et une
       réponse de candidat n'engage rien.
-    - ⑬ « Évolution du financement » : l'écriture d'un montant.
-    - ⑩ ⑪ ⑫ : les trois livrables, qui attendent l'Extension 16.
+    - 13. « Évolution du financement » : l'écriture d'un montant.
+    - 10. 11. 12. : les trois livrables, qui attendent l'Extension 16.
 
     Pour celles-là, le Python dit **quand**, jamais **quoi ni à qui**. Le
     message, le sous-type et les destinataires restent dans
@@ -26,7 +26,7 @@ class ProjectNotifications(models.Model):
     def notify_event(self, action_code):
         """Déclenche une notification **configurée**, hors transition.
 
-        ⚠ Ne construit aucun message. Elle nomme une action et laisse le moteur
+        Ne construit aucun message. Elle nomme une action et laisse le moteur
         faire — le même `_execute_notify` que pour les transitions, donc les
         mêmes règles de sous-type et la même résolution des destinataires par
         `instance.actor`.
@@ -52,13 +52,13 @@ class ProjectNotifications(models.Model):
         return action.execute(instance)
 
     # ------------------------------------------------------------
-    # ⑬ Évolution du financement
+    # 13. Évolution du financement
     # ------------------------------------------------------------
 
     def write(self, vals):
         """Prévient le porteur quand le montant obtenu change réellement.
 
-        ⚠ Sur le **changement de valeur**, pas sur la présence de la clé. Un
+        Sur le **changement de valeur**, pas sur la présence de la clé. Un
         écran qui renvoie tous ses champs à chaque enregistrement écrit
         `financement_obtenu` même sans y toucher : notifier sur la clé enverrait
         un courriel au porteur à chaque sauvegarde du dossier par le cluster.
@@ -93,7 +93,7 @@ class ProjectNotifications(models.Model):
         même situation que sur le Module 1, et même réponse — un bloc QWeb en
         lecture seule, alimenté par une liste de dictionnaires.
 
-        ⚠ **Des dictionnaires, pas le recordset**, et c'est le point du motif
+        **Des dictionnaires, pas le recordset**, et c'est le point du motif
         repris au Module 1 : c'est le modèle qui décide ce que chaque public a
         le droit de lire, pas le gabarit. Passer `history_ids` à la page
         donnerait accès à l'instance, à ses acteurs et, de fil en aiguille, au

@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_mission_request_form" model="ir.ui.view">
+        <field name="name">opex.mission.request.form</field>
+        <field name="model">opex.mission.request</field>
+        <field name="arch" type="xml">
+            <form string="Appel à mission">
+                <!--
+                    Le bloc que le mixin fournit en commentaire
+                    (`workflow_mixin.py:138-157`), recopié tel quel.
+
+                    Un bouton **unique**. Les quatorze étapes et leurs
+                    trente-deux sorties vivent dans la configuration : cette vue
+                    ne les connaît pas, et c'est précisément ce qui permet
+                    d'ajouter une étape au configurateur sans toucher au XML de
+                    la vue.
+
+                    `workflow_definition_id` doit être présent, même invisible :
+                    sans lui le `domain` du statusbar ne peut pas être évalué,
+                    et la barre affiche les étapes de **tous** les workflows de
+                    la base — celles du projet d'innovation comprises.
+                -->
+                <header>
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_applications" type="object"
+                                class="oe_stat_button" icon="fa-users">
+                            <field name="received_application_count"
+                                   widget="statinfo" string="Candidatures"/>
+                        </button>
+                        <button name="action_view_documents" type="object"
+                                class="oe_stat_button" icon="fa-paperclip">
+                            <field name="document_count"
+                                   widget="statinfo" string="Documents"/>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <!-- L'en-tête exact du §40 : référence, titre, puis
+                             l'état en libellé utilisateur — jamais le code. -->
+                        <h2><field name="name" readonly="1" class="text-muted"/></h2>
+                        <label for="title"/>
+                        <h1><field name="title" placeholder="Audit cybersécurité"/></h1>
+                        <h3><field name="workflow_stage_label" readonly="1"/></h3>
+                    </div>
+
+                    <group>
+                        <group string="Client">
+                            <field name="client_id"/>
+                            <field name="client_organisation_id"/>
+                            <field name="client_email"/>
+                            <field name="client_phone"/>
+                        </group>
+                        <group string="Mission">
+                            <field name="mission_type_id"/>
+                            <field name="type_multi_intervenants"
+                                   invisible="not type_multi_intervenants"/>
+                            <field name="domaine_id"/>
+                            <field name="sourcing_mode"/>
+                            <field name="is_published"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Besoin" name="besoin">
+                            <group>
+                                <field name="description"
+                                       placeholder="Quel est le besoin du client ?"/>
+                                <field name="objectifs"
+                                       placeholder="Que doit atteindre la mission ?"/>
+                                <field name="resultats_attendus"
+                                       placeholder="Quels livrables, quels résultats concrets ?"/>
+                            </group>
+                        </page>
+
+                        <page string="Profil recherché" name="profil">
+                            <group>
+                                <group>
+                                    <field name="skill_ids" widget="many2many_tags"
+                                           options="{'no_create': True}"/>
+                                    <field name="niveau_experience"/>
+                                    <field name="annees_experience_min"/>
+                                </group>
+                                <group>
+                                    <field name="mode_intervention"/>
+                                    <field name="wilaya"/>
+                                    <field name="localisation"/>
+                                    <field name="langues"/>
+                                </group>
+                            </group>
+                            <group string="Certifications souhaitées">
+                                <field name="certifications_souhaitees" nolabel="1"/>
+                            </group>
+                        </page>
+
+                        <page string="Organisation et budget" name="organisation">
+                            <group>
+                                <group string="Calendrier">
+                                    <field name="date_debut_souhaitee"/>
+                                    <field name="date_fin_souhaitee"/>
+                                    <field name="duree_estimee_jours"/>
+                                    <field name="date_limite_candidature"/>
+                                    <!-- Affiché : c'est la condition qui bloque
+                                         « Publier l'appel », et un utilisateur
+                                         doit pouvoir voir pourquoi. -->
+                                    <field name="date_limite_is_open"/>
+                                </group>
+                                <group string="Budget">
+                                    <field name="currency_id" groups="base.group_multi_currency"/>
+                                    <field name="budget_estimatif"/>
+                                    <field name="type_remuneration"/>
+                                </group>
+                            </group>
+                            <group string="Conditions financières">
+                                <field name="conditions_financieres" nolabel="1"/>
+                            </group>
+                        </page>
+
+                        <page string="Documents" name="documents">
+                            <field name="document_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="document_type"/>
+                                    <field name="name"/>
+                                    <field name="file" filename="filename" widget="binary"/>
+                                    <field name="filename" column_invisible="1"/>
+                                    <field name="is_public" widget="boolean_toggle"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Candidatures" name="candidatures">
+                            <!--
+                                En lecture seule ici, et ce n'est pas une
+                                commodité : une candidature a **sa propre**
+                                machine à états. On la fait avancer depuis sa
+                                fiche, avec son bouton « Action » et ses
+                                conditions — pas depuis une ligne éditable dans
+                                le formulaire de la mission, qui court-circuiterait
+                                le moteur.
+                            -->
+                            <field name="application_ids" nolabel="1" readonly="1">
+                                <list>
+                                    <field name="partner_id"/>
+                                    <field name="source"/>
+                                    <field name="workflow_stage_label"/>
+                                    <field name="disponibilite"/>
+                                    <field name="delai_propose_jours"/>
+                                    <field name="tarif_propose"/>
+                                    <field name="score"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <page string="Confidentialité" name="confidentialite"
+                              groups="opex_intervenants.group_mission_manager">
+                            <group>
+                                <field name="public_fields_only"/>
+                                <field name="nda_required"/>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mission_request_list" model="ir.ui.view">
+        <field name="name">opex.mission.request.list</field>
+        <field name="model">opex.mission.request</field>
+        <field name="arch" type="xml">
+            <list string="Appels à mission">
+                <field name="name"/>
+                <field name="title"/>
+                <field name="client_id"/>
+                <field name="mission_type_id"/>
+                <field name="domaine_id" optional="show"/>
+                <!-- Le libellé utilisateur, jamais le code technique. -->
+                <field name="workflow_stage_label" string="État"/>
+                <field name="date_limite_candidature" optional="show"/>
+                <field name="received_application_count" string="Candidatures"/>
+                <field name="budget_estimatif" optional="hide"/>
+                <field name="currency_id" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mission_request_search" model="ir.ui.view">
+        <field name="name">opex.mission.request.search</field>
+        <field name="model">opex.mission.request</field>
+        <field name="arch" type="xml">
+            <search string="Appels à mission">
+                <field name="name" string="Référence"/>
+                <field name="title"/>
+                <field name="client_id"/>
+                <field name="skill_ids"/>
+                <field name="domaine_id"/>
+                <separator/>
+
+                <!--
+                    Les filtres portent sur `workflow_stage_id.code`,
+                    c'est-à-dire sur la configuration. Ils reproduisent le menu
+                    du §5 : Brouillons · Publiés · En candidature · En
+                    sélection · Clôturés.
+                -->
+                <filter name="filter_draft" string="Brouillons"
+                        domain="[('workflow_stage_id.code', '=', 'draft')]"/>
+                <filter name="filter_qualification" string="À qualifier"
+                        domain="[('workflow_stage_id.code', '=', 'qualified')]"/>
+                <filter name="filter_published" string="Publiés"
+                        domain="[('workflow_stage_id.code', '=', 'sourcing')]"/>
+                <filter name="filter_open" string="En candidature"
+                        domain="[('workflow_stage_id.code', '=', 'open')]"/>
+                <filter name="filter_selection" string="En sélection"
+                        domain="[('workflow_stage_id.code', '=', 'selection')]"/>
+                <separator/>
+                <!-- « Missions à venir » du §5 : le contrat est en cours de
+                     signature, la mission n'a pas démarré. C'est un filtre, pas
+                     une étape — la table de correspondance du CLAUDE.md fait de
+                     SCHEDULED la fin de CONTRACTING. -->
+                <filter name="filter_upcoming" string="Missions à venir"
+                        domain="[('workflow_stage_id.code', 'in', ['awarded', 'contracting'])]"/>
+                <filter name="filter_running" string="Missions en cours"
+                        domain="[('workflow_stage_id.code', '=', 'in_progress')]"/>
+                <filter name="filter_validation" string="En validation"
+                        domain="[('workflow_stage_id.code', 'in', ['delivered', 'accepted'])]"/>
+                <filter name="filter_on_hold" string="Suspendues"
+                        domain="[('workflow_stage_id.code', '=', 'on_hold')]"/>
+                <separator/>
+                <filter name="filter_closed" string="Clôturées"
+                        domain="[('workflow_stage_id.code', '=', 'closed')]"/>
+                <filter name="filter_unsuccessful" string="Sans suite"
+                        domain="[('workflow_stage_id.code', 'in', ['cancelled', 'unsuccessful'])]"/>
+                <separator/>
+                <filter name="filter_active" string="En cours de traitement"
+                        domain="[('workflow_state', '=', 'running')]"/>
+                <!-- `client_id` est un `res.partner`, pas un `res.users` :
+                     `[('client_id', '=', uid)]` comparerait un identifiant de
+                     partenaire à un identifiant d'utilisateur et filtrerait sur
+                     le mauvais enregistrement, silencieusement. On traverse
+                     donc jusqu'aux comptes du contact. -->
+                <filter name="filter_mine" string="Mes appels"
+                        domain="[('client_id.user_ids', 'in', [uid])]"/>
+
+                <!-- `<group name="group_by">` nu : Odoo 19 refuse `expand` et
+                     `string` sur ce nœud, et la vue entière devient invalide au
+                     chargement du module. -->
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                    <filter name="group_type" string="Type de mission"
+                            context="{'group_by': 'mission_type_id'}"/>
+                    <filter name="group_domaine" string="Domaine"
+                            context="{'group_by': 'domaine_id'}"/>
+                    <filter name="group_client" string="Client"
+                            context="{'group_by': 'client_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mission_request" model="ir.actions.act_window">
+        <field name="name">Appels à mission</field>
+        <field name="res_model">opex.mission.request</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_mission_request_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun appel à mission</p>
+            <p>Un appel naît du besoin d'un client, passe par la qualification du
+               cluster, puis par le sourcing — matching ciblé, appel ouvert, ou
+               les deux. Son avancement n'est pas un champ de la fiche : c'est
+               son workflow.</p>
+        </field>
+    </record>
+
+</odoo>

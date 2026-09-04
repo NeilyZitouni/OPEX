@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LES TROIS LISTES DU §34
+
+            Le document en donne trois - client, intervenant, gestionnaire - et
+            chacune est ici une suite d'actions `notify` posées sur les
+            transitions qui produisent l'événement. Aucun `message_post()`
+            métier n'a été ajouté : la question « qui est prévenu, et quand »
+            se règle dans le configurateur, pas dans une méthode.
+
+            Les quinze actions des Extensions 7 à 10 couvraient déjà une partie
+            des trois listes. Celles qui suivent complètent, elles ne
+            remplacent pas.
+
+            CHOIX DU SOUS-TYPE, CAS PAR CAS
+
+            `comment` part par email et touche aussi les followers de
+            l'enregistrement ; `note` reste interne mais atteint quand même son
+            destinataire dans la cloche du portail, parce que
+            `_execute_notify()` passe toujours `partner_ids`.
+
+            La règle appliquée ici : `comment` quand les followers du dossier
+            *sont* le public visé, `note` sinon. Le cas qui l'a imposée est la
+            candidature déposée - l'intervenant est follower de sa propre
+            candidature, et prévenir le client en `comment` lui enverrait un
+            email pour un message qui ne lui est pas destiné.
+        -->
+
+        <!-- Client - « demande reçue » et gestionnaire - « nouvelle demande ».
+             Même transition, deux publics, deux sous-types. -->
+
+        <record id="action_mis_notify_request_received" model="opex.workflow.action">
+            <field name="name">Accuser réception de la demande</field>
+            <field name="code">mission_notify_request_received</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Votre demande d'intervention est enregistrée. Le cluster la qualifie et revient vers vous.</p></field>
+        </record>
+
+        <record id="action_mis_notify_staff_new_request" model="opex.workflow.action">
+            <field name="name">Signaler une nouvelle demande au cluster</field>
+            <field name="code">mission_notify_staff_new_request</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Une nouvelle demande d'intervention attend sa qualification.</p></field>
+        </record>
+
+        <!-- Client - « demande validée ». -->
+        <record id="action_mis_notify_qualified" model="opex.workflow.action">
+            <field name="name">Annoncer la qualification de la demande</field>
+            <field name="code">mission_notify_qualified</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Votre demande est validée. Le cluster ouvre le sourcing des intervenants.</p></field>
+        </record>
+
+        <!-- Gestionnaire - « demande nécessitant une validation ». Les
+             candidatures sont closes, la décision revient au comité. -->
+        <record id="action_mis_notify_decision_due" model="opex.workflow.action">
+            <field name="name">Appeler la décision du comité</field>
+            <field name="code">mission_notify_decision_due</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_decideur'), ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Les candidatures sont closes sur cet appel. La comparaison et l'attribution attendent une décision.</p></field>
+        </record>
+
+        <!-- Candidature déposée : trois publics sur la même transition.
+
+             Le client est prévenu en `note` et non en `comment` : il n'est pas
+             follower de la candidature, mais l'intervenant l'est. En
+             `comment`, le message destiné au client partirait par email au
+             candidat. La cloche du portail le montre quand même au client -
+             `_execute_notify()` passe `partner_ids`, et la seconde source de
+             la cloche lit précisément ce champ. -->
+
+        <record id="action_app_notify_applicant" model="opex.workflow.action">
+            <field name="name">Accuser réception de la candidature</field>
+            <field name="code">application_notify_applicant</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Votre candidature est déposée. Le cluster l'examine et vous tient informé.</p></field>
+        </record>
+
+        <record id="action_app_notify_client" model="opex.workflow.action">
+            <field name="name">Prévenir le client d'une candidature reçue</field>
+            <field name="code">application_notify_client</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Une candidature a été déposée sur votre appel à mission.</p></field>
+        </record>
+
+        <record id="action_app_notify_staff" model="opex.workflow.action">
+            <field name="name">Signaler la candidature au responsable</field>
+            <field name="code">application_notify_staff</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">30</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Une nouvelle candidature attend une qualification.</p></field>
+        </record>
+
+        <!-- Intervenant - « candidature présélectionnée ». -->
+        <record id="action_app_notify_shortlisted" model="opex.workflow.action">
+            <field name="name">Annoncer la présélection</field>
+            <field name="code">application_notify_shortlisted</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Votre candidature est retenue en short-list. La décision d'attribution suivra.</p></field>
+        </record>
+
+        <!-- Intervenant - « candidature refusée ».
+
+             Une seule action pour les trois transitions de refus : le message
+             est le même, et trois copies auraient divergé au premier
+             ajustement de formulation. -->
+        <record id="action_app_notify_rejected" model="opex.workflow.action">
+            <field name="name">Annoncer que la candidature n'est pas retenue</field>
+            <field name="code">application_notify_rejected</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Votre candidature n'a pas été retenue sur cet appel. Le motif figure dans l'historique du dossier.</p></field>
+        </record>
+
+        <!-- Client - « contrat à valider » et intervenant - « contrat
+             disponible ». Le même événement vu des deux côtés : une seule
+             action, deux rôles. -->
+        <record id="action_ctr_notify_available" model="opex.workflow.action">
+            <field name="name">Annoncer que le contrat est à signer</field>
+            <field name="code">contract_notify_available</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client'), ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Le contrat et l'ordre de mission sont disponibles pour signature.</p></field>
+        </record>
+
+        <!-- Client - « livrable à valider ». Le responsable est déjà prévenu
+             par `deliverable_notify_submitted`, posée à l'Extension 8. -->
+        <record id="action_dl_notify_client" model="opex.workflow.action">
+            <field name="name">Prévenir le client qu'un livrable est déposé</field>
+            <field name="code">deliverable_notify_client</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Un livrable de votre mission vient d'être déposé et entre en validation.</p></field>
+        </record>
+
+        <!-- Client et intervenant - « mission terminée ».
+             Gestionnaire - « mission à clôturer ». -->
+
+        <record id="action_mis_notify_accepted" model="opex.workflow.action">
+            <field name="name">Annoncer la fin de la mission</field>
+            <field name="code">mission_notify_accepted</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client'), ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>La mission est terminée : le service fait est validé.</p></field>
+        </record>
+
+        <record id="action_mis_notify_to_close" model="opex.workflow.action">
+            <field name="name">Signaler une mission à clôturer</field>
+            <field name="code">mission_notify_to_close</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="body" type="html"><p>Cette mission est validée et attend sa facturation et sa clôture.</p></field>
+        </record>
+
+        <!-- Client - « évaluation à effectuer ». Les grilles sont ouvertes par
+             le déclencheur de la même transition, à l'Extension 10. -->
+        <record id="action_mis_notify_evaluation_due" model="opex.workflow.action">
+            <field name="name">Demander l'évaluation au client</field>
+            <field name="code">mission_notify_evaluation_due</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">40</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Évaluez l'intervenant ayant réalisé votre mission : la grille est ouverte dans votre espace.</p></field>
+        </record>
+
+    </data>
+
+    <!--
+        LE RATTACHEMENT - HORS DU BLOC `noupdate`
+
+        Les transitions visées ont été créées par les Extensions 1 et 7, dans
+        des blocs `noupdate="1"`. Le drapeau est stocké par enregistrement dans
+        `ir_model_data` : un `<record>` qui les redéfinirait serait ignoré à la
+        mise à jour, sans erreur ni avertissement.
+
+        `Command.link` partout, jamais `Command.set` : plusieurs de ces
+        transitions portent déjà des actions et des conditions posées par les
+        Extensions 7 à 10, et un `set` les retirerait en silence.
+    -->
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_submit')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_notify_request_received')),
+            Command.link(ref('action_mis_notify_staff_new_request')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_start_sourcing')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_notify_qualified')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_close_applications')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_notify_decision_due')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('atr_apply')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_app_notify_applicant')),
+            Command.link(ref('action_app_notify_client')),
+            Command.link(ref('action_app_notify_staff')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('atr_shortlist')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_app_notify_shortlisted')),
+        ]}"/>
+    </function>
+
+    <!-- Les trois refus, une seule action. -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('atr_reject_applied'), ref('atr_reject_screened'),
+                      ref('atr_reject_shortlisted')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_app_notify_rejected')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('ctr_send_to_sign')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_ctr_notify_available')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('dltr_submit')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_dl_notify_client')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_accept_service')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_notify_accepted')),
+            Command.link(ref('action_mis_notify_to_close')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_close')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_notify_evaluation_due')),
+        ]}"/>
+    </function>
+</odoo>

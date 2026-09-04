@@ -894,7 +894,7 @@ class OpexCrowdfundingProject(models.Model):
         l'accompagnement derrière lui. Le module générique le construit avec
         une transition de plus ; ici, c'est une méthode de plus.
 
-        ⚠ Depuis l'ajout du Demo Day (section 18), ce retour ne mène plus
+        Depuis l'ajout du Demo Day (section 18), ce retour ne mène plus
         directement au matching : le projet passe d'abord devant le comité.
         Le nom de la méthode est conservé — le renommer aurait touché la vue,
         les tests et l'historique sans rien apporter.
@@ -957,7 +957,7 @@ class OpexCrowdfundingProject(models.Model):
     def action_run_matching(self):
         """Propose les acteurs financiers compatibles, classés par score.
 
-        ⚠️ Cette méthode **ne fait pas avancer le dossier**, et c'est le point
+        Cette méthode **ne fait pas avancer le dossier**, et c'est le point
         central de la section 10 : « le matching est une recommandation ».
         Elle remplit une liste, le comité en fait ce qu'il veut. Aucun score,
         même à 100, ne déclenche quoi que ce soit.
@@ -1037,9 +1037,7 @@ class OpexCrowdfundingProject(models.Model):
     def _champs_dossier_requis(self):
         """Les champs exigés par le besoin exprimé — le branchement, en un point.
 
-        ═══════════════════════════════════════════════════════════════════
         COÛT D'UN QUATRIÈME TYPE DE BESOIN — pour le document de comparaison
-        ═══════════════════════════════════════════════════════════════════
         Chiffres relevés sur la branche « sponsor » déjà écrite, en comptant
         ses lignes réelles. Ajouter « mécénat », « prêt d'honneur » ou tout
         autre besoin oblige à toucher **cinq fichiers**, par un développeur
@@ -1077,7 +1075,6 @@ class OpexCrowdfundingProject(models.Model):
         d'une branche par quelqu'un qui connaît déjà le module. Le benchmark
         de l'Extension 12 y ajoutera le temps réel, chronométré — face à zéro
         ligne et zéro redéploiement côté module générique.
-        ═══════════════════════════════════════════════════════════════════
         """
         self.ensure_one()
         if self.besoin_type not in self._CHAMPS_DOSSIER:
@@ -1387,7 +1384,7 @@ class OpexCrowdfundingProject(models.Model):
         """Les cinq jalons de la section 16, avec leur avancement.
 
         Renvoie une liste de `{'label', 'status'}`, `status` valant `done`,
-        `current` ou `todo` — de quoi rendre les ✓ ● ○ sans que le gabarit
+        `current` ou `todo` — de quoi rendre les sans que le gabarit
         n'ait à connaître un seul code d'état.
         """
         self.ensure_one()
@@ -1439,7 +1436,7 @@ class OpexCrowdfundingProject(models.Model):
         porteur n'est pas le dossier d'instruction du comité. L'audit complet,
         lui, reste dans le fil du projet côté backend.
 
-        ⚠ Les valeurs de suivi sont écrites par Odoo au **précommit**
+        Les valeurs de suivi sont écrites par Odoo au **précommit**
         (`_track_finalize`), pas au flush. En production chaque requête HTTP
         commite, donc elles sont là ; dans un test qui ne commite jamais, il
         faut appeler `env.cr.precommit.run()` — sinon cet historique paraît

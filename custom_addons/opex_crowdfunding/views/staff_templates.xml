@@ -4,7 +4,7 @@
     <!--
         Espace de traitement du Smart Crowdfunding, côté site.
 
-        ⚠ Écran de **démonstration**, pas remplacement du back-office : file de
+        Écran de **démonstration**, pas remplacement du back-office : file de
         travail et décisions à un bouton. Ce qu'il ne couvre pas — matching,
         accompagnement, closing, chatter, filtres, saisie riche — est listé dans
         le CLAUDE.md du module, et chaque fiche porte un lien de sortie.
@@ -102,7 +102,7 @@
                 <div t-if="error" class="alert alert-danger mt-3" role="alert"
                      t-out="error"/>
 
-                <!-- ═══ Le dossier, en lecture seule ═══ -->
+                <!-- Le dossier, en lecture seule -->
                 <div class="card mt-3">
                     <div class="card-body">
                         <dl class="row mb-0">
@@ -134,7 +134,7 @@
                     </div>
                 </div>
 
-                <!-- ═══ Les décisions ouvertes à ce rôle, à cette étape ═══ -->
+                <!-- Les décisions ouvertes à ce rôle, à cette étape -->
                 <h5 class="mt-4">Décisions</h5>
                 <div t-if="not actions" class="alert alert-light" role="status">
                     Aucune action ne vous revient sur ce dossier à son étape
@@ -165,7 +165,7 @@
                     </form>
                 </t>
 
-                <!-- ═══ Historique ═══
+                <!-- Historique
                      Titre explicite plutôt que « Historique » tout court :
                      d'une part `/staff/innovation` a déjà une section de ce
                      nom, d'autre part ce n'est PAS le journal d'instruction

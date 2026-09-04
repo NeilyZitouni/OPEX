@@ -3,9 +3,7 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             SMART CROWDFUNDING — la seconde instance du moteur
-            ═══════════════════════════════════════════════════════════════
 
             Le processus du document « Instance 01 — Smart Crowdfunding »,
             sections 4 à 15, configuré **entièrement en données**.
@@ -14,7 +12,7 @@
             C'est le point : le même moteur qui fait tourner le parcours
             d'innovation à quinze étapes fait tourner celui-ci, sans le savoir.
 
-            ⚠ Codes d'étapes **communs avec l'implémentation « texto »** de
+            Codes d'étapes **communs avec l'implémentation « texto »** de
             Kassab. C'est ce qui rendra la comparaison finale lisible sans
             ambiguïté : les deux modules parlent du même processus avec les
             mêmes mots.
@@ -35,7 +33,7 @@
                elle qui distingue ce processus d'une séquence.
         -->
 
-        <!-- ══════════ Le rôle propre à ce processus ══════════ -->
+        <!-- Le rôle propre à ce processus -->
 
         <record id="role_controle_qualite" model="opex.workflow.role">
             <field name="name">Contrôle Qualité</field>
@@ -43,7 +41,7 @@
             <field name="description">Quality Gate opérationnel : complétude, cohérence, conformité, anomalies. Le document prévoit qu'un agent IA le remplace à terme « sans modification du workflow métier » — c'est possible ici parce que le rôle est une donnée, pas du code.</field>
         </record>
 
-        <!-- ══════════ Conditions réelles ══════════ -->
+        <!-- Conditions réelles -->
 
         <record id="scf_rule_dossier_minimal" model="opex.workflow.rule">
             <field name="name">Dépôt express complet</field>
@@ -66,7 +64,7 @@
             <field name="message">Le montant recherché doit être renseigné avant le matching financier.</field>
         </record>
 
-        <!-- ══════════ Actions réelles ══════════ -->
+        <!-- Actions réelles -->
 
         <record id="scf_action_alerte_ceo" model="opex.workflow.action">
             <field name="name">Alerter le CEO</field>
@@ -86,16 +84,14 @@
         </record>
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LES QUATRE DESTINATAIRES INTERNES
-            ═══════════════════════════════════════════════════════════════
 
             Seize transitions de ce processus ne notifiaient personne : un
             dossier arrivait dans la file d'un rôle sans que ce rôle l'apprenne.
             Quatre actions suffisent à les couvrir, parce que ce qui change
             d'une transition à l'autre est le **destinataire**, pas le message.
 
-            ⚠ Toutes en `note`. Un `mt_comment` part aussi aux followers de
+            Toutes en `note`. Un `mt_comment` part aussi aux followers de
             l'enregistrement, dont le porteur : de la coordination interne
             postée en `comment` lui arriverait. C'est le bug déjà corrigé une
             fois sur ce projet. Le porteur, lui, est servi par
@@ -112,7 +108,7 @@
         </record>
 
         <!--
-            ⚠ Deux rôles visés, et c'est délibéré.
+            Deux rôles visés, et c'est délibéré.
 
             `role_controle_qualite` n'a **pas de groupe** : personne ne le porte
             en permanence, il s'attribue dossier par dossier par une ligne
@@ -172,7 +168,7 @@
             <field name="matching_limit">5</field>
         </record>
 
-        <!-- ══════════ La définition ══════════ -->
+        <!-- La définition -->
 
         <record id="wf_smart_crowdfunding" model="opex.workflow.definition">
             <field name="name">Smart Crowdfunding</field>
@@ -181,7 +177,7 @@
             <field name="description">Instance 01 du CEO Smart Workflow. Progressive commitment : on ne demande à chaque étape que le minimum nécessaire pour décider de la suivante. Configuré intégralement en données, sans une ligne de Python ajoutée au moteur.</field>
         </record>
 
-        <!-- ══════════ Les étapes ══════════ -->
+        <!-- Les étapes -->
 
         <record id="scf_depot_express" model="opex.workflow.stage">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -316,7 +312,7 @@
             <field name="sequence">140</field>
         </record>
 
-        <!-- ══════════ ① Dépôt express → Pré-analyse ══════════ -->
+        <!-- 1. Dépôt express → Pré-analyse -->
 
         <record id="scf_tr_presenter" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -332,7 +328,7 @@
             <field name="condition_ids" eval="[Command.set([ref('scf_rule_dossier_minimal')])]"/>
         </record>
 
-        <!-- ══════════ ② Pré-analyse — QUATRE sorties ══════════ -->
+        <!-- 2. Pré-analyse — QUATRE sorties -->
 
         <record id="scf_tr_go" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -393,7 +389,7 @@
             <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ③ Dossier progressif → Quality Gate ══════════ -->
+        <!-- 3. Dossier progressif → Quality Gate -->
 
         <record id="scf_tr_soumettre_dossier" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -407,7 +403,7 @@
             <field name="action_ids" eval="[Command.set([ref('scf_action_tache_qualite')])]"/>
         </record>
 
-        <!-- ══════════ ④ Quality Gate — TROIS sorties ══════════ -->
+        <!-- 4. Quality Gate — TROIS sorties -->
 
         <record id="scf_tr_conforme" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -432,7 +428,7 @@
         </record>
 
         <!--
-            ⚠ La troisième sortie ne fait pas avancer le dossier.
+            La troisième sortie ne fait pas avancer le dossier.
 
             « Alerte → notification CEO, dossier maintenu en quality_gate. » La
             transition boucle donc sur son étape de départ. Le moteur n'a rien
@@ -462,7 +458,7 @@
             <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑤ Étude CEO — les trois routes de la section 9 ══════════ -->
+        <!-- 5. Étude CEO — les trois routes de la section 9 -->
 
         <record id="scf_tr_investment_ready" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -499,7 +495,7 @@
             <field name="action_ids" eval="[Command.set([ref('scf_action_informer_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑦ La boucle Accompagnement → Réévaluation → Matching ══════════ -->
+        <!-- 7. La boucle Accompagnement → Réévaluation → Matching -->
 
         <record id="scf_tr_fin_accompagnement" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -521,7 +517,7 @@
             <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
             <field name="condition_ids" eval="[Command.set([ref('scf_rule_montant_defini')])]"/>
             <!--
-                ⚠ **Pas d'action de matching ici**, et c'est délibéré.
+                **Pas d'action de matching ici**, et c'est délibéré.
 
                 Le § 10 dit que le matching est une recommandation que le CEO
                 « valide, modifie, exclut, complète ». Sur la route B, la
@@ -573,7 +569,7 @@
             <field name="requires_comment" eval="True"/>
         </record>
 
-        <!-- ══════════ ⑧ ⑨ ⑩ Mise en relation, décision, closing ══════════ -->
+        <!-- 8. 9. 10. Mise en relation, décision, closing -->
 
         <record id="scf_tr_mise_en_relation" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
@@ -598,7 +594,7 @@
         <record id="scf_tr_financeur_interesse" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
             <field name="code">financeur_interesse</field>
-            <field name="name">★ Intéressé — aller au closing</field>
+            <field name="name">Intéressé — aller au closing</field>
             <field name="source_stage_id" ref="scf_decision_financeur"/>
             <field name="target_stage_id" ref="scf_closing"/>
             <field name="sequence">200</field>
@@ -623,7 +619,7 @@
         <record id="scf_tr_financeur_non" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_smart_crowdfunding"/>
             <field name="code">financeur_non_interesse</field>
-            <field name="name">✕ Non intéressé</field>
+            <field name="name">Non intéressé</field>
             <field name="source_stage_id" ref="scf_decision_financeur"/>
             <field name="target_stage_id" ref="scf_matching_financier"/>
             <field name="sequence">220</field>
@@ -632,9 +628,9 @@
         </record>
 
         <!--
-            ══════════ Critères de matching — § 10 ══════════
+             Critères de matching — § 10
 
-            ⚠ Les critères sont attachés à **une définition**. Ceux du parcours
+            Les critères sont attachés à **une définition**. Ceux du parcours
             d'innovation ne servent donc pas ici : sans ce bloc, l'action
             « Rechercher des acteurs financiers » se déclenche, ne trouve aucun
             critère, échoue, et — conformément à la règle de l'Extension 4 —
@@ -722,9 +718,7 @@
         échouer le déploiement au lieu de se découvrir en démonstration.
     -->
     <!--
-        ═══════════════════════════════════════════════════════════════
         Le branchement des seize transitions muettes
-        ═══════════════════════════════════════════════════════════════
 
         Par `<function>` et `Command.link`, pour les trois raisons habituelles :
         les transitions portent le drapeau `noupdate` de leur création dans le
@@ -766,7 +760,7 @@
         son dossier part en accompagnement, il doit le savoir en même temps que
         l'expert. Les suivantes marquent une avancée qu'il ne voyait pas.
 
-        ⚠ `scf_tr_reevaluation_ok` est **volontairement absente** de cette
+        `scf_tr_reevaluation_ok` est **volontairement absente** de cette
         liste, et il ne faut pas l'y remettre.
 
         L'arc qui mène de la réévaluation au matching doit rester **sans

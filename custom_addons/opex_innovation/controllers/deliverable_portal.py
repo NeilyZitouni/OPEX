@@ -10,7 +10,7 @@ from odoo.addons.portal.controllers.portal import CustomerPortal
 class DeliverablePortal(CustomerPortal):
     """Sections 23 et 24 — le porteur dépose, l'expert valide.
 
-    ⚠ **Le contrôle d'accès est une seule fonction**, `_deliverable()`, appelée
+    **Le contrôle d'accès est une seule fonction**, `_deliverable()`, appelée
     par les trois routes. Elle interroge `instance._has_access()`, qui est la
     seule fonction de visibilité du moteur. Une route qui referait sa propre
     requête finirait par oublier une condition — et c'est celle-là qui recevrait
@@ -88,9 +88,9 @@ class DeliverablePortal(CustomerPortal):
     @http.route(['/my/innovation/deliverable/<int:deliverable_id>/decide'],
                 type='http', auth='user', website=True, methods=['POST'])
     def portal_deliverable_decide(self, deliverable_id, **post):
-        """✓ Valider ou ↻ Demander une correction — section 24.
+        """Valider ou Demander une correction — section 24.
 
-        ⚠ Le contrôleur ne vérifie **pas** que l'utilisateur est expert : c'est
+        Le contrôleur ne vérifie **pas** que l'utilisateur est expert : c'est
         `_check_transition_allowed()` du moteur qui tranche, et lui seul. Un
         second contrôle ici finirait par dire autre chose que celui-là.
         """

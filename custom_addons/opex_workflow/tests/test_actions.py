@@ -86,7 +86,7 @@ class TestActions(WorkflowCase):
         self.assertIn("attend votre contrôle", messages.sorted('id')[-1].body)
 
     def test_notify_defaults_to_internal_note(self):
-        """⚠ Le défaut est `mt_note`. Un message interne posté en `mt_comment`
+        """Le défaut est `mt_note`. Un message interne posté en `mt_comment`
         part par email chez le porteur — bug déjà payé sur le module précédent.
         """
         action = self.Action.create({
@@ -329,7 +329,7 @@ class TestActions(WorkflowCase):
             % ", ".join(unimplemented))
 
     # ------------------------------------------------------------
-    # ⚠ La règle : un échec ne rollback pas la transition
+    # La règle : un échec ne rollback pas la transition
     # ------------------------------------------------------------
 
     def test_failing_action_does_not_roll_back_the_transition(self):
@@ -373,8 +373,8 @@ class TestActions(WorkflowCase):
         # L'action valide a bien produit son effet malgré l'échec de la première.
         self.assertEqual(self.record.color, 77)
         note = self.instance.history_ids.sorted('id')[-1].conditions_note
-        self.assertIn("✗ Cassée", note)
-        self.assertIn("✓ Valide", note)
+        self.assertIn("Cassée", note)
+        self.assertIn("Valide", note)
 
     def test_action_with_a_failing_expression_leaves_the_field_untouched(self):
         """Une expression qui lève n'écrit rien et ne bloque pas la transition."""

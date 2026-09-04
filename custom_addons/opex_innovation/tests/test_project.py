@@ -54,7 +54,7 @@ class TestInnovationProject(TransactionCase):
     # ------------------------------------------------------------
 
     def test_the_project_has_no_state_field(self):
-        """⚠ LA règle. Un `state` ici et la démonstration s'effondre."""
+        """LA règle. Un `state` ici et la démonstration s'effondre."""
         self.assertNotIn('state', self.Project._fields)
         self.assertIn('workflow_stage_id', self.Project._fields)
         self.assertIn('workflow_instance_id', self.Project._fields)
@@ -236,7 +236,7 @@ class TestInnovationProject(TransactionCase):
         self.assertIn("résumé", str(error.exception).lower())
 
     # ------------------------------------------------------------
-    # ⚠ LE TEST DE FIN D'EXTENSION
+    # LE TEST DE FIN D'EXTENSION
     # ------------------------------------------------------------
 
     def test_full_path_from_draft_to_closed_through_remediation(self):
@@ -294,7 +294,7 @@ class TestInnovationProject(TransactionCase):
         # L'audit porte le parcours entier, boucles comprises.
         history = project.workflow_instance_id.history_ids
         self.assertGreaterEqual(len(history), 16)
-        # ⚠ Pas de `mapped('to_stage_id.code')` : `to_stage_id` est un Many2one,
+        # Pas de `mapped('to_stage_id.code')` : `to_stage_id` est un Many2one,
         # l'intermédiaire est donc un **recordset**, qui déduplique. Le passage
         # deux fois par la même étape y devient invisible — exactement ce que
         # ce test cherche à constater.

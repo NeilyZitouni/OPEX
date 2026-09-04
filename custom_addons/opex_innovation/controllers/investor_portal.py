@@ -22,7 +22,7 @@ class InvestorOpportunityPortal(MatchingCandidatePortal):
     """
 
     def _my_proposals(self):
-        """⚠ Renforcement du filtre de l'Extension 15.
+        """Renforcement du filtre de l'Extension 15.
 
         La version précédente ne consultait que la table des candidats :
         `partner_id` de l'utilisateur, et `state = 'accepted'`. Cela marche
@@ -59,7 +59,7 @@ class InvestorOpportunityPortal(MatchingCandidatePortal):
     def portal_opportunity_detail(self, candidate_id, **kw):
         """Bouton [Voir le projet] de la section 26.
 
-        ⚠ Le contrôle est **serveur**, avant tout rendu. Un gabarit qui
+        Le contrôle est **serveur**, avant tout rendu. Un gabarit qui
         masquerait le contenu à l'affichage laisserait la page se construire
         avec les données dedans : il suffit de lire la source. Ici, un
         investisseur à qui le projet n'est pas proposé est renvoyé avant même
@@ -107,7 +107,7 @@ class FinalEvaluationPortal(CustomerPortal):
         error = None
         if request.httprequest.method == 'POST':
             try:
-                # ⚠ `side` n'est pas lu dans `post`. Il est déduit de
+                # `side` n'est pas lu dans `post`. Il est déduit de
                 # l'identité, côté serveur. Un champ caché dans le formulaire
                 # permettrait à un porteur de déposer l'avis du cluster sur
                 # l'accompagnement qu'il a lui-même reçu.

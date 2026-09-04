@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_mission_evaluation_form" model="ir.ui.view">
+        <field name="name">opex.mission.evaluation.form</field>
+        <field name="model">opex.mission.evaluation</field>
+        <field name="arch" type="xml">
+            <form string="Évaluation de mission">
+                <header>
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <!-- La règle 7 se lit avant le clic, pas après le refus. -->
+                    <div class="alert alert-warning" role="alert"
+                         invisible="mission_validee">
+                        La validation finale de la mission n'a pas été
+                        prononcée. L'évaluation ne pourra pas être rendue tant
+                        que ce n'est pas le cas (règle 7 du §39).
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h5 class="text-muted">
+                            <field name="workflow_stage_label" readonly="1"/>
+                        </h5>
+                    </div>
+
+                    <group>
+                        <group string="Objet">
+                            <field name="mission_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="client_id" readonly="1"/>
+                            <field name="evaluateur" readonly="1"/>
+                        </group>
+                        <group string="Résultat">
+                            <field name="note_globale" readonly="1"/>
+                            <field name="grille_complete" readonly="1"/>
+                            <field name="mission_validee" invisible="1"/>
+                            <field name="is_validated" invisible="1"/>
+                            <field name="is_public"/>
+                            <field name="rating_id" readonly="1"
+                                   invisible="not rating_id"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Grille du client — §30" name="grille_client"
+                              invisible="evaluateur != 'client'">
+                            <group>
+                                <field name="note_qualite"/>
+                                <field name="note_delais"/>
+                                <field name="note_expertise"/>
+                                <field name="note_communication"/>
+                                <field name="note_pertinence"/>
+                                <field name="note_satisfaction"/>
+                            </group>
+                            <div class="text-muted">
+                                Chaque critère se note de 1 à 5. Zéro signifie
+                                « pas encore noté » et empêche de soumettre.
+                            </div>
+                        </page>
+
+                        <page string="Grille du cluster — §31" name="grille_cluster"
+                              invisible="evaluateur != 'cluster'">
+                            <group>
+                                <field name="note_contrat"/>
+                                <field name="note_delais"/>
+                                <field name="note_livrables"/>
+                                <field name="note_professionnalisme"/>
+                                <field name="note_communication"/>
+                                <field name="note_procedures"/>
+                            </group>
+                        </page>
+
+                        <page string="Commentaire" name="commentaire">
+                            <field name="commentaire" nolabel="1"
+                                   placeholder="Ce que les notes ne disent pas."/>
+                            <div class="text-muted">
+                                Le commentaire reste confidentiel. La case
+                                « Visible dans l'historique public » n'ouvre
+                                que la note globale (§33).
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mission_evaluation_list" model="ir.ui.view">
+        <field name="name">opex.mission.evaluation.list</field>
+        <field name="model">opex.mission.evaluation</field>
+        <field name="arch" type="xml">
+            <list string="Évaluations">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="partner_id"/>
+                <field name="evaluateur"/>
+                <field name="note_globale" avg="Moyenne"/>
+                <field name="is_public" optional="show"/>
+                <field name="workflow_stage_label" string="Étape"/>
+            </list>
+        </field>
+    </record>
+
+    <!-- Les champs d'une vue search se déclarent tous avant les filtres, et le
+         groupe de regroupement s'écrit nu : il refuse `expand` et `string`. -->
+    <record id="view_mission_evaluation_search" model="ir.ui.view">
+        <field name="name">opex.mission.evaluation.search</field>
+        <field name="model">opex.mission.evaluation</field>
+        <field name="arch" type="xml">
+            <search string="Évaluations">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="partner_id"/>
+
+                <filter name="client" string="Grille client"
+                        domain="[('evaluateur', '=', 'client')]"/>
+                <filter name="cluster" string="Grille cluster"
+                        domain="[('evaluateur', '=', 'cluster')]"/>
+                <separator/>
+                <filter name="a_rendre" string="À rendre"
+                        domain="[('workflow_stage_id.code', 'in', ['pending', 'returned'])]"/>
+                <filter name="a_valider" string="À valider"
+                        domain="[('workflow_stage_id.code', '=', 'submitted')]"/>
+                <filter name="validees" string="Validées"
+                        domain="[('workflow_stage_id.code', '=', 'validated')]"/>
+
+                <group name="group_by">
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_evaluateur" string="Évaluateur"
+                            context="{'group_by': 'evaluateur'}"/>
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mission_evaluation" model="ir.actions.act_window">
+        <field name="name">Évaluations</field>
+        <field name="res_model">opex.mission.evaluation</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucune évaluation</p>
+            <p>
+                Les grilles s'ouvrent automatiquement à la clôture d'une
+                mission, une par intervenant et par évaluateur. Elles ne se
+                créent pas à la main.
+            </p>
+        </field>
+    </record>
+
+    <!-- Greffe sur la fiche de l'appel -->
+
+    <record id="view_mission_request_form_evaluation" model="ir.ui.view">
+        <field name="name">opex.mission.request.form.evaluation</field>
+        <field name="model">opex.mission.request</field>
+        <field name="inherit_id" ref="view_mission_request_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_evaluations" type="object"
+                        class="oe_stat_button" icon="fa-star"
+                        invisible="evaluation_count == 0">
+                    <field name="evaluation_count" widget="statinfo"
+                           string="Évaluations"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Évaluations" name="evaluations"
+                      invisible="evaluation_count == 0">
+                    <div class="alert alert-info" role="alert"
+                         invisible="evaluation_pending_count == 0">
+                        <strong><field name="evaluation_pending_count"
+                                       class="oe_inline" readonly="1"/></strong>
+                        évaluation(s) n'ont pas encore été validées. La
+                        réputation de l'intervenant ne les compte pas.
+                    </div>
+
+                    <field name="evaluations_validees" invisible="1"/>
+                    <field name="evaluation_ids">
+                        <list>
+                            <field name="name"/>
+                            <field name="partner_id"/>
+                            <field name="evaluateur"/>
+                            <field name="note_globale" avg="Moyenne"/>
+                            <field name="is_public"/>
+                            <field name="workflow_stage_label" string="Étape"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Greffe sur le profil expert : les cinq indicateurs du §32 -->
+
+    <record id="view_expert_profile_form_reputation" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.form.reputation</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <!-- Greffé sur la vue du Module 2 directement, comme celle de
+             l'Extension 3 : deux héritiers frères plutôt qu'une chaîne, pour
+             qu'aucun des deux ne dépende de la structure interne de l'autre. -->
+        <field name="inherit_id" ref="opex_innovation.view_expert_profile_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//notebook" position="inside">
+                <page string="Réputation — §32" name="reputation">
+                    <group>
+                        <group string="Indicateurs">
+                            <field name="reputation_score"/>
+                            <field name="rating_count"/>
+                            <field name="mission_realisee_count"/>
+                            <field name="mission_terminee_count"/>
+                            <field name="satisfaction_rate"/>
+                            <field name="delay_compliance_rate"/>
+                        </group>
+                    </group>
+                    <div class="text-muted">
+                        Les volumes comptent les missions réellement réalisées,
+                        c'est-à-dire celles qui ont au moins démarré. Une
+                        candidature retenue puis annulée n'y figure pas.
+                    </div>
+
+                    <separator string="Évaluations reçues"/>
+                    <field name="expert_rating_ids" readonly="1">
+                        <list>
+                            <field name="date"/>
+                            <field name="mission_id"/>
+                            <field name="source"/>
+                            <field name="note"/>
+                            <field name="respect_delais"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <menuitem id="menu_mission_evaluation"
+              name="Évaluations"
+              parent="menu_intervenants_root"
+              action="action_mission_evaluation"
+              sequence="88"
+              groups="group_mission_manager,opex_membership.group_secretariat"/>
+
+</odoo>

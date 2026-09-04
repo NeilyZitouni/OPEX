@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        L'ECRAN DE CONFIGURATION
+
+        Aucune clé n'est posée ici, ni dans aucun autre fichier de données.
+        Ce fichier est versionné : ce qu'on y écrit reste dans l'historique
+        Git même après avoir été retiré. Les trois paramètres sont saisis à
+        l'écran et vivent dans `ir.config_parameter`.
+    -->
+
+    <record id="view_ai_settings" model="ir.ui.view">
+        <field name="name">res.config.settings.opex.ai</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//form" position="inside">
+                <app string="Assistance IA" name="opex_ai"
+                     logo="/base/static/img/icons/settings.png">
+
+                    <block title="Fournisseur" name="opex_ai_provider_block">
+                        <setting string="Fournisseur et modèle"
+                                 help="Le service n'est appelé que si une clé est enregistrée. Sans clé, le module fonctionne en saisie manuelle et aucun parcours utilisateur n'est bloqué.">
+                            <div class="content-group">
+                                <div class="row mt-2">
+                                    <label for="opex_ai_provider"
+                                           class="col-lg-3 o_light_label"/>
+                                    <field name="opex_ai_provider"/>
+                                </div>
+                                <div class="row">
+                                    <label for="opex_ai_model"
+                                           class="col-lg-3 o_light_label"/>
+                                    <field name="opex_ai_model"
+                                           placeholder="gemini-3.6-flash"/>
+                                </div>
+                                <div class="row">
+                                    <label for="opex_ai_api_key"
+                                           class="col-lg-3 o_light_label"/>
+                                    <field name="opex_ai_api_key"
+                                           password="True"
+                                           placeholder="Collez la clé ici"/>
+                                </div>
+                            </div>
+                        </setting>
+
+                        <setting string="Vérifier"
+                                 help="Enregistre les valeurs ci-dessus, puis fait un aller-retour réel avec le fournisseur. L'essai vérifie la chaîne entière : réseau, authentification, modèle, et format de réponse.">
+                            <field name="opex_ai_configured" invisible="1"/>
+                            <button name="action_opex_ai_test_connection"
+                                    type="object" string="Tester la connexion"
+                                    class="btn-primary"/>
+                            <button name="action_opex_ai_view_logs"
+                                    type="object" string="Journal des appels"
+                                    class="btn-link"/>
+                            <div class="text-muted mt-2"
+                                 invisible="opex_ai_configured">
+                                Aucune clé enregistrée : l'assistance IA est
+                                inactive, et c'est un état de fonctionnement
+                                normal.
+                            </div>
+                        </setting>
+                    </block>
+                </app>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+        LE JOURNAL
+
+        En lecture seule de bout en bout. Une ligne de journal qu'on peut
+        modifier ne prouve rien - c'est le même raisonnement que sur les
+        versions de livrable de l'Extension 8 et sur l'historique du moteur.
+    -->
+
+    <record id="view_ai_call_log_list" model="ir.ui.view">
+        <field name="name">opex.ai.call.log.list</field>
+        <field name="model">opex.ai.call.log</field>
+        <field name="arch" type="xml">
+            <list string="Appels à l'IA" create="false" edit="false"
+                  decoration-danger="not success"
+                  decoration-warning="success and attempts > 1">
+                <field name="date"/>
+                <field name="purpose"/>
+                <field name="prompt_version" optional="show"/>
+                <field name="model"/>
+                <field name="success"/>
+                <field name="error_type"/>
+                <field name="attempts"/>
+                <field name="duration_ms" sum="Total"/>
+                <field name="prompt_tokens" sum="Total"/>
+                <field name="completion_tokens" sum="Total"/>
+                <field name="cost_estimate" sum="Coût estimé"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_call_log_form" model="ir.ui.view">
+        <field name="name">opex.ai.call.log.form</field>
+        <field name="model">opex.ai.call.log</field>
+        <field name="arch" type="xml">
+            <form string="Appel à l'IA" create="false" edit="false">
+                <sheet>
+                    <group>
+                        <group string="Appel">
+                            <field name="date"/>
+                            <field name="purpose"/>
+                            <field name="prompt_version"/>
+                            <field name="provider"/>
+                            <field name="model"/>
+                            <field name="duration_ms"/>
+                            <field name="attempts"/>
+                        </group>
+                        <group string="Consommation">
+                            <field name="prompt_tokens"/>
+                            <field name="completion_tokens"/>
+                            <field name="total_tokens"/>
+                            <field name="cost_estimate"/>
+                        </group>
+                    </group>
+                    <group string="Issue">
+                        <field name="success"/>
+                        <field name="error_type" invisible="success"/>
+                        <field name="error_message" invisible="success"/>
+                    </group>
+                    <div class="text-muted">
+                        Ni le prompt ni la réponse ne sont conservés : un
+                        document passé au service contient des données
+                        personnelles, et un journal de supervision n'est pas
+                        un endroit où les garder.
+                    </div>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--
+        Les champs d'une vue search se déclarent tous avant les filtres, et le
+        groupe de regroupement s'écrit nu : il refuse `expand` et `string`.
+    -->
+    <record id="view_ai_call_log_search" model="ir.ui.view">
+        <field name="name">opex.ai.call.log.search</field>
+        <field name="model">opex.ai.call.log</field>
+        <field name="arch" type="xml">
+            <search string="Appels à l'IA">
+                <field name="purpose"/>
+                <field name="model"/>
+                <field name="error_message"/>
+
+                <filter name="failed" string="Échecs"
+                        domain="[('success', '=', False)]"/>
+                <filter name="retried" string="Ont été retentés"
+                        domain="[('attempts', '&gt;', 1)]"/>
+                <separator/>
+                <filter name="today" string="Aujourd'hui"
+                        domain="[('date', '&gt;=', datetime.datetime.combine(context_today(), datetime.time(0,0,0)))]"/>
+
+                <group name="group_by">
+                    <filter name="group_purpose" string="Objet"
+                            context="{'group_by': 'purpose'}"/>
+                    <filter name="group_error" string="Type d'échec"
+                            context="{'group_by': 'error_type'}"/>
+                    <filter name="group_model" string="Modèle"
+                            context="{'group_by': 'model'}"/>
+                    <filter name="group_date" string="Jour"
+                            context="{'group_by': 'date:day'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_ai_call_log" model="ir.actions.act_window">
+        <field name="name">Journal des appels à l'IA</field>
+        <field name="res_model">opex.ai.call.log</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun appel enregistré</p>
+            <p>
+                Chaque appel au service d'IA laisse une ligne ici, qu'il ait
+                réussi ou échoué. C'est ce qui permettra de savoir pourquoi
+                une extraction n'a rien donné, et où part le budget.
+            </p>
+        </field>
+    </record>
+
+    <!-- ══════════ LES PROMPTS ══════════
+
+         Le fichier de données est la référence : ces écrans servent à
+         essayer une reformulation, pas à décider. Une retouche faite ici est
+         écrasée à la prochaine mise à jour du module, et c'est voulu.
+    -->
+
+    <record id="view_ai_prompt_list" model="ir.ui.view">
+        <field name="name">opex.ai.prompt.list</field>
+        <field name="model">opex.ai.prompt</field>
+        <field name="arch" type="xml">
+            <list string="Prompts">
+                <field name="code"/>
+                <field name="name"/>
+                <field name="version"/>
+                <field name="expected_keys" optional="show"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_ai_prompt_form" model="ir.ui.view">
+        <field name="name">opex.ai.prompt.form</field>
+        <field name="model">opex.ai.prompt</field>
+        <field name="arch" type="xml">
+            <form string="Prompt">
+                <header>
+                    <button name="action_preview" type="object"
+                            string="Aperçu du rendu" class="btn-secondary"/>
+                </header>
+                <sheet>
+                    <widget name="web_ribbon" title="Archivé" bg_color="text-bg-danger"
+                            invisible="active"/>
+                    <div class="oe_title">
+                        <label for="code"/>
+                        <h1><field name="code" placeholder="cv_extraction"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="version"/>
+                            <field name="active" invisible="1"/>
+                        </group>
+                        <group>
+                            <field name="expected_keys"
+                                   placeholder="nom, competences, experiences"/>
+                        </group>
+                    </group>
+                    <separator string="Corps du prompt"/>
+                    <field name="body" nolabel="1"
+                           placeholder="Les variables s'écrivent {entre_accolades}."/>
+                    <div class="text-muted">
+                        Les accolades d'un exemple JSON ne sont pas touchées :
+                        seules les variables en minuscules,
+                        <code>{comme_ceci}</code>, sont remplacées. Une
+                        variable non fournie fait refuser le rendu plutôt que
+                        d'envoyer l'accolade au modèle.
+                    </div>
+                    <separator string="À quoi il sert"/>
+                    <field name="description" nolabel="1"/>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_ai_prompt" model="ir.actions.act_window">
+        <field name="name">Prompts d'assistance IA</field>
+        <field name="res_model">opex.ai.prompt</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun prompt</p>
+            <p>
+                Les prompts sont livrés en données avec le module. Cet écran
+                sert à les lire et à essayer une reformulation ; le fichier
+                versionné reste la référence.
+            </p>
+        </field>
+    </record>
+
+    <!--
+        LES MENUS
+
+        Sous Configuration, et réservés à l'administrateur. Ce module n'a pas
+        de menu racine à lui : ce n'est pas une application, c'est un service.
+        Lui donner une icône dans le lanceur laisserait croire qu'il y a
+        quelque chose à y faire.
+    -->
+
+    <menuitem id="menu_ai_root"
+              name="Assistance IA"
+              parent="base.menu_administration"
+              sequence="95"
+              groups="base.group_system"/>
+
+    <menuitem id="menu_ai_prompt"
+              name="Prompts"
+              parent="menu_ai_root"
+              action="action_ai_prompt"
+              sequence="10"/>
+
+    <menuitem id="menu_ai_call_log"
+              name="Journal des appels"
+              parent="menu_ai_root"
+              action="action_ai_call_log"
+              sequence="20"/>
+
+</odoo>

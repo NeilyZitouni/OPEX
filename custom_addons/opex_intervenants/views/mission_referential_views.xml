@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+         TYPES DE MISSION
+          -->
+
+    <record id="view_mission_type_list" model="ir.ui.view">
+        <field name="name">opex.mission.type.list</field>
+        <field name="model">opex.mission.type</field>
+        <field name="arch" type="xml">
+            <list string="Types de mission" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <!-- Rendu visible en liste, et pas relégué au formulaire : c'est
+                     le réglage qui décide si la règle 4 du §39 s'applique, et il
+                     doit se lire d'un coup d'œil sur les six types. -->
+                <field name="multi_intervenants" widget="boolean_toggle"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mission_type_form" model="ir.ui.view">
+        <field name="name">opex.mission.type.form</field>
+        <field name="model">opex.mission.type</field>
+        <field name="arch" type="xml">
+            <form string="Type de mission">
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" placeholder="Audit"/></h1>
+                    </div>
+                    <group>
+                        <group>
+                            <field name="code" placeholder="audit"/>
+                            <field name="sequence"/>
+                            <field name="active"/>
+                        </group>
+                        <group>
+                            <field name="multi_intervenants"/>
+                        </group>
+                    </group>
+                    <group string="Description">
+                        <field name="description" nolabel="1"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_mission_type" model="ir.actions.act_window">
+        <field name="name">Types de mission</field>
+        <field name="res_model">opex.mission.type</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Définissez les types d'intervention</p>
+            <p>Audit, conseil, expertise, formation, coaching, mentoring… Cochez
+               « Plusieurs intervenants autorisés » sur les types qui peuvent
+               mobiliser plus d'une personne : c'est ce réglage qui lève la
+               règle « une seule candidature retenue par appel ».</p>
+        </field>
+    </record>
+
+    <!--
+         DOMAINES D'EXPERTISE
+          -->
+
+    <record id="view_mission_domain_list" model="ir.ui.view">
+        <field name="name">opex.mission.domain.list</field>
+        <field name="model">opex.mission.domain</field>
+        <field name="arch" type="xml">
+            <list string="Domaines d'expertise" editable="bottom">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="code"/>
+                <field name="description"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_mission_domain" model="ir.actions.act_window">
+        <field name="name">Domaines d'expertise</field>
+        <field name="res_model">opex.mission.domain</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Définissez les domaines d'expertise</p>
+            <p>Le domaine situe la mission ; les compétences disent ce qu'il faut
+               savoir faire. Le Smart Matching les compare séparément, avec des
+               poids différents.</p>
+        </field>
+    </record>
+
+    <!--
+         LES PIÈCES JOINTES
+          -->
+
+    <record id="view_mission_document_list" model="ir.ui.view">
+        <field name="name">opex.mission.document.list</field>
+        <field name="model">opex.mission.document</field>
+        <field name="arch" type="xml">
+            <list string="Documents" editable="bottom">
+                <field name="document_type"/>
+                <field name="name"/>
+                <field name="file" filename="filename" widget="binary"/>
+                <field name="filename" column_invisible="1"/>
+                <field name="is_public" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_application_document_list" model="ir.ui.view">
+        <field name="name">opex.mission.application.document.list</field>
+        <field name="model">opex.mission.application.document</field>
+        <field name="arch" type="xml">
+            <list string="Pièces jointes" editable="bottom">
+                <field name="document_type"/>
+                <field name="name"/>
+                <field name="file" filename="filename" widget="binary"/>
+                <field name="filename" column_invisible="1"/>
+            </list>
+        </field>
+    </record>
+
+</odoo>

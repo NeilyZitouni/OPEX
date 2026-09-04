@@ -46,7 +46,7 @@ class MatchingStaffPortal(InnovationStaffPortal):
     def staff_matching_decide(self, project_id, **post):
         """Accepter / Modifier / Ignorer — la décision humaine.
 
-        ⚠ Aucune de ces décisions ne fait avancer le dossier. Retenir un
+        Aucune de ces décisions ne fait avancer le dossier. Retenir un
         candidat lui ouvre l'accès à ce qui le concerne, rien de plus : la
         suite du processus se déclenche par une transition, séparément et
         volontairement.
@@ -126,9 +126,9 @@ class MatchingCandidatePortal(CustomerPortal):
 
         if post.get('response') == 'interested':
             candidate.action_interested()
-            # ⑨ « Expert intéressé » — section 30.
+            # 9. « Expert intéressé » — section 30.
             #
-            # ⚠ Déclenché ici et non par une transition, parce qu'il n'y en a
+            # Déclenché ici et non par une transition, parce qu'il n'y en a
             # pas : la réponse d'un candidat ne fait pas avancer le dossier.
             # « L'IA recommande, elle ne décide pas seule », et un candidat qui
             # se déclare disponible n'engage rien non plus.

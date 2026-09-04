@@ -10,7 +10,7 @@
                 <t t-set="url" t-value="'/my/innovation/profiles'"/>
                 <t t-set="text">Devenir Expert ou Investisseur du cluster</t>
                 <!--
-                    ⚠ Toujours visible : cette tuile est le seul chemin vers
+                    Toujours visible : cette tuile est le seul chemin vers
                     « Devenir Expert ». La masquer faute de profil la
                     supprimerait pour tous ceux qui n'en ont pas encore — le
                     public exact auquel elle s'adresse. Voir la note détaillée
@@ -35,18 +35,18 @@
                 </div>
 
                 <div class="row">
-                    <!-- ═══ Expert ═══ -->
+                    <!-- Expert -->
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h5 class="card-title">Expert</h5>
 
                                 <p t-if="partner.is_expert" class="text-success mb-2">
-                                    ✓ Votre profil Expert est actif.
+                                    Votre profil Expert est actif.
                                 </p>
 
                                 <!--
-                                    ⚠ Le bouton est masqué quand le profil
+                                    Le bouton est masqué quand le profil
                                     existe déjà — mais c'est la route qui
                                     l'interdit. Ce `t-if` n'est que de la
                                     courtoisie visuelle.
@@ -71,14 +71,14 @@
                         </div>
                     </div>
 
-                    <!-- ═══ Investisseur ═══ -->
+                    <!-- Investisseur -->
                     <div class="col-md-6 mb-3">
                         <div class="card h-100">
                             <div class="card-body">
                                 <h5 class="card-title">Investisseur</h5>
 
                                 <p t-if="partner.is_investor" class="text-success mb-2">
-                                    ✓ Votre profil Investisseur est actif.
+                                    Votre profil Investisseur est actif.
                                 </p>
 
                                 <a t-if="can_request_investor"
@@ -203,16 +203,14 @@
                 </div>
 
                 <!--
-                    ══════════════════════════════════════════════════════
                     LES ACTIONS DU PORTEUR
-                    ══════════════════════════════════════════════════════
 
                     Un bouton par transition que le moteur propose, libellé
                     par la transition elle-même : « Soumettre ma demande »,
                     « Renvoyer ma demande ». Rien n'est écrit en dur — ajouter
                     une transition à la configuration ajoute son bouton.
 
-                    ⚠ Les transitions bloquées restent **affichées**,
+                    Les transitions bloquées restent **affichées**,
                     désactivées, avec le motif de la règle qui les retient. Les
                     masquer laisserait le porteur devant un écran sans action
                     et sans explication — précisément ce que
@@ -270,9 +268,7 @@
                 </div>
 
                 <!--
-                    ══════════════════════════════════════════════════════
                     LES JUSTIFICATIFS
-                    ══════════════════════════════════════════════════════
 
                     C'est ce dépôt qui débloque `has_document('cv')` : le
                     `document_type` choisi ici est exactement celui que la

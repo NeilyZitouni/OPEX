@@ -73,7 +73,7 @@ class WorkflowForm(models.Model):
     def visible_field_lines(self, instance):
         """Les champs à rendre, **calculés côté serveur**.
 
-        ⚠ C'est le pivot de sécurité de toute l'extension. Un champ dont la
+        C'est le pivot de sécurité de toute l'extension. Un champ dont la
         condition de visibilité est fausse ne doit pas être rendu du tout —
         pas rendu puis masqué en CSS. « Présent dans le HTML » suffirait à
         divulguer une information réservée, et un masquage client se retire
@@ -130,7 +130,7 @@ class WorkflowForm(models.Model):
         vérification des champs requis se fait au moment de valider l'étape,
         pas à chaque frappe.
 
-        ⚠ Seuls les champs **visibles** sont écrits, et ils sont relus depuis
+        Seuls les champs **visibles** sont écrits, et ils sont relus depuis
         la configuration, jamais depuis les clés du POST. Un formulaire forgé
         qui nommerait un champ non exposé n'écrit rien.
         """

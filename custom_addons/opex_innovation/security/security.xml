@@ -22,9 +22,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         UN GROUPE VIDE BLOQUE LE PROCESSUS SANS RIEN DIRE
-        ═══════════════════════════════════════════════════════════════
 
         Rattacher un rôle à un groupe ne suffit pas : encore faut-il que
         quelqu'un soit dans ce groupe. `role_ceo` pointe bien vers
@@ -49,7 +47,7 @@
         ensuite le relais, et l'administrateur peut se retirer du groupe une
         fois quelqu'un nommé.
 
-        ⚠ `<function>` et non `<record>`, pour la raison habituelle : la ligne
+        `<function>` et non `<record>`, pour la raison habituelle : la ligne
         `ir_model_data` de `base.user_admin` appartient au module `base` et
         porte `noupdate=1`. Un `<record id="base.user_admin">` serait créé à
         l'installation puis ignoré à toute mise à jour — le rattachement ne

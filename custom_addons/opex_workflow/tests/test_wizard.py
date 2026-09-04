@@ -124,7 +124,7 @@ class TestTransitionWizard(WorkflowCase):
         self._transition_by_code('submit').condition_ids = [(6, 0, rule.ids)]
         self.record.color = 10
 
-        # ⚠ Elle est **proposée**, avec son motif dans le libellé.
+        # Elle est **proposée**, avec son motif dans le libellé.
         options = self._options()
         self.assertEqual(len(options), 1)
         value, label = options[0]

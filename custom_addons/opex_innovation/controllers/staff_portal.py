@@ -11,7 +11,7 @@ from .portal import InnovationProfilePortal
 class InnovationStaffPortal(http.Controller):
     """Écrans du personnel : contrôle administratif et qualification.
 
-    ⚠ **Le contrôle d'accès staff est une seule fonction**, `_staff_user()`,
+    **Le contrôle d'accès staff est une seule fonction**, `_staff_user()`,
     appelée par toutes les routes `/staff/innovation/*`. Une vérification
     recopiée finit par en oublier une occurrence — et c'est celle-là qui reçoit
     la requête forgée. C'est la règle transversale héritée du Module 1, et elle
@@ -122,7 +122,7 @@ class InnovationStaffPortal(http.Controller):
     def staff_project_transition(self, project_id, **post):
         """Franchit une transition depuis l'écran de contrôle.
 
-        ⚠ Aucun contrôle de droit n'est réécrit ici. La transition est cherchée
+        Aucun contrôle de droit n'est réécrit ici. La transition est cherchée
         **dans** celles que le moteur propose à cet utilisateur, puis franchie
         par `do_transition()`, qui repasse par `_check_transition_allowed()`.
         Le motif obligatoire est exigé par la configuration
@@ -170,7 +170,7 @@ class InnovationProfileStaffPortal(http.Controller):
     après contrôle d'habilitation, sa file serait vide et le processus sans
     issue — c'est exactement ce qui bloquait les demandes de profil jusqu'ici.
 
-    ⚠ L'ordre compte : on vérifie **puis** on lit en `sudo()`. L'inverse —
+    L'ordre compte : on vérifie **puis** on lit en `sudo()`. L'inverse —
     lire d'abord — donnerait tous les dossiers à tout le monde.
     """
 
@@ -190,7 +190,7 @@ class InnovationProfileStaffPortal(http.Controller):
     def _profile_staff_user(self):
         """L'utilisateur connecté s'il instruit les dossiers, sinon vide.
 
-        ⚠ Ce n'est pas un second contrôle d'accès : la politique vit dans
+        Ce n'est pas un second contrôle d'accès : la politique vit dans
         `res.users._is_innovation_staff()`, l'unique endroit qui dit quels
         groupes instruisent — le même que celui qu'interroge `_staff_user()`
         des projets et le `t-if` de la tuile portail. On ne redéclare ici
@@ -307,7 +307,7 @@ class InnovationProfileStaffPortal(http.Controller):
     def staff_profile_document(self, profile_type, profile_id, document_id, **kw):
         """Sert une pièce jointe au contrôleur.
 
-        ⚠ La pièce est résolue **à travers la demande**, jamais par un
+        La pièce est résolue **à travers la demande**, jamais par un
         `browse()` sur l'identifiant reçu. Un identifiant forgé ne peut donc
         pas servir à extraire le justificatif d'un autre dossier : il faut
         déjà que la demande soit dans le périmètre du contrôleur, et que la
@@ -346,7 +346,7 @@ class InnovationProfileStaffPortal(http.Controller):
     def staff_profile_transition(self, profile_type, profile_id, **post):
         """Franchit une transition depuis l'écran de contrôle.
 
-        ⚠ Aucun droit n'est rejugé ici, exactement comme côté porteur. La
+        Aucun droit n'est rejugé ici, exactement comme côté porteur. La
         transition est cherchée parmi celles que le moteur propose à cet
         utilisateur, puis franchie par `workflow_do_transition()`, qui
         repasse par `_check_transition_allowed()`. Le motif obligatoire est

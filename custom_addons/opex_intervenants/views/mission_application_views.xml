@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_mission_application_form" model="ir.ui.view">
+        <field name="name">opex.mission.application.form</field>
+        <field name="model">opex.mission.application</field>
+        <field name="arch" type="xml">
+            <form string="Candidature">
+                <!--
+                    Le **second** statusbar du module, sur la **seconde**
+                    définition. C'est la démonstration à l'écran de la
+                    séparation exigée par le §12.2 : deux fiches ouvertes côte à
+                    côte, deux barres de progression qui n'avancent pas
+                    ensemble.
+                -->
+                <header>
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_documents" type="object"
+                                class="oe_stat_button" icon="fa-paperclip">
+                            <field name="document_count"
+                                   widget="statinfo" string="Pièces"/>
+                        </button>
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="partner_id"/>
+                        <h1><field name="partner_id"/></h1>
+                        <h3><field name="workflow_stage_label" readonly="1"/></h3>
+                    </div>
+
+                    <group>
+                        <group string="Appel">
+                            <field name="mission_id"/>
+                            <field name="source"/>
+                            <field name="matching_candidate_id"
+                                   invisible="source != 'matching'"/>
+                        </group>
+                        <group string="Intervenant">
+                            <!-- Le profil du Module 2. « Un expert référencé ne
+                                 ressaisit pas son profil permanent » : ce qui
+                                 est permanent se lit là, pas ici. -->
+                            <field name="expert_profile_id"/>
+                            <field name="score"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Proposition" name="proposition">
+                            <group>
+                                <group string="Disponibilité et délai">
+                                    <field name="disponibilite"/>
+                                    <field name="disponibilite_commentaire"/>
+                                    <field name="delai_propose_jours"/>
+                                </group>
+                                <group string="Proposition financière">
+                                    <field name="type_tarif"/>
+                                    <field name="tarif_propose"/>
+                                    <field name="currency_id" column_invisible="1"/>
+                                    <field name="consentement"/>
+                                </group>
+                            </group>
+                            <group string="Motivation">
+                                <field name="motivation" nolabel="1"
+                                       placeholder="Pourquoi cette mission ?"/>
+                            </group>
+                            <group string="Méthodologie proposée">
+                                <field name="methodologie" nolabel="1"
+                                       placeholder="Comment comptez-vous procéder ?"/>
+                            </group>
+                        </page>
+
+                        <page string="Pièces jointes" name="documents">
+                            <field name="document_ids" nolabel="1">
+                                <list editable="bottom">
+                                    <field name="document_type"/>
+                                    <field name="name"/>
+                                    <field name="file" filename="filename" widget="binary"/>
+                                    <field name="filename" column_invisible="1"/>
+                                </list>
+                            </field>
+                        </page>
+
+                        <!--
+                            L'explication du score, et pas seulement le score.
+
+                            « Le responsable peut comprendre les raisons d'un
+                            score » est l'un des neuf critères d'acceptation du
+                            §21. Un score de 87 % sans justification n'est pas
+                            défendable devant un jury — le moteur rend d'ailleurs
+                            son champ `detail` obligatoire au niveau du modèle.
+
+                            Vide tant que l'Extension 4 n'a pas configuré le
+                            matching : l'onglet le dit plutôt que de laisser une
+                            zone blanche inexpliquée.
+                        -->
+                        <page string="Explication du score" name="score">
+                            <field name="score_detail" nolabel="1" readonly="1"/>
+                            <div class="alert alert-info" role="status"
+                                 invisible="score_detail">
+                                Le score et son explication sont calculés par le
+                                Smart Matching à la qualification de la
+                                candidature. Le moteur de scoring est configuré
+                                à l'Extension 4 ; ce module n'écrit aucune ligne
+                                de calcul.
+                            </div>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_mission_application_list" model="ir.ui.view">
+        <field name="name">opex.mission.application.list</field>
+        <field name="model">opex.mission.application</field>
+        <field name="arch" type="xml">
+            <!--
+                L'écran « Candidatures reçues » du §15, dont l'objectif déclaré
+                est « de faciliter la comparaison ». Et le deuxième critère
+                d'acceptation du §21 : une candidature issue du matching et une
+                candidature Web sont comparables **dans le même écran** — c'est
+                cette liste-là, et la colonne « Origine » est la seule chose qui
+                les distingue.
+            -->
+            <list string="Candidatures" default_order="score desc">
+                <field name="mission_id" optional="show"/>
+                <field name="partner_id"/>
+                <field name="source"/>
+                <field name="workflow_stage_label" string="État"/>
+                <field name="disponibilite"/>
+                <field name="delai_propose_jours"/>
+                <field name="tarif_propose"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="score"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_mission_application_search" model="ir.ui.view">
+        <field name="name">opex.mission.application.search</field>
+        <field name="model">opex.mission.application</field>
+        <field name="arch" type="xml">
+            <search string="Candidatures">
+                <field name="partner_id"/>
+                <field name="mission_id"/>
+                <separator/>
+
+                <!-- Les quatre colonnes du Kanban du §10 : Nouveaux →
+                     Qualifiés → Short-list → Retenus. L'Extension 6 en fera un
+                     vrai Kanban ; ici ce sont déjà les mêmes domaines. -->
+                <filter name="filter_pending" string="Invitations en attente"
+                        domain="[('workflow_stage_id.code', 'in', ['invited', 'viewed', 'interested'])]"/>
+                <filter name="filter_new" string="Nouvelles"
+                        domain="[('workflow_stage_id.code', '=', 'applied')]"/>
+                <filter name="filter_screened" string="Qualifiées"
+                        domain="[('workflow_stage_id.code', '=', 'screened')]"/>
+                <filter name="filter_shortlisted" string="Short-list"
+                        domain="[('workflow_stage_id.code', '=', 'shortlisted')]"/>
+                <filter name="filter_selected" string="Retenues"
+                        domain="[('workflow_stage_id.code', '=', 'selected')]"/>
+                <separator/>
+                <filter name="filter_closed" string="Sans suite"
+                        domain="[('workflow_stage_id.code', 'in', ['rejected', 'withdrawn', 'declined'])]"/>
+                <separator/>
+                <filter name="filter_matching" string="Issues du matching"
+                        domain="[('source', '=', 'matching')]"/>
+                <filter name="filter_portal" string="Issues du portail"
+                        domain="[('source', '=', 'portail')]"/>
+
+                <group name="group_by">
+                    <filter name="group_mission" string="Appel"
+                            context="{'group_by': 'mission_id'}"/>
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                    <filter name="group_source" string="Origine"
+                            context="{'group_by': 'source'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_mission_application" model="ir.actions.act_window">
+        <field name="name">Candidatures</field>
+        <field name="res_model">opex.mission.application</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_mission_application_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucune candidature</p>
+            <p>Toutes les candidatures convergent ici, quelle que soit leur
+               origine : matching, portail, invitation directe ou ajout manuel.
+               Le champ « Origine » les distingue, et rien d'autre — c'est le
+               pool unique du §10.</p>
+        </field>
+    </record>
+
+</odoo>

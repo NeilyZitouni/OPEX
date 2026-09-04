@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LE BACK-OFFICE : ON HÉRITE, ON NE DUPLIQUE PAS
+
+        Le formulaire du profil expert appartient au Module 2. On y greffe deux
+        onglets plutôt que d'ouvrir un second écran « capital » : le
+        gestionnaire qui consulte un intervenant ne doit pas avoir à choisir
+        entre deux fiches pour la même personne.
+
+        `opex_innovation` n'est pas modifié — c'est une vue héritée, elle vit
+        entièrement dans ce module et disparaît avec lui.
+    -->
+    <record id="view_expert_profile_form_capital" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.form.capital</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <field name="inherit_id" ref="opex_innovation.view_expert_profile_form"/>
+        <field name="arch" type="xml">
+
+            <!-- La réputation en tête de fiche : c'est ce que le décideur
+                 regarde en premier au §16. -->
+            <xpath expr="//notebook" position="before">
+                <group string="Capital pour les missions" name="capital_summary">
+                    <group>
+                        <field name="skill_count"/>
+                        <field name="experience_count"/>
+                        <field name="valid_certification_count"/>
+                    </group>
+                    <group>
+                        <field name="is_available_now" widget="boolean_toggle"/>
+                        <field name="current_availability_rate"
+                               invisible="not is_available_now"/>
+                        <field name="reputation_score" widget="float"/>
+                        <field name="rating_count"/>
+                    </group>
+                </group>
+            </xpath>
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Compétences et expérience" name="capital">
+                    <group string="Compétences qualifiées">
+                        <field name="expert_skill_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="competence_id"/>
+                                <field name="niveau"/>
+                                <field name="annees"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Expériences">
+                        <field name="expert_experience_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="name"/>
+                                <field name="organisation"/>
+                                <field name="mission_type_id"/>
+                                <field name="domaine_id"/>
+                                <field name="seniorite"/>
+                                <field name="date_debut"/>
+                                <field name="date_fin"/>
+                                <field name="duree_jours" optional="hide"/>
+                            </list>
+                        </field>
+                    </group>
+                </page>
+
+                <page string="Certifications et disponibilité" name="capital_2">
+                    <group string="Certifications">
+                        <field name="expert_certification_ids" nolabel="1">
+                            <list editable="bottom"
+                                  decoration-muted="not is_valid">
+                                <field name="name"/>
+                                <field name="organisme"/>
+                                <field name="reference" optional="hide"/>
+                                <field name="date_obtention"/>
+                                <field name="date_expiration"/>
+                                <field name="is_valid" widget="boolean_toggle"/>
+                            </list>
+                        </field>
+                    </group>
+                    <group string="Disponibilités">
+                        <field name="expert_availability_ids" nolabel="1">
+                            <list editable="bottom"
+                                  decoration-success="is_current">
+                                <field name="date_debut"/>
+                                <field name="date_fin"/>
+                                <field name="taux"/>
+                                <field name="note"/>
+                                <field name="is_current" widget="boolean_toggle"/>
+                            </list>
+                        </field>
+                    </group>
+                </page>
+
+                <!--
+                    En **lecture seule**, et sans bouton d'ajout.
+
+                    Les évaluations viennent de l'Extension 10, à la clôture
+                    d'une mission. Un gestionnaire qui pourrait en saisir une à
+                    la main viderait la réputation de son sens : elle ne
+                    reposerait plus sur des missions réellement réalisées, ce
+                    que le §32 demande explicitement.
+                -->
+                <page string="Évaluations" name="capital_ratings">
+                    <field name="expert_rating_ids" nolabel="1" readonly="1">
+                        <list create="false" delete="false">
+                            <field name="date"/>
+                            <field name="mission_id"/>
+                            <field name="source"/>
+                            <field name="note"/>
+                            <field name="respect_delais" widget="boolean_toggle"/>
+                            <field name="commentaire"/>
+                        </list>
+                    </field>
+                    <div class="alert alert-info mt-3" role="status"
+                         invisible="rating_count">
+                        Aucune évaluation à ce jour. Les notes sont portées à la
+                        clôture d'une mission, par le client (§30) et par le
+                        cluster (§31) — c'est l'Extension 10. La réputation
+                        affichée vaut donc 0, et c'est la bonne valeur : elle ne
+                        dit pas « mal noté », elle dit « jamais évalué ».
+                    </div>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+         Vues autonomes, pour l'analyse transversale
+
+        Le gestionnaire a parfois besoin de la question inverse : « qui pratique
+        cette compétence ? », « qui est disponible en octobre ? ». Une liste par
+        modèle y répond ; le formulaire du profil, non.
+    -->
+
+    <record id="view_expert_skill_list" model="ir.ui.view">
+        <field name="name">opex.expert.skill.list</field>
+        <field name="model">opex.expert.skill</field>
+        <field name="arch" type="xml">
+            <list string="Compétences des intervenants">
+                <field name="partner_id"/>
+                <field name="competence_id"/>
+                <field name="niveau"/>
+                <field name="annees"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_expert_skill_search" model="ir.ui.view">
+        <field name="name">opex.expert.skill.search</field>
+        <field name="model">opex.expert.skill</field>
+        <field name="arch" type="xml">
+            <search string="Compétences des intervenants">
+                <field name="partner_id"/>
+                <field name="competence_id"/>
+                <separator/>
+                <filter name="filter_expert" string="Niveau expert"
+                        domain="[('niveau', '=', 'expert')]"/>
+                <filter name="filter_confirme" string="Confirmé ou plus"
+                        domain="[('niveau', 'in', ['confirme', 'expert'])]"/>
+                <group name="group_by">
+                    <filter name="group_competence" string="Compétence"
+                            context="{'group_by': 'competence_id'}"/>
+                    <filter name="group_niveau" string="Niveau"
+                            context="{'group_by': 'niveau'}"/>
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_expert_skill" model="ir.actions.act_window">
+        <field name="name">Compétences des intervenants</field>
+        <field name="res_model">opex.expert.skill</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_expert_skill_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucune compétence déclarée</p>
+            <p>Les intervenants déclarent leur capital depuis leur espace
+               portail. C'est ce que le Smart Matching comparera aux compétences
+               recherchées par un appel à mission.</p>
+        </field>
+    </record>
+
+    <record id="view_expert_availability_list" model="ir.ui.view">
+        <field name="name">opex.expert.availability.list</field>
+        <field name="model">opex.expert.availability</field>
+        <field name="arch" type="xml">
+            <list string="Disponibilités" decoration-success="is_current">
+                <field name="partner_id"/>
+                <field name="date_debut"/>
+                <field name="date_fin"/>
+                <field name="taux"/>
+                <field name="is_current" widget="boolean_toggle"/>
+                <field name="note" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_expert_availability" model="ir.actions.act_window">
+        <field name="name">Disponibilités</field>
+        <field name="res_model">opex.expert.availability</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucune disponibilité déclarée</p>
+            <p>Sans période de disponibilité en cours, un intervenant est
+               considéré indisponible par le matching.</p>
+        </field>
+    </record>
+
+    <record id="view_expert_certification_list" model="ir.ui.view">
+        <field name="name">opex.expert.certification.list</field>
+        <field name="model">opex.expert.certification</field>
+        <field name="arch" type="xml">
+            <list string="Certifications" decoration-muted="not is_valid">
+                <field name="partner_id"/>
+                <field name="name"/>
+                <field name="organisme"/>
+                <field name="date_obtention"/>
+                <field name="date_expiration"/>
+                <field name="is_valid" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_expert_certification" model="ir.actions.act_window">
+        <field name="name">Certifications</field>
+        <field name="res_model">opex.expert.certification</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <!-- Les menus -->
+
+    <menuitem id="menu_intervenants_capital"
+              name="Capital des intervenants"
+              parent="menu_intervenants_root"
+              sequence="30"/>
+
+    <menuitem id="menu_expert_skill"
+              name="Compétences"
+              parent="menu_intervenants_capital"
+              action="action_expert_skill"
+              sequence="10"/>
+
+    <menuitem id="menu_expert_certification"
+              name="Certifications"
+              parent="menu_intervenants_capital"
+              action="action_expert_certification"
+              sequence="20"/>
+
+    <menuitem id="menu_expert_availability"
+              name="Disponibilités"
+              parent="menu_intervenants_capital"
+              action="action_expert_availability"
+              sequence="30"/>
+
+</odoo>

@@ -1,0 +1,496 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LE WORKFLOW DE LA CANDIDATURE — 10 étapes, 20 transitions
+
+            §12.2 de la spécification Smart Missions, arbitrage rendu :
+
+                INVITED → VIEWED → INTERESTED → APPLIED → SCREENED
+                        → SHORTLISTED → SELECTED
+
+                Branches : DECLINED · REJECTED · WITHDRAWN
+
+            **La seconde définition, sur un second modèle.** C'est l'exigence du
+            §12.2 : « la séparation des deux machines à états est obligatoire ».
+            Une mission en `selection` porte simultanément des candidatures en
+            `shortlisted`, en `rejected` et en `applied` ; faire avancer l'une ne
+            fait bouger ni la mission ni les autres.
+
+            C'est aussi le meilleur banc d'essai du moteur à ce jour : deux
+            workflows qui tournent en parallèle sur des objets liés, sans qu'une
+            ligne de Python ait été ajoutée à `opex_workflow`.
+
+             Les deux canaux du §8 entrent par la même porte
+
+            Le moteur n'admet qu'une seule étape de départ (`_check_graph`), or
+            le §8 a deux canaux d'alimentation du même pool. `invited` est donc
+            l'entrée des deux :
+
+            · **Matching** — le responsable clique « Inviter » sur une
+              proposition scorée : la candidature naît en `invited`,
+              `source = 'matching'`, `matching_candidate_id` renseigné.
+            · **Portail** — l'intervenant clique « Je suis intéressé » sur
+              l'appel public : la candidature naît en `invited`,
+              `source = 'portail'`, et le controller franchit `view` puis
+              `express_interest` dans la même requête (Extension 5).
+
+            La ligne d'historique `invited` d'une candidature portail est donc
+            un artefact — l'instant de création, pas une invitation reçue. Le
+            champ `source` le lève, et c'est le seul prix à payer pour tenir à
+            la fois « une seule étape de départ » et « INVITED est un état ».
+
+             DECLINED est réversible, les trois autres fins ne le sont pas
+
+            Avec le §12.2, `declined` est atteignable **dès `invited`**. Un
+            expert qui décline une invitation ciblée, sur un appel ensuite
+            publié au portail, doit pouvoir revenir.
+
+            Sans chemin de retour, il ne le pourrait pas : atteindre une étape
+            `is_end` clôt l'instance (`state = 'done'`), et
+            `_check_transition_allowed()` refuse alors **tout** — pendant que la
+            contrainte SQL `unique(mission_id, partner_id)` interdit une seconde
+            candidature. Le refus d'une invitation fermerait l'appel
+            définitivement.
+
+            La réponse n'est donc pas une seconde ligne en base, c'est une
+            transition : `reconsider : declined → viewed`. `declined` n'est pas
+            `is_end` et porte une sortie ; `selected`, `rejected` et `withdrawn`
+            restent terminaux.
+
+             Ce que ce fichier ne contient PAS
+
+            Aucune action, pour la même raison que côté mission : elles viendront
+            avec les objets qu'elles manipulent, rattachées par
+            `<function name="write">`.
+        -->
+
+        <!--
+             LES RÈGLES
+              -->
+
+        <record id="rule_application_lean_complete" model="opex.workflow.rule">
+            <field name="name">Candidature complète</field>
+            <field name="code">application_lean_complete</field>
+            <field name="expression">bool(field('disponibilite') and field('delai_propose_jours') and field('tarif_propose') and field('motivation') and field('consentement'))</field>
+            <field name="message">Renseignez votre disponibilité, votre délai de mobilisation, votre tarif et votre motivation, et acceptez les conditions de candidature.</field>
+            <field name="description">§13 du Module 3 et §9 de la spécification. On ne demande **que** les données propres à la mission : l'identité, le CV, les compétences et l'historique sont déjà connus et ne sont jamais redemandés.</field>
+        </record>
+
+        <!--
+            Règle 4 du §39, vue depuis la candidature.
+
+            Ce n'est pas dériver l'état de la candidature de celui de la
+            mission : c'est compter, sur la mission, combien de candidatures y
+            sont déjà retenues. Le sens est unique — aucune étape de la mission
+            ne détermine une étape de la candidature.
+
+            Les deux champs lus sont des `related` en lecture seule
+            (`mission_selected_count`, `mission_allows_multi`), pas une
+            traversée `safe_eval` de `record.mission_id.application_ids`. Le
+            contexte d'évaluation lit l'enregistrement en `sudo()`
+            (`workflow_instance.py:281`), le décideur n'a donc pas besoin d'un
+            droit de lecture particulier pour que la condition soit évaluée.
+        -->
+        <record id="rule_application_single_selection" model="opex.workflow.rule">
+            <field name="name">Aucune candidature déjà retenue</field>
+            <field name="code">application_single_selection</field>
+            <field name="expression">bool(field('mission_allows_multi')) or field('mission_selected_count') == 0</field>
+            <field name="message">Une candidature est déjà retenue sur cet appel, et ce type de mission n'autorise qu'un seul intervenant (règle 4 du §39). Écartez la précédente, ou autorisez plusieurs intervenants sur le type de mission.</field>
+        </record>
+
+        <!--
+             LA DÉFINITION
+              -->
+
+        <!--
+            **`initiator_role_id` volontairement absent**, et c'est ici le cas
+            le plus net des deux.
+
+            Le moteur poserait le rôle sur celui qui exécute le `create()`
+            (`workflow_definition.py:89-97`). Sur le canal matching, c'est le
+            **responsable** qui crée la candidature en invitant un expert : il
+            recevrait le rôle `intervenant` en accès `full` sur la candidature
+            d'un autre.
+
+            L'acteur est donc posé par
+            `MissionApplication._grant_intervenant_actor()`, depuis
+            `partner_id`. Un test le vérifie dans les deux sens : l'intervenant
+            est acteur, le créateur ne l'est pas.
+        -->
+        <record id="wf_mission_application" model="opex.workflow.definition">
+            <field name="name">Candidature à un appel</field>
+            <field name="code">mission_application</field>
+            <field name="model_id" ref="model_opex_mission_application"/>
+            <field name="description">Parcours individuel d'un candidat : invitation ou intérêt spontané, candidature Lean, qualification, short-list, sélection. §12.2 de la spécification OPEX Smart Missions. Indépendant de l'avancement de la mission.</field>
+        </record>
+
+        <!--
+             LES 10 ÉTAPES
+              -->
+
+        <record id="astage_invited" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">invited</field>
+            <field name="name">Opportunité proposée</field>
+            <field name="user_label">Nouvelle opportunité</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="sla_days">7</field>
+            <field name="description">L'entrée des deux canaux du §8. Pour une candidature issue du matching, c'est l'invitation ; pour une candidature portail, c'est l'instant de création — `source` distingue les deux. Le SLA alimente la « relance des experts invités n'ayant pas répondu » du §19.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="astage_viewed" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">viewed</field>
+            <field name="name">Consultée</field>
+            <field name="user_label">Appel consulté</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">7</field>
+            <field name="description">§12 — l'intervenant a ouvert la fiche de l'appel. Franchie par la route de consultation, pas par un bouton.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="astage_interested" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">interested</field>
+            <field name="name">Intéressé</field>
+            <field name="user_label">Compléter ma candidature</field>
+            <field name="sequence">30</field>
+            <field name="description">Le CTA « Je suis intéressé » du §7 a été cliqué. C'est ici que se remplit la candidature Lean, et **la seule étape** où l'`ir.rule` autorise l'intervenant à écrire.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="astage_applied" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">applied</field>
+            <field name="name">Candidature déposée</field>
+            <field name="user_label">Candidature envoyée</field>
+            <field name="sequence">40</field>
+            <field name="sla_days">3</field>
+            <field name="description">La première étape qui compte comme une « candidature reçue » au sens du §15 : c'est à partir d'ici que les compteurs de la mission et les `ir.rule` des internes la voient.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="astage_screened" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">screened</field>
+            <field name="name">Qualifiée</field>
+            <field name="user_label">Candidature en cours d'analyse</field>
+            <field name="sequence">50</field>
+            <field name="description">L'éligibilité a été contrôlée et le score calculé. L'Extension 4 rattachera ici le calcul et son explication ; l'Extension 6 en fera la colonne « Qualifiés » du Kanban du §10.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_decideur')])]"/>
+        </record>
+
+        <record id="astage_shortlisted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">shortlisted</field>
+            <field name="name">Short-listée</field>
+            <field name="user_label">Vous êtes présélectionné</field>
+            <field name="sequence">60</field>
+            <field name="description">Colonne « Short-list » du Kanban du §10.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+        </record>
+
+        <record id="astage_selected" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">selected</field>
+            <field name="name">Retenue</field>
+            <field name="user_label">Candidature retenue</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">70</field>
+            <field name="description">Fin nominale. §13 de la spécification : c'est ce passage qui déclenchera la contractualisation — mais côté mission, par la transition « Attribuer la mission » que le décideur franchit séparément. L'acceptation de l'intervenant est portée par le cycle de validation du contrat (Schéma 7), pas par une étape de plus ici.</field>
+        </record>
+
+        <!-- Les trois branches -->
+
+        <!--
+            La seule fin réversible du module, et la raison est en tête de
+            fichier : sans `reconsider`, un refus d'invitation fermerait l'appel
+            définitivement à cause de la contrainte SQL d'unicité.
+        -->
+        <record id="astage_declined" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">declined</field>
+            <field name="name">Déclinée</field>
+            <field name="user_label">Vous avez décliné cette opportunité</field>
+            <field name="sequence">200</field>
+            <field name="description">Le candidat s'est déclaré non disponible. **Réversible** : la transition « Finalement, cela m'intéresse » ramène en `viewed`. Ce n'est donc pas une étape finale, et elle porte une sortie — sans quoi le moteur refuserait le graphe (cul-de-sac).</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="astage_rejected" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">rejected</field>
+            <field name="name">Non retenue</field>
+            <field name="user_label">Candidature non retenue</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">210</field>
+            <field name="description">Écartée par le cluster. Terminale, et volontairement : un candidat écarté ne se réinvite pas lui-même. Quatre transitions y mènent, toutes avec motif obligatoire — le §17 prévoit que les non-retenus soient notifiés, et une notification sans motif n'a rien à dire.</field>
+        </record>
+
+        <record id="astage_withdrawn" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">withdrawn</field>
+            <field name="name">Retirée</field>
+            <field name="user_label">Candidature retirée</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">220</field>
+            <field name="description">Le candidat a retiré une candidature qu'il avait engagée. Terminale : contrairement au refus d'une invitation, c'est un acte réfléchi et postérieur au dépôt.</field>
+        </record>
+
+        <!--
+             LES 20 TRANSITIONS
+              -->
+
+        <!-- Depuis INVITED -->
+
+        <record id="atr_view" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_view</field>
+            <field name="name">Consulter l'appel</field>
+            <field name="source_stage_id" ref="astage_invited"/>
+            <field name="target_stage_id" ref="astage_viewed"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="atr_decline_invitation" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_decline_invitation</field>
+            <field name="name">Je ne suis pas disponible</field>
+            <field name="source_stage_id" ref="astage_invited"/>
+            <field name="target_stage_id" ref="astage_declined"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="atr_reject_invited" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reject_invited</field>
+            <field name="name">Retirer l'invitation</field>
+            <field name="source_stage_id" ref="astage_invited"/>
+            <field name="target_stage_id" ref="astage_rejected"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="description">« Écarter », l'une des cinq actions du responsable au §6 de la spécification.</field>
+        </record>
+
+        <!-- Depuis VIEWED -->
+
+        <record id="atr_express_interest" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_express_interest</field>
+            <field name="name">Je suis intéressé</field>
+            <field name="source_stage_id" ref="astage_viewed"/>
+            <field name="target_stage_id" ref="astage_interested"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="description">Le CTA principal du §7. C'est lui qui ouvre le formulaire de candidature Lean.</field>
+        </record>
+
+        <record id="atr_decline_viewed" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_decline_viewed</field>
+            <field name="name">Je ne suis pas disponible</field>
+            <field name="source_stage_id" ref="astage_viewed"/>
+            <field name="target_stage_id" ref="astage_declined"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="atr_reject_viewed" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reject_viewed</field>
+            <field name="name">Écarter ce candidat</field>
+            <field name="source_stage_id" ref="astage_viewed"/>
+            <field name="target_stage_id" ref="astage_rejected"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <!-- Depuis INTERESTED -->
+
+        <record id="atr_apply" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_apply</field>
+            <field name="name">Envoyer ma candidature</field>
+            <field name="source_stage_id" ref="astage_interested"/>
+            <field name="target_stage_id" ref="astage_applied"/>
+            <field name="sequence">70</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_application_lean_complete')])]"/>
+            <field name="description">La règle 1 du §39 — « on ne peut candidater que si on a le profil Expert » — n'est **pas** une condition de transition : elle se vérifie côté serveur sur la route, avant que la candidature n'existe. Une condition arriverait trop tard.</field>
+        </record>
+
+        <record id="atr_withdraw_interested" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_withdraw_interested</field>
+            <field name="name">Retirer ma candidature</field>
+            <field name="source_stage_id" ref="astage_interested"/>
+            <field name="target_stage_id" ref="astage_withdrawn"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="atr_reject_interested" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reject_interested</field>
+            <field name="name">Écarter ce candidat</field>
+            <field name="source_stage_id" ref="astage_interested"/>
+            <field name="target_stage_id" ref="astage_rejected"/>
+            <field name="sequence">90</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <!-- Depuis APPLIED -->
+
+        <record id="atr_screen" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_screen</field>
+            <field name="name">Qualifier la candidature</field>
+            <field name="source_stage_id" ref="astage_applied"/>
+            <field name="target_stage_id" ref="astage_screened"/>
+            <field name="sequence">100</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="description">L'Extension 4 rattachera ici le calcul du score et la recopie de son explication.</field>
+        </record>
+
+        <!-- La sortie directe « Soumise → Non retenue » du Schéma 5 : la voie
+             des candidatures inéligibles, qu'on ne qualifie même pas. -->
+        <record id="atr_reject_applied" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reject_applied</field>
+            <field name="name">Ne pas retenir</field>
+            <field name="source_stage_id" ref="astage_applied"/>
+            <field name="target_stage_id" ref="astage_rejected"/>
+            <field name="sequence">110</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="atr_withdraw_applied" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_withdraw_applied</field>
+            <field name="name">Retirer ma candidature</field>
+            <field name="source_stage_id" ref="astage_applied"/>
+            <field name="target_stage_id" ref="astage_withdrawn"/>
+            <field name="sequence">120</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <!-- Depuis SCREENED -->
+
+        <record id="atr_shortlist" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_shortlist</field>
+            <field name="name">Mettre en short-list</field>
+            <field name="source_stage_id" ref="astage_screened"/>
+            <field name="target_stage_id" ref="astage_shortlisted"/>
+            <field name="sequence">130</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="description">« Mettre en short-list », l'une des cinq actions du responsable au §6 de la spécification.</field>
+        </record>
+
+        <record id="atr_reject_screened" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reject_screened</field>
+            <field name="name">Ne pas retenir</field>
+            <field name="source_stage_id" ref="astage_screened"/>
+            <field name="target_stage_id" ref="astage_rejected"/>
+            <field name="sequence">140</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="atr_withdraw_screened" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_withdraw_screened</field>
+            <field name="name">Retirer ma candidature</field>
+            <field name="source_stage_id" ref="astage_screened"/>
+            <field name="target_stage_id" ref="astage_withdrawn"/>
+            <field name="sequence">150</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <!-- Depuis SHORTLISTED — quatre sorties -->
+
+        <record id="atr_select" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_select</field>
+            <field name="name">Retenir cette candidature</field>
+            <field name="source_stage_id" ref="astage_shortlisted"/>
+            <field name="target_stage_id" ref="astage_selected"/>
+            <field name="sequence">160</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_application_single_selection')])]"/>
+            <field name="description">« La sélection finale reste réalisée par les responsables habilités du cluster » (§16). Le score est une aide à la décision, jamais la décision.</field>
+        </record>
+
+        <!-- La boucle : le décideur renvoie une candidature à l'analyse. -->
+        <record id="atr_back_to_screened" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_back_to_screened</field>
+            <field name="name">Renvoyer à l'analyse</field>
+            <field name="source_stage_id" ref="astage_shortlisted"/>
+            <field name="target_stage_id" ref="astage_screened"/>
+            <field name="sequence">170</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+        </record>
+
+        <record id="atr_reject_shortlisted" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reject_shortlisted</field>
+            <field name="name">Ne pas retenir</field>
+            <field name="source_stage_id" ref="astage_shortlisted"/>
+            <field name="target_stage_id" ref="astage_rejected"/>
+            <field name="sequence">180</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="atr_withdraw_shortlisted" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_withdraw_shortlisted</field>
+            <field name="name">Retirer ma candidature</field>
+            <field name="source_stage_id" ref="astage_shortlisted"/>
+            <field name="target_stage_id" ref="astage_withdrawn"/>
+            <field name="sequence">190</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <!-- Depuis DECLINED — la sortie qui rend le refus réversible -->
+
+        <record id="atr_reconsider" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_application"/>
+            <field name="code">application_reconsider</field>
+            <field name="name">Finalement, cela m'intéresse</field>
+            <field name="source_stage_id" ref="astage_declined"/>
+            <field name="target_stage_id" ref="astage_viewed"/>
+            <field name="sequence">200</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+            <field name="description">Le chemin de retour d'un refus d'invitation. Ouvert aussi au responsable : un expert qui décline par téléphone puis se ravise ne doit pas rester bloqué parce qu'il n'a pas cliqué au bon endroit. Le passage est daté et signé dans l'historique du moteur.</field>
+        </record>
+
+    </data>
+
+    <!--
+        Publication hors du bloc `noupdate`, pour la raison détaillée dans
+        `mission_request_workflow.xml` : un `<function>` d'un bloc `noupdate`
+        n'est **pas rejoué** à la mise à jour, et la définition resterait en
+        brouillon — donc introuvable par `start_workflow()`, sans erreur.
+
+        Rejouée à chaque `-u`, elle revalide aussi le graphe : un cul-de-sac ou
+        une étape inatteignable introduits par erreur font échouer le
+        déploiement au lieu de se découvrir en démonstration.
+    -->
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_mission_application')]]"/>
+
+</odoo>

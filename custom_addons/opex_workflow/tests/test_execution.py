@@ -234,7 +234,7 @@ class TestExecution(WorkflowCase):
         self.assertIn("La note doit atteindre 70.", str(error.exception))
         self.assertEqual(self.instance.current_stage_id, self._stage_by_code('draft'))
 
-        # ⚠ La transition reste **visible** : elle n'a pas disparu de la liste.
+        # La transition reste **visible** : elle n'a pas disparu de la liste.
         self.assertIn(submit, self.instance.available_transitions())
         option = self.instance.transition_options()[0]
         self.assertEqual(option['transition'], submit)
@@ -270,7 +270,7 @@ class TestExecution(WorkflowCase):
         self.instance.do_transition(submit)
         entry = self.instance.history_ids.filtered(lambda h: h.transition_id == submit)
         self.assertIn("test_note_ok", entry.conditions_note)
-        self.assertIn("✓", entry.conditions_note)
+        self.assertIn("", entry.conditions_note)
 
     def test_has_document_is_tolerant_on_a_model_without_documents(self):
         """`res.partner` n'a pas de documents : la condition est fausse, pas

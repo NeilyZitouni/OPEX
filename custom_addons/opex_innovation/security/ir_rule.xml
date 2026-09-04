@@ -129,9 +129,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
-        ⚠ CONFIDENTIALITÉ DES AVIS — schéma 7
-        ═══════════════════════════════════════════════════════════════
+        CONFIDENTIALITÉ DES AVIS — schéma 7
 
         « Chaque évaluateur travaille indépendamment. Il ne peut pas consulter
         les avis ou les scores des autres évaluateurs avant la finalisation de
@@ -196,9 +194,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Extension 17 — industrialisation, bilan, évaluation finale
-        ═══════════════════════════════════════════════════════════════
     -->
 
     <record id="rule_industrialisation_portal" model="ir.rule">
@@ -224,7 +220,7 @@
     </record>
 
     <!--
-        ⚠ Section 29 — le porteur ne lit pas l'avis du cluster.
+        Section 29 — le porteur ne lit pas l'avis du cluster.
 
         Même raisonnement que la confidentialité des avis d'évaluation : l'écart
         entre l'avis du porteur et celui du cluster est le seul renseignement
@@ -271,9 +267,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Extension 18 — section 32, ce qui manquait
-        ═══════════════════════════════════════════════════════════════
 
         Le tableau de la section 32 nomme cinq acteurs. Un employé ordinaire
         n'en fait pas partie — or il n'existait **aucune** `ir.rule` sur
@@ -286,7 +280,7 @@
         rédaction. Le domaine s'appuie sur `workflow_stage_id.code`, donc sur la
         configuration : le processus peut changer sans que cette règle bouge.
 
-        ⚠ Rappel de sémantique Odoo : les règles portées par les différents
+        Rappel de sémantique Odoo : les règles portées par les différents
         groupes d'un même utilisateur sont **unies** (OR), pas intersectées. Un
         gestionnaire Innovation, qui est aussi `base.group_user`, retrouve donc
         l'accès complet par sa propre règle ci-dessous — il ne se le voit pas
@@ -339,7 +333,7 @@
     </record>
 
     <!--
-        ⚠ **Les lignes « Expert » et « Investisseur » de la section 32 ne sont
+        **Les lignes « Expert » et « Investisseur » de la section 32 ne sont
         volontairement PAS traduites en `ir.rule` permissive.**
 
         On pourrait écrire `[('workflow_instance_id.actor_ids.user_id', '=',
@@ -362,11 +356,9 @@
     -->
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Extension 16 — accompagnement et livrables
-        ═══════════════════════════════════════════════════════════════
 
-        ⚠ Le porteur accède à **son** accompagnement, l'expert au sien par sa
+        Le porteur accède à **son** accompagnement, l'expert au sien par sa
         ligne `instance.actor` sur le livrable. Comme partout ailleurs dans ce
         module, la visibilité fine se tranche dans le contrôleur par
         `instance._has_access()` ; ces règles sont le plancher de la base.

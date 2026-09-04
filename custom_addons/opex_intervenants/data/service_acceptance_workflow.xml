@@ -1,0 +1,406 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LE CONSTAT DE SERVICE FAIT — §27, §28, Schéma 11
+
+            Quatrième définition du module, dixième du projet.
+
+            Le Schéma 11 donne l'enchaînement :
+
+                Mission en cours → Livrables terminés → Validation finale
+                → Mission terminée → { Facturation, Évaluation }
+
+            « Validation finale » est le seul de ces cinq nœuds qui soit un
+            **processus** : deux parties se prononcent l'une après l'autre, le
+            client peut contester, et une contestation renvoie le constat au
+            cluster. Les autres sont des étapes de la mission, et elles
+            existent depuis l'Extension 1.
+
+            **La facturation, elle, n'a pas de définition** — voir l'en-tête
+            de `models/mission_invoicing.py`. Les quatre cases du Schéma 12
+            sont celles de `sale.order` et d'`account.move`, qu'Odoo tient déjà.
+
+            UNE SEULE ÉTAPE `is_end`, ET C'EST LA RÈGLE 14
+
+            `accepted` est finale ; `disputed` ne l'est pas et boucle vers
+            l'amont.
+
+            La règle 14 est née à l'Extension 7 sur ce défaut exact :
+            `do_transition()` pose `state = 'done'` en atteignant **n'importe
+            quelle** étape `is_end` (`workflow_instance.py:769`). Marquer la
+            contestation comme finale ferait qu'un constat **refusé** clôt son
+            instance — et le fait paraître terminé à tout ce qui l'interroge.
+
+            Ici la conséquence serait mesurable en argent : `is_accepted` teste
+            l'étape et non l'état de l'instance, donc il resterait juste — mais
+            plus aucune transition ne serait franchissable
+            (`_check_transition_allowed()` refuse tout sur une instance close),
+            et « Reprendre après contestation » disparaîtrait. Un client ayant
+            contesté fermerait la mission définitivement.
+
+            `_check_graph()` ne dit rien : deux étapes finales sont un graphe
+            valide. Seuls les tests dédiés le signalent.
+        -->
+
+        <!-- Les conditions -->
+
+        <!--
+            §28 — les quatre points de la validation finale, en condition.
+
+            « La validation finale confirme que : les objectifs ont été
+              atteints, les livrables sont complets, les corrections ont été
+              effectuées, la prestation correspond au contrat. »
+
+            Quatre cases à cocher que rien ne lirait seraient un aide-mémoire.
+            Celles-ci ferment la transition, et le message dit laquelle manque
+            — enfin, il dit qu'il en manque une : le moteur restitue le message
+            de la règle, pas le détail de son expression. C'est assumé, les
+            quatre cases étant sous les yeux de celui qui clique.
+        -->
+        <record id="rule_service_checklist" model="opex.workflow.rule">
+            <field name="name">Les quatre points du §28 sont confirmés</field>
+            <field name="code">service_acceptance_checklist</field>
+            <field name="expression">field('objectifs_atteints') and field('livrables_complets') and field('corrections_effectuees') and field('conforme_contrat')</field>
+            <field name="message">Les quatre points de la validation finale (§28) doivent être confirmés : objectifs atteints, livrables complets, corrections effectuées, prestation conforme au contrat.</field>
+        </record>
+
+        <!--
+            La règle 6 du §39 ne figure pas ici : elle est **déclarée depuis
+            l'Extension 1** dans `mission_request_workflow.xml`, et c'est cet
+            enregistrement-là qui est rattaché plus bas — aux deux transitions.
+            Une seconde règle disant la même chose aurait divergé.
+        -->
+
+        <!-- Les notifications du §47
+
+             Déclarées avant les transitions qui les référencent : le
+             chargement d'un fichier de données est séquentiel, et un `ref()`
+             vers un enregistrement pas encore créé fait échouer
+             l'installation.
+        -->
+
+        <record id="action_sa_notify_client" model="opex.workflow.action">
+            <field name="name">Demander la validation finale au client</field>
+            <field name="code">service_notify_client</field>
+            <field name="action_type">notify</field>
+            <!--
+                `comment` : le client est un compte portail, et la cloche
+                écarte les `mt_note` via `_get_search_domain_share()`. En
+                `note`, la demande de validation ne lui parviendrait pas — et
+                c'est la seule chose que le §28 lui demande de faire.
+            -->
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="body" type="html"><p>Le cluster a vérifié la réalisation de votre mission. La validation finale du service fait vous revient : elle confirme que les objectifs sont atteints, les livrables complets et la prestation conforme au contrat.</p></field>
+        </record>
+
+        <record id="action_sa_task_client" model="opex.workflow.action">
+            <field name="name">Relancer la validation client</field>
+            <field name="code">service_task_client</field>
+            <field name="action_type">create_task</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="deadline_days">10</field>
+            <field name="description">Le §28 ne prévoit pas de validation tacite : sans réponse du client, quelqu'un doit le relancer. La tâche donne à ce « quelqu'un » un nom et une échéance.</field>
+        </record>
+
+        <record id="action_sa_notify_accepted" model="opex.workflow.action">
+            <field name="name">Annoncer le service fait</field>
+            <field name="code">service_notify_accepted</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Le service fait est validé. La mission peut être acceptée puis facturée.</p></field>
+        </record>
+
+        <record id="action_sa_notify_disputed" model="opex.workflow.action">
+            <field name="name">Signaler la contestation au cluster</field>
+            <field name="code">service_notify_disputed</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('opex_workflow.role_secretariat')])]"/>
+            <field name="body" type="html"><p>Le client conteste le service fait. Le motif figure dans l'historique du constat.</p></field>
+        </record>
+
+        <!-- La définition -->
+
+        <!--
+            `initiator_role_id` volontairement absent, pour la troisième
+            fois du module et pour la même raison qu'aux Extensions 1 et 7.
+
+            Le constat est créé par le déclencheur de « Soumettre les
+            livrables », donc sous l'identité du **responsable** — ou de
+            l'intervenant. Le moteur poserait le rôle sur `initiator_id`,
+            c'est-à-dire sur lui (`workflow_definition.py:89-97`) : celui qui
+            remet les livrables recevrait le rôle `client` en accès `full` sur
+            le constat, et validerait sa propre prestation.
+
+            Les acteurs sont posés par `ServiceAcceptance._grant_actors()`,
+            depuis `mission_id.client_id` et depuis les affectations.
+        -->
+        <record id="wf_service_acceptance" model="opex.workflow.definition">
+            <field name="name">Constat de service fait</field>
+            <field name="code">mission_service_acceptance</field>
+            <field name="model_id" ref="model_opex_service_acceptance"/>
+            <field name="description">Validation finale d'une mission : vérification du cluster, validation du client, service fait. §27 et §28 du Module 3 — Schéma 11. La contestation du client renvoie le constat au cluster ; elle n'est pas une fin.</field>
+        </record>
+
+        <!-- Étapes -->
+
+        <record id="sast_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">draft</field>
+            <field name="name">Constat à établir</field>
+            <field name="user_label">Vérification du cluster en cours</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="sla_days">7</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="sast_cluster_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">cluster_validated</field>
+            <field name="name">Validé par le cluster</field>
+            <field name="user_label">Action requise : valider le service fait</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="description">§27 — « Le client ou le responsable habilité valide la réalisation. » L'acteur attendu est le client ; la transition reste ouverte au responsable, que le document autorise explicitement.</field>
+        </record>
+
+        <record id="sast_disputed" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">disputed</field>
+            <field name="name">Contesté par le client</field>
+            <field name="user_label">Service fait contesté</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="description">Volontairement **non** `is_end`. Une contestation clôturerait l'instance et rendrait « Reprendre après contestation » infranchissable : le client qui conteste fermerait la mission définitivement. Règle 14 du CLAUDE.md.</field>
+        </record>
+
+        <record id="sast_accepted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">accepted</field>
+            <field name="name">Service fait</field>
+            <field name="user_label">Service fait validé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">40</field>
+        </record>
+
+        <!-- Transitions -->
+
+        <record id="satr_validate_cluster" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">service_validate_cluster</field>
+            <field name="name">Valider (cluster)</field>
+            <field name="source_stage_id" ref="sast_draft"/>
+            <field name="target_stage_id" ref="sast_cluster_validated"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_sa_notify_client'), ref('action_sa_task_client')])]"/>
+        </record>
+
+        <record id="satr_validate_client" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">service_validate_client</field>
+            <field name="name">Valider le service fait</field>
+            <field name="source_stage_id" ref="sast_cluster_validated"/>
+            <field name="target_stage_id" ref="sast_accepted"/>
+            <field name="sequence">20</field>
+            <!--
+                §27 : « Le client **ou le responsable habilité** valide la
+                réalisation. » Les deux rôles, à la lettre du document. Le
+                responsable ne s'en sert que si le client ne répond pas — la
+                tâche de relance ci-dessus est là pour qu'il essaie d'abord.
+            -->
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_client'), ref('role_mission_manager')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_sa_notify_accepted')])]"/>
+        </record>
+
+        <record id="satr_dispute" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">service_dispute</field>
+            <field name="name">Contester le service fait</field>
+            <field name="source_stage_id" ref="sast_cluster_validated"/>
+            <field name="target_stage_id" ref="sast_disputed"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <!--
+                Contester sans dire quoi est le « ce n'est pas ce que
+                j'attendais » auquel l'intervenant n'a pas de réponse. Le motif
+                est journalisé, et c'est là que `validation_entries()` le relit
+                — pas dans un champ qui serait écrasé à la contestation
+                suivante.
+            -->
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_sa_notify_disputed')])]"/>
+        </record>
+
+        <record id="satr_rework" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_service_acceptance"/>
+            <field name="code">service_rework</field>
+            <field name="name">Reprendre après contestation</field>
+            <field name="source_stage_id" ref="sast_disputed"/>
+            <field name="target_stage_id" ref="sast_draft"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="description">La boucle qui fait de ce cycle un graphe et non une séquence. C'est elle qui interdit de marquer `disputed` comme finale.</field>
+        </record>
+
+        <!-- Les déclencheurs du côté de la mission -->
+
+        <record id="action_mis_trigger_acceptance" model="opex.workflow.action">
+            <field name="name">Ouvrir le constat de service fait</field>
+            <field name="code">mission_trigger_acceptance</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">10</field>
+            <field name="field_id" ref="field_opex_mission_request__operational_trigger"/>
+            <field name="value_expression">'service_acceptance'</field>
+            <field name="description">§27 — le constat instruit la validation finale, il doit donc exister avant qu'elle soit prononcée. Posé sur « Soumettre les livrables » et non sur « Valider le service fait », qui la conclut.</field>
+        </record>
+
+        <record id="action_mis_trigger_invoicing" model="opex.workflow.action">
+            <field name="name">Émettre la commande et la facture</field>
+            <field name="code">mission_trigger_invoicing</field>
+            <field name="action_type">set_field</field>
+            <field name="sequence">10</field>
+            <field name="field_id" ref="field_opex_mission_request__operational_trigger"/>
+            <field name="value_expression">'invoicing'</field>
+            <field name="description">§29 — `sale.order` confirmée puis facturée, avec le client, l'intervenant, la référence, le montant, la prestation et la date que le document énumère.</field>
+        </record>
+
+        <record id="action_mis_notify_invoiced" model="opex.workflow.action">
+            <field name="name">Annoncer la facturation</field>
+            <field name="code">mission_notify_invoiced</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">20</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_client'), ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>La mission est clôturée et la facturation est émise. Le détail figure dans votre espace.</p></field>
+        </record>
+
+    </data>
+
+    <!--
+        HORS DU BLOC `noupdate`
+
+        Les transitions visées ont été créées par l'Extension 1, dans un bloc
+        `noupdate="1"`. Le drapeau est stocké **par enregistrement** dans
+        `ir_model_data` : un `<record>` qui les redéfinirait serait ignoré à la
+        mise à jour, sans erreur ni avertissement. Seul un
+        `<function name="write">` hors bloc les modifie.
+
+        `Command.link` et non `Command.set` partout : `mtr_deliver` porte déjà
+        la condition de dépôt posée par l'Extension 8, et un `set` la
+        retirerait — silencieusement, et on ne s'en apercevrait qu'à la
+        première mission remise sans livrable.
+    -->
+
+    <!--
+        1. LE CONSTAT S'OUVRE À LA REMISE DES LIVRABLES.
+    -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_deliver')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_trigger_acceptance')),
+        ]}"/>
+    </function>
+
+    <!--
+        2. LA RÈGLE 6 DU §39 — DEUX TRANSITIONS, UNE SEULE RÈGLE
+
+            « Une mission ne doit pas être considérée comme complètement
+              terminée tant que les livrables obligatoires ne sont pas
+              validés. »
+
+        `rule_mission_deliverables_validated` a été **déclarée à l'Extension 1**
+        et laissée rattachée à rien : son champ n'existait pas, et son défaut
+        de repli — `field('deliverable_unvalidated_count', 1) == 0` — la rendait
+        fermée. Le champ existe depuis l'Extension 8 ;
+        `mission_request_workflow.xml` annonçait sur `mtr_accept_service` que
+        « la règle 6 y sera rattachée par l'Extension 9 ». Elle l'est.
+
+        **Le même enregistrement de règle garde aussi la validation du
+        cluster.** Ce n'est pas une seconde règle : c'est la même, rattachée à
+        la seconde transition où « terminé » se décide. `field()` résout sur
+        l'enregistrement piloté — la mission ici, le constat là —, et
+        `opex.service.acceptance.deliverable_unvalidated_count` est le
+        `related` qui le lui permet.
+
+        Écrire une règle jumelle pour le constat aurait été l'autre issue, et
+        la mauvaise : deux définitions du même prédicat divergent au premier
+        ajustement, sans que rien ne le signale. C'est la leçon de la règle 16,
+        prise du bon côté.
+
+        Il n'y a donc, et il n'y aura, aucun `if livrables_valides` dans une
+        méthode : la condition est ici, le moteur la lit, l'utilisateur en lit
+        le message quand elle bloque, et `_evaluate_conditions()` la consigne
+        dans l'historique du dossier.
+    -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('satr_validate_cluster')]"/>
+        <value eval="{'condition_ids': [
+            Command.link(ref('rule_service_checklist')),
+            Command.link(ref('rule_mission_deliverables_validated')),
+        ]}"/>
+    </function>
+
+    <!--
+        3. « VALIDER LE SERVICE FAIT » SUR LA MISSION.
+
+        Deux conditions, et elles ne disent pas la même chose :
+
+        - la règle 6 : les livrables obligatoires sont validés ;
+        - `rule_mission_service_accepted` : le constat du §28 a été prononcé,
+          par le cluster **puis** par le client.
+
+        Sans la seconde, le constat serait décoratif — le responsable
+        franchirait « Valider le service fait » sans que le client se soit
+        exprimé, et le §27 dit précisément le contraire.
+
+        Elle n'a pas besoin de défaut de repli : `_field()` renvoie `False`
+        pour un champ absent, et `bool(False)` refuse. Une condition qu'on ne
+        sait pas évaluer doit bloquer, et celle-ci le fait sans qu'on ait à
+        l'écrire — c'est le cas favorable de l'idiome de l'Extension 1, pas une
+        exception à celui-ci.
+    -->
+    <record id="rule_mission_service_accepted" model="opex.workflow.rule">
+        <field name="name">Le constat de service fait est validé</field>
+        <field name="code">mission_service_accepted</field>
+        <field name="expression">bool(field('service_fait_valide'))</field>
+        <field name="message">Le constat de service fait (§28) doit être validé par le cluster puis par le client avant que la mission soit acceptée.</field>
+    </record>
+
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_accept_service')]"/>
+        <value eval="{'condition_ids': [
+            Command.link(ref('rule_mission_deliverables_validated')),
+            Command.link(ref('rule_mission_service_accepted')),
+        ]}"/>
+    </function>
+
+    <!--
+        4. « FACTURER ET CLÔTURER » FACTURE ENFIN.
+
+        L'Extension 1 avait écrit sur cette transition que « l'Extension 9 y
+        rattachera la création du `sale.order` ». C'est fait.
+    -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_close')]"/>
+        <value eval="{'action_ids': [
+            Command.link(ref('action_mis_trigger_invoicing')),
+            Command.link(ref('action_mis_notify_invoiced')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_service_acceptance')]]"/>
+</odoo>

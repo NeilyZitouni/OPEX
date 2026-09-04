@@ -4,7 +4,7 @@ from odoo import api, fields, models
 class WorkflowTransition(models.Model):
     """Un passage possible d'une étape à une autre.
 
-    ⚠ **Plusieurs transitions partent d'une même étape.** C'est ce qui produit
+    **Plusieurs transitions partent d'une même étape.** C'est ce qui produit
     le GO / À clarifier / NO GO / Orientation d'une pré-analyse et le
     Accepté / Ajourné / Refusé d'un comité. Aucune contrainte d'unicité ne porte
     sur `source_stage_id` : supposer qu'une étape n'a qu'une sortie

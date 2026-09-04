@@ -25,7 +25,7 @@ Le moteur ne contient aucune logique métier : il ne connaît ni « projet », n
     #
     # `mail` : le suivi (`tracking=True`) des définitions et le `message_post()`
     #          des actions de notification.
-    # `portal` : ⚠ **écart assumé** au « base + mail, rien d'autre » de la
+    # `portal` : **écart assumé** au « base + mail, rien d'autre » de la
     #          spécification, ajouté en Extension 6. Les formulaires dynamiques
     #          doivent se rendre sur une vraie page portail, et le portail
     #          générique de l'Extension 8 en aura besoin de toute façon.

@@ -1,0 +1,844 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Le socle de la taxonomie du §8 — six domaines, seize familles,
+        cinquante-deux compétences, quarante-huit synonymes.
+
+        POURQUOI PAS DE noupdate="1"
+
+        Contrairement aux workflows, ce catalogue ne porte aucun état
+        d'exécution : pas de compteur de séquence, pas d'instance en cours.
+        Un `-u` doit redéployer la version du fichier, qui est la référence.
+
+        Ce que cela implique, et qui est voulu : un libellé corrigé ici
+        écrase la correction faite à l'écran. C'est le bon sens de la
+        dépendance — le socle est livré, les ajouts du cluster passent par
+        l'arbitrage et reçoivent des identifiants qui ne sont pas les nôtres.
+        Aucun `-u` n'y touche.
+
+        POURQUOI CES COMPÉTENCES-LÀ
+
+        Elles sont tirées de ce que le portail sait déjà faire : les types de
+        mission semés à l'Extension 1 (audit, formation, conseil,
+        accompagnement) et les critères de matching de l'Extension 4. Un
+        catalogue qui ne recouvrirait pas les missions que le cluster publie
+        enverrait tout en arbitrage dès le premier CV.
+
+        LES SYNONYMES SONT LA MOITIÉ DU TRAVAIL
+
+        Sans eux, l'étape 1 du rapprochement ne reconnaît que l'orthographe
+        exacte, et tout part en arbitrage — la file devient inutilisable et
+        le gestionnaire cesse de la regarder. Les sigles (SI, QHSE, RGPD) et
+        les formes anglaises sont ceux qu'un CV algérien écrit réellement.
+
+        ATTENTION : deux libellés qui se normalisent pareil rendent le
+        rapprochement ambigu, et `resolve_label()` refuse alors de choisir -
+        c'est le défaut trouvé en écrivant les tests de l'IA-2. Le test
+        `test_the_seeded_catalogue_has_no_normalisation_collision` vérifie
+        que ce fichier n'en introduit aucune.
+    -->
+    <data>
+
+        <!-- ============================================================
+             DOMAINES
+             ============================================================ -->
+
+        <record id="skill_domain_audit" model="opex.skill.domain">
+            <field name="name">Audit et contrôle</field>
+            <field name="code">AUD</field>
+            <field name="sequence">10</field>
+            <field name="description">Audit de conformité, audit interne, contrôle de gestion, maîtrise des risques.</field>
+        </record>
+
+        <record id="skill_domain_si" model="opex.skill.domain">
+            <field name="name">Systèmes d'information</field>
+            <field name="code">SI</field>
+            <field name="sequence">20</field>
+            <field name="description">Gouvernance SI, sécurité, données, transformation numérique.</field>
+        </record>
+
+        <record id="skill_domain_qhse" model="opex.skill.domain">
+            <field name="name">Qualité, hygiène, sécurité, environnement</field>
+            <field name="code">QHSE</field>
+            <field name="sequence">30</field>
+            <field name="description">Systèmes de management, certification, HSE industrielle.</field>
+        </record>
+
+        <record id="skill_domain_management" model="opex.skill.domain">
+            <field name="name">Management et organisation</field>
+            <field name="code">MGT</field>
+            <field name="sequence">40</field>
+            <field name="description">Conduite de projet, organisation, accompagnement du changement.</field>
+        </record>
+
+        <record id="skill_domain_finance" model="opex.skill.domain">
+            <field name="name">Finance et juridique</field>
+            <field name="code">FIN</field>
+            <field name="sequence">50</field>
+            <field name="description">Comptabilité, fiscalité, droit des affaires, conformité.</field>
+        </record>
+
+        <record id="skill_domain_industrie" model="opex.skill.domain">
+            <field name="name">Ingénierie et industrie</field>
+            <field name="code">IND</field>
+            <field name="sequence">60</field>
+            <field name="description">Procédés, maintenance, énergie, génie civil.</field>
+        </record>
+
+        <!-- ============================================================
+             FAMILLES
+             ============================================================ -->
+
+        <record id="skill_family_audit_interne" model="opex.skill.family">
+            <field name="name">Audit interne et conformité</field>
+            <field name="code">AUD-INT</field>
+            <field name="domain_id" ref="skill_domain_audit"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="skill_family_audit_risques" model="opex.skill.family">
+            <field name="name">Maîtrise des risques</field>
+            <field name="code">AUD-RSK</field>
+            <field name="domain_id" ref="skill_domain_audit"/>
+            <field name="sequence">20</field>
+        </record>
+        <record id="skill_family_audit_controle" model="opex.skill.family">
+            <field name="name">Contrôle de gestion</field>
+            <field name="code">AUD-CDG</field>
+            <field name="domain_id" ref="skill_domain_audit"/>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="skill_family_si_gouvernance" model="opex.skill.family">
+            <field name="name">Gouvernance des systèmes d'information</field>
+            <field name="code">SI-GOV</field>
+            <field name="domain_id" ref="skill_domain_si"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="skill_family_si_securite" model="opex.skill.family">
+            <field name="name">Sécurité des systèmes d'information</field>
+            <field name="code">SI-SEC</field>
+            <field name="domain_id" ref="skill_domain_si"/>
+            <field name="sequence">20</field>
+        </record>
+        <record id="skill_family_si_data" model="opex.skill.family">
+            <field name="name">Données et intelligence artificielle</field>
+            <field name="code">SI-DAT</field>
+            <field name="domain_id" ref="skill_domain_si"/>
+            <field name="sequence">30</field>
+        </record>
+        <record id="skill_family_si_dev" model="opex.skill.family">
+            <field name="name">Développement et intégration</field>
+            <field name="code">SI-DEV</field>
+            <field name="domain_id" ref="skill_domain_si"/>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="skill_family_qhse_qualite" model="opex.skill.family">
+            <field name="name">Management de la qualité</field>
+            <field name="code">QHSE-QUA</field>
+            <field name="domain_id" ref="skill_domain_qhse"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="skill_family_qhse_hse" model="opex.skill.family">
+            <field name="name">Hygiène, sécurité et environnement</field>
+            <field name="code">QHSE-HSE</field>
+            <field name="domain_id" ref="skill_domain_qhse"/>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="skill_family_mgt_projet" model="opex.skill.family">
+            <field name="name">Conduite de projet</field>
+            <field name="code">MGT-PRJ</field>
+            <field name="domain_id" ref="skill_domain_management"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="skill_family_mgt_organisation" model="opex.skill.family">
+            <field name="name">Organisation et processus</field>
+            <field name="code">MGT-ORG</field>
+            <field name="domain_id" ref="skill_domain_management"/>
+            <field name="sequence">20</field>
+        </record>
+        <record id="skill_family_mgt_formation" model="opex.skill.family">
+            <field name="name">Formation et transfert de compétences</field>
+            <field name="code">MGT-FOR</field>
+            <field name="domain_id" ref="skill_domain_management"/>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="skill_family_fin_compta" model="opex.skill.family">
+            <field name="name">Comptabilité et fiscalité</field>
+            <field name="code">FIN-CPT</field>
+            <field name="domain_id" ref="skill_domain_finance"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="skill_family_fin_juridique" model="opex.skill.family">
+            <field name="name">Droit et conformité</field>
+            <field name="code">FIN-JUR</field>
+            <field name="domain_id" ref="skill_domain_finance"/>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="skill_family_ind_procedes" model="opex.skill.family">
+            <field name="name">Procédés et maintenance</field>
+            <field name="code">IND-PRO</field>
+            <field name="domain_id" ref="skill_domain_industrie"/>
+            <field name="sequence">10</field>
+        </record>
+        <record id="skill_family_ind_energie" model="opex.skill.family">
+            <field name="name">Énergie et environnement industriel</field>
+            <field name="code">IND-ENR</field>
+            <field name="domain_id" ref="skill_domain_industrie"/>
+            <field name="sequence">20</field>
+        </record>
+
+        <!-- ============================================================
+             COMPÉTENCES — le référentiel du Module 2, rangé
+             ============================================================ -->
+
+        <record id="skill_comp_audit_interne" model="opex.innovation.competence">
+            <field name="name">Audit interne</field>
+            <field name="code">AUD-INT-01</field>
+            <field name="family_id" ref="skill_family_audit_interne"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+        <record id="skill_comp_audit_si" model="opex.innovation.competence">
+            <field name="name">Audit des systèmes d'information</field>
+            <field name="code">AUD-INT-02</field>
+            <field name="family_id" ref="skill_family_audit_interne"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+        <record id="skill_comp_audit_conformite" model="opex.innovation.competence">
+            <field name="name">Audit de conformité réglementaire</field>
+            <field name="code">AUD-INT-03</field>
+            <field name="family_id" ref="skill_family_audit_interne"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+        <record id="skill_comp_audit_social" model="opex.innovation.competence">
+            <field name="name">Audit social et des ressources humaines</field>
+            <field name="code">AUD-INT-04</field>
+            <field name="family_id" ref="skill_family_audit_interne"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+
+        <record id="skill_comp_cartographie_risques" model="opex.innovation.competence">
+            <field name="name">Cartographie des risques</field>
+            <field name="code">AUD-RSK-01</field>
+            <field name="family_id" ref="skill_family_audit_risques"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+        <record id="skill_comp_controle_interne" model="opex.innovation.competence">
+            <field name="name">Dispositif de contrôle interne</field>
+            <field name="code">AUD-RSK-02</field>
+            <field name="family_id" ref="skill_family_audit_risques"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+        <record id="skill_comp_continuite" model="opex.innovation.competence">
+            <field name="name">Plan de continuité d'activité</field>
+            <field name="code">AUD-RSK-03</field>
+            <field name="family_id" ref="skill_family_audit_risques"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+
+        <record id="skill_comp_controle_gestion" model="opex.innovation.competence">
+            <field name="name">Contrôle de gestion</field>
+            <field name="code">AUD-CDG-01</field>
+            <field name="family_id" ref="skill_family_audit_controle"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+        <record id="skill_comp_tableau_bord" model="opex.innovation.competence">
+            <field name="name">Tableaux de bord et pilotage de la performance</field>
+            <field name="code">AUD-CDG-02</field>
+            <field name="family_id" ref="skill_family_audit_controle"/>
+            <field name="domaine">Audit et contrôle</field>
+        </record>
+
+        <record id="skill_comp_gouvernance_si" model="opex.innovation.competence">
+            <field name="name">Gouvernance des systèmes d'information</field>
+            <field name="code">SI-GOV-01</field>
+            <field name="family_id" ref="skill_family_si_gouvernance"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_schema_directeur" model="opex.innovation.competence">
+            <field name="name">Schéma directeur des systèmes d'information</field>
+            <field name="code">SI-GOV-02</field>
+            <field name="family_id" ref="skill_family_si_gouvernance"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_urbanisation" model="opex.innovation.competence">
+            <field name="name">Urbanisation et architecture applicative</field>
+            <field name="code">SI-GOV-03</field>
+            <field name="family_id" ref="skill_family_si_gouvernance"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_transformation_num" model="opex.innovation.competence">
+            <field name="name">Transformation numérique</field>
+            <field name="code">SI-GOV-04</field>
+            <field name="family_id" ref="skill_family_si_gouvernance"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+
+        <record id="skill_comp_ssi" model="opex.innovation.competence">
+            <field name="name">Sécurité des systèmes d'information</field>
+            <field name="code">SI-SEC-01</field>
+            <field name="family_id" ref="skill_family_si_securite"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_iso27001" model="opex.innovation.competence">
+            <field name="name">Mise en conformité ISO 27001</field>
+            <field name="code">SI-SEC-02</field>
+            <field name="family_id" ref="skill_family_si_securite"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_test_intrusion" model="opex.innovation.competence">
+            <field name="name">Test d'intrusion et audit technique</field>
+            <field name="code">SI-SEC-03</field>
+            <field name="family_id" ref="skill_family_si_securite"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_protection_donnees" model="opex.innovation.competence">
+            <field name="name">Protection des données personnelles</field>
+            <field name="code">SI-SEC-04</field>
+            <field name="family_id" ref="skill_family_si_securite"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+
+        <record id="skill_comp_data_analyse" model="opex.innovation.competence">
+            <field name="name">Analyse de données</field>
+            <field name="code">SI-DAT-01</field>
+            <field name="family_id" ref="skill_family_si_data"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_bi" model="opex.innovation.competence">
+            <field name="name">Informatique décisionnelle</field>
+            <field name="code">SI-DAT-02</field>
+            <field name="family_id" ref="skill_family_si_data"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_ia" model="opex.innovation.competence">
+            <field name="name">Intelligence artificielle et apprentissage automatique</field>
+            <field name="code">SI-DAT-03</field>
+            <field name="family_id" ref="skill_family_si_data"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_gouvernance_donnees" model="opex.innovation.competence">
+            <field name="name">Gouvernance des données</field>
+            <field name="code">SI-DAT-04</field>
+            <field name="family_id" ref="skill_family_si_data"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+
+        <record id="skill_comp_dev_web" model="opex.innovation.competence">
+            <field name="name">Développement web</field>
+            <field name="code">SI-DEV-01</field>
+            <field name="family_id" ref="skill_family_si_dev"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_erp" model="opex.innovation.competence">
+            <field name="name">Intégration de progiciel de gestion intégré</field>
+            <field name="code">SI-DEV-02</field>
+            <field name="family_id" ref="skill_family_si_dev"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_bases_donnees" model="opex.innovation.competence">
+            <field name="name">Administration de bases de données</field>
+            <field name="code">SI-DEV-03</field>
+            <field name="family_id" ref="skill_family_si_dev"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+        <record id="skill_comp_reseaux" model="opex.innovation.competence">
+            <field name="name">Réseaux et infrastructures</field>
+            <field name="code">SI-DEV-04</field>
+            <field name="family_id" ref="skill_family_si_dev"/>
+            <field name="domaine">Systèmes d'information</field>
+        </record>
+
+        <record id="skill_comp_iso9001" model="opex.innovation.competence">
+            <field name="name">Management de la qualité ISO 9001</field>
+            <field name="code">QHSE-QUA-01</field>
+            <field name="family_id" ref="skill_family_qhse_qualite"/>
+            <field name="domaine">Qualité, hygiène, sécurité, environnement</field>
+        </record>
+        <record id="skill_comp_amelioration_continue" model="opex.innovation.competence">
+            <field name="name">Amélioration continue et Lean</field>
+            <field name="code">QHSE-QUA-02</field>
+            <field name="family_id" ref="skill_family_qhse_qualite"/>
+            <field name="domaine">Qualité, hygiène, sécurité, environnement</field>
+        </record>
+        <record id="skill_comp_metrologie" model="opex.innovation.competence">
+            <field name="name">Métrologie et contrôle qualité</field>
+            <field name="code">QHSE-QUA-03</field>
+            <field name="family_id" ref="skill_family_qhse_qualite"/>
+            <field name="domaine">Qualité, hygiène, sécurité, environnement</field>
+        </record>
+
+        <record id="skill_comp_iso45001" model="opex.innovation.competence">
+            <field name="name">Santé et sécurité au travail ISO 45001</field>
+            <field name="code">QHSE-HSE-01</field>
+            <field name="family_id" ref="skill_family_qhse_hse"/>
+            <field name="domaine">Qualité, hygiène, sécurité, environnement</field>
+        </record>
+        <record id="skill_comp_iso14001" model="opex.innovation.competence">
+            <field name="name">Management environnemental ISO 14001</field>
+            <field name="code">QHSE-HSE-02</field>
+            <field name="family_id" ref="skill_family_qhse_hse"/>
+            <field name="domaine">Qualité, hygiène, sécurité, environnement</field>
+        </record>
+        <record id="skill_comp_etude_dangers" model="opex.innovation.competence">
+            <field name="name">Étude de dangers et analyse des risques industriels</field>
+            <field name="code">QHSE-HSE-03</field>
+            <field name="family_id" ref="skill_family_qhse_hse"/>
+            <field name="domaine">Qualité, hygiène, sécurité, environnement</field>
+        </record>
+
+        <record id="skill_comp_gestion_projet" model="opex.innovation.competence">
+            <field name="name">Gestion de projet</field>
+            <field name="code">MGT-PRJ-01</field>
+            <field name="family_id" ref="skill_family_mgt_projet"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+        <record id="skill_comp_gestion_portefeuille" model="opex.innovation.competence">
+            <field name="name">Gestion de portefeuille de projets</field>
+            <field name="code">MGT-PRJ-02</field>
+            <field name="family_id" ref="skill_family_mgt_projet"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+        <record id="skill_comp_methodes_agiles" model="opex.innovation.competence">
+            <field name="name">Méthodes agiles</field>
+            <field name="code">MGT-PRJ-03</field>
+            <field name="family_id" ref="skill_family_mgt_projet"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+
+        <record id="skill_comp_organisation" model="opex.innovation.competence">
+            <field name="name">Diagnostic organisationnel</field>
+            <field name="code">MGT-ORG-01</field>
+            <field name="family_id" ref="skill_family_mgt_organisation"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+        <record id="skill_comp_processus" model="opex.innovation.competence">
+            <field name="name">Cartographie et optimisation des processus</field>
+            <field name="code">MGT-ORG-02</field>
+            <field name="family_id" ref="skill_family_mgt_organisation"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+        <record id="skill_comp_conduite_changement" model="opex.innovation.competence">
+            <field name="name">Conduite du changement</field>
+            <field name="code">MGT-ORG-03</field>
+            <field name="family_id" ref="skill_family_mgt_organisation"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+
+        <record id="skill_comp_ingenierie_formation" model="opex.innovation.competence">
+            <field name="name">Ingénierie de formation</field>
+            <field name="code">MGT-FOR-01</field>
+            <field name="family_id" ref="skill_family_mgt_formation"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+        <record id="skill_comp_animation" model="opex.innovation.competence">
+            <field name="name">Animation de formation</field>
+            <field name="code">MGT-FOR-02</field>
+            <field name="family_id" ref="skill_family_mgt_formation"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+        <record id="skill_comp_coaching" model="opex.innovation.competence">
+            <field name="name">Coaching et accompagnement individuel</field>
+            <field name="code">MGT-FOR-03</field>
+            <field name="family_id" ref="skill_family_mgt_formation"/>
+            <field name="domaine">Management et organisation</field>
+        </record>
+
+        <record id="skill_comp_comptabilite" model="opex.innovation.competence">
+            <field name="name">Comptabilité générale</field>
+            <field name="code">FIN-CPT-01</field>
+            <field name="family_id" ref="skill_family_fin_compta"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+        <record id="skill_comp_fiscalite" model="opex.innovation.competence">
+            <field name="name">Fiscalité des entreprises</field>
+            <field name="code">FIN-CPT-02</field>
+            <field name="family_id" ref="skill_family_fin_compta"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+        <record id="skill_comp_analyse_financiere" model="opex.innovation.competence">
+            <field name="name">Analyse financière</field>
+            <field name="code">FIN-CPT-03</field>
+            <field name="family_id" ref="skill_family_fin_compta"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+        <record id="skill_comp_normes_ifrs" model="opex.innovation.competence">
+            <field name="name">Normes comptables internationales</field>
+            <field name="code">FIN-CPT-04</field>
+            <field name="family_id" ref="skill_family_fin_compta"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+
+        <record id="skill_comp_droit_affaires" model="opex.innovation.competence">
+            <field name="name">Droit des affaires</field>
+            <field name="code">FIN-JUR-01</field>
+            <field name="family_id" ref="skill_family_fin_juridique"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+        <record id="skill_comp_droit_travail" model="opex.innovation.competence">
+            <field name="name">Droit du travail</field>
+            <field name="code">FIN-JUR-02</field>
+            <field name="family_id" ref="skill_family_fin_juridique"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+        <record id="skill_comp_marches_publics" model="opex.innovation.competence">
+            <field name="name">Marchés publics</field>
+            <field name="code">FIN-JUR-03</field>
+            <field name="family_id" ref="skill_family_fin_juridique"/>
+            <field name="domaine">Finance et juridique</field>
+        </record>
+
+        <record id="skill_comp_maintenance" model="opex.innovation.competence">
+            <field name="name">Maintenance industrielle</field>
+            <field name="code">IND-PRO-01</field>
+            <field name="family_id" ref="skill_family_ind_procedes"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+        <record id="skill_comp_genie_procedes" model="opex.innovation.competence">
+            <field name="name">Génie des procédés</field>
+            <field name="code">IND-PRO-02</field>
+            <field name="family_id" ref="skill_family_ind_procedes"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+        <record id="skill_comp_automatisme" model="opex.innovation.competence">
+            <field name="name">Automatisme et supervision industrielle</field>
+            <field name="code">IND-PRO-03</field>
+            <field name="family_id" ref="skill_family_ind_procedes"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+        <record id="skill_comp_genie_civil" model="opex.innovation.competence">
+            <field name="name">Génie civil et bâtiment</field>
+            <field name="code">IND-PRO-04</field>
+            <field name="family_id" ref="skill_family_ind_procedes"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+
+        <record id="skill_comp_efficacite_energetique" model="opex.innovation.competence">
+            <field name="name">Efficacité énergétique</field>
+            <field name="code">IND-ENR-01</field>
+            <field name="family_id" ref="skill_family_ind_energie"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+        <record id="skill_comp_energies_renouvelables" model="opex.innovation.competence">
+            <field name="name">Énergies renouvelables</field>
+            <field name="code">IND-ENR-02</field>
+            <field name="family_id" ref="skill_family_ind_energie"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+        <record id="skill_comp_etude_impact" model="opex.innovation.competence">
+            <field name="name">Étude d'impact environnemental</field>
+            <field name="code">IND-ENR-03</field>
+            <field name="family_id" ref="skill_family_ind_energie"/>
+            <field name="domaine">Ingénierie et industrie</field>
+        </record>
+
+        <!-- ============================================================
+             SYNONYMES — l'étape 1 du rapprochement, celle qui est gratuite
+             ============================================================
+
+             `origine` vaut `socle` : ils sont livrés, par opposition à ceux
+             que l'arbitrage crée (`arbitrage`) et à ceux qu'un gestionnaire
+             saisit à la main (`manuel`). La distinction sert à savoir ce
+             qu'un `-u` va réécrire.
+        -->
+
+        <record id="skill_syn_audit_si_sigle" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_audit_si"/>
+            <field name="name">Audit SI</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_audit_si_en" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_audit_si"/>
+            <field name="name">IT audit</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_audit_si_info" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_audit_si"/>
+            <field name="name">Audit informatique</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_audit_interne_en" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_audit_interne"/>
+            <field name="name">Internal audit</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_audit_rh" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_audit_social"/>
+            <field name="name">Audit RH</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_risk_mapping" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_cartographie_risques"/>
+            <field name="name">Risk mapping</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_gestion_risques" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_cartographie_risques"/>
+            <field name="name">Gestion des risques</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_pca" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_continuite"/>
+            <field name="name">PCA</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_bcp" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_continuite"/>
+            <field name="name">Business continuity plan</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_cdg" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_controle_gestion"/>
+            <field name="name">CDG</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_kpi" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_tableau_bord"/>
+            <field name="name">Tableaux de bord KPI</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_gouvernance_sigle" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_gouvernance_si"/>
+            <field name="name">Gouvernance SI</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_cobit" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_gouvernance_si"/>
+            <field name="name">COBIT</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_itil" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_gouvernance_si"/>
+            <field name="name">ITIL</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_sdsi" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_schema_directeur"/>
+            <field name="name">SDSI</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_digitalisation" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_transformation_num"/>
+            <field name="name">Digitalisation</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_digital_transformation" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_transformation_num"/>
+            <field name="name">Digital transformation</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_ssi_sigle" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_ssi"/>
+            <field name="name">SSI</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_cybersecurite" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_ssi"/>
+            <field name="name">Cybersécurité</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_cybersecurity" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_ssi"/>
+            <field name="name">Cybersecurity</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_iso27001_court" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso27001"/>
+            <field name="name">ISO 27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_iso27001_colle" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso27001"/>
+            <field name="name">ISO27001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_smsi" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso27001"/>
+            <field name="name">SMSI</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_pentest" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_test_intrusion"/>
+            <field name="name">Pentest</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_rgpd" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_protection_donnees"/>
+            <field name="name">RGPD</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_gdpr" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_protection_donnees"/>
+            <field name="name">GDPR</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_data_analysis" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_data_analyse"/>
+            <field name="name">Data analysis</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_data_science" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_data_analyse"/>
+            <field name="name">Data science</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_bi" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_bi"/>
+            <field name="name">Business intelligence</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_ia_sigle" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_ia"/>
+            <field name="name">Intelligence artificielle</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_machine_learning" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_ia"/>
+            <field name="name">Machine learning</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_data_governance" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_gouvernance_donnees"/>
+            <field name="name">Data governance</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_web_dev" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_dev_web"/>
+            <field name="name">Web development</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_erp_sigle" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_erp"/>
+            <field name="name">ERP</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_dba" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_bases_donnees"/>
+            <field name="name">DBA</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_iso9001_court" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso9001"/>
+            <field name="name">ISO 9001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_smq" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso9001"/>
+            <field name="name">SMQ</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_lean" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_amelioration_continue"/>
+            <field name="name">Lean management</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_six_sigma" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_amelioration_continue"/>
+            <field name="name">Six Sigma</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_iso45001_court" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso45001"/>
+            <field name="name">ISO 45001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_hse" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso45001"/>
+            <field name="name">HSE</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_iso14001_court" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_iso14001"/>
+            <field name="name">ISO 14001</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_project_management" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_gestion_projet"/>
+            <field name="name">Project management</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_pmp" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_gestion_projet"/>
+            <field name="name">PMP</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_scrum" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_methodes_agiles"/>
+            <field name="name">Scrum</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_agile" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_methodes_agiles"/>
+            <field name="name">Agile</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_bpm" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_processus"/>
+            <field name="name">BPM</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_change_management" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_conduite_changement"/>
+            <field name="name">Change management</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_formateur" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_animation"/>
+            <field name="name">Formateur</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_scf" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_comptabilite"/>
+            <field name="name">SCF</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_ifrs" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_normes_ifrs"/>
+            <field name="name">IFRS</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_appels_offres" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_marches_publics"/>
+            <field name="name">Appels d'offres publics</field>
+            <field name="origine">socle</field>
+        </record>
+
+        <record id="skill_syn_gmao" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_maintenance"/>
+            <field name="name">GMAO</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_scada" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_automatisme"/>
+            <field name="name">SCADA</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_btp" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_genie_civil"/>
+            <field name="name">BTP</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_iso50001" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_efficacite_energetique"/>
+            <field name="name">ISO 50001</field>
+            <field name="origine">socle</field>
+        </record>
+        <record id="skill_syn_eie" model="opex.competence.synonyme">
+            <field name="competence_id" ref="skill_comp_etude_impact"/>
+            <field name="name">EIE</field>
+            <field name="origine">socle</field>
+        </record>
+
+    </data>
+</odoo>

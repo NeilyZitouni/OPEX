@@ -4,7 +4,7 @@ from odoo import fields, models
 class OpexCrowdfundingCompensationType(models.Model):
     """La contrepartie du CEO pour un accompagnement (section 12).
 
-    ⚠️ Le document est catégorique : « Le workflow ne doit pas coder en dur le
+    Le document est catégorique : « Le workflow ne doit pas coder en dur le
     modèle économique. La contrepartie doit être configurable. »
 
     C'est, avec les critères de pré-analyse, l'une des deux zones où la

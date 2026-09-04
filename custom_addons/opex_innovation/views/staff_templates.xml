@@ -60,7 +60,7 @@
         </div>
     </template>
 
-    <!-- ══════════ La file des demandes de profil ══════════ -->
+    <!-- La file des demandes de profil -->
 
     <template id="staff_profile_queue" name="Staff : demandes de profil à traiter">
         <t t-call="portal.portal_layout">
@@ -112,7 +112,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Le détail d'une demande de profil ══════════ -->
+    <!-- Le détail d'une demande de profil -->
 
     <template id="staff_profile_detail" name="Staff : contrôle d'une demande de profil">
         <t t-call="portal.portal_layout">
@@ -165,7 +165,7 @@
                     </t>
                 </table>
 
-                <!-- ═══ Les pièces, consultables ═══
+                <!-- Les pièces, consultables
                      Le lien passe par une route du staff plutôt que par
                      `/web/content` : la pièce y est résolue à travers la
                      demande, donc bornée au périmètre du contrôleur. -->
@@ -193,7 +193,7 @@
                     </tbody>
                 </table>
 
-                <!-- ═══ Les décisions ═══
+                <!-- Les décisions
                      Cet écran ne connaît ni « valider » ni « refuser » : il
                      affiche ce que la configuration ouvre à cette étape, pour
                      ce rôle. Ajouter une issue au processus l'ajoute ici. -->
@@ -253,7 +253,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Section 13 — La file de contrôle ══════════ -->
+    <!-- Section 13 — La file de contrôle -->
 
     <template id="staff_projects" name="Staff : projets à traiter">
         <t t-call="portal.portal_layout">
@@ -303,7 +303,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Section 13 — Le dossier vu par le contrôleur ══════════ -->
+    <!-- Section 13 — Le dossier vu par le contrôleur -->
 
     <template id="staff_project_detail" name="Staff : contrôle d'un projet">
         <t t-call="portal.portal_layout">
@@ -324,7 +324,7 @@
                 <div t-if="error" class="alert alert-danger mt-3" role="alert"
                      t-esc="error"/>
 
-                <!-- ═══ Section 14 — Fiche de qualification ═══
+                <!-- Section 14 — Fiche de qualification
                      Une vue, pas un modèle : la section 14 décrit un écran,
                      pas une entité. Un modèle stocké divergerait du projet à
                      la première modification. -->
@@ -338,7 +338,7 @@
                     </t>
                 </table>
 
-                <!-- ═══ Le porteur ═══ -->
+                <!-- Le porteur -->
                 <h5 class="mt-4">Porteur</h5>
                 <table class="table table-sm">
                     <tr><th style="width: 30%">Porteur</th>
@@ -350,7 +350,7 @@
                     <tr><th>Wilaya</th><td t-esc="project.wilaya or '—'"/></tr>
                 </table>
 
-                <!-- ═══ Description ═══ -->
+                <!-- Description -->
                 <h5 class="mt-4">Description</h5>
                 <table class="table table-sm">
                     <tr><th style="width: 30%">Résumé</th>
@@ -362,7 +362,7 @@
                         <td t-esc="project.proposition_valeur or '—'"/></tr>
                 </table>
 
-                <!-- ═══ Équipe ═══ -->
+                <!-- Équipe -->
                 <h5 class="mt-4">Équipe</h5>
                 <table t-if="project.team_member_ids" class="table table-sm">
                     <thead><tr><th>Nom</th><th>Fonction</th><th>Compétence</th></tr></thead>
@@ -380,7 +380,7 @@
                     Aucun membre d'équipe déclaré.
                 </p>
 
-                <!-- ═══ Documents ═══ -->
+                <!-- Documents -->
                 <h5 class="mt-4">Pièces jointes</h5>
                 <table t-if="project.document_ids" class="table table-sm">
                     <thead><tr><th>Type</th><th>Libellé</th><th>Fichier</th></tr></thead>
@@ -398,7 +398,7 @@
                     Aucune pièce jointe — le dossier est probablement incomplet.
                 </p>
 
-                <!-- ═══ Besoins et financement ═══ -->
+                <!-- Besoins et financement -->
                 <h5 class="mt-4">Besoins et financement</h5>
                 <table class="table table-sm">
                     <tr><th style="width: 30%">Compétences recherchées</th>
@@ -415,7 +415,7 @@
                         <td t-esc="project.utilisation_prevue or '—'"/></tr>
                 </table>
 
-                <!-- ═══ Les deux issues du contrôle ═══
+                <!-- Les deux issues du contrôle
                      Les actions proposées viennent du moteur. Cet écran ne
                      connaît ni « conforme » ni « incomplet » : il affiche ce
                      que la configuration autorise à cette étape, pour ce
@@ -466,7 +466,7 @@
                     </form>
                 </t>
 
-                <!-- ═══ Historique ═══ -->
+                <!-- Historique -->
                 <h5 class="mt-4">Historique</h5>
                 <table class="table table-sm">
                     <thead><tr><th>Date</th><th>Auteur</th><th>Étape</th><th>Commentaire</th></tr></thead>

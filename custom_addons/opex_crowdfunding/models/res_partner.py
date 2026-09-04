@@ -87,7 +87,7 @@ class ResPartner(models.Model):
         bien ses messages, mais son modèle n'était pas dans le périmètre : rien
         n'arrivait jusqu'à la cloche.
 
-        ⚠⚠ **INACTIVE EN L'ÉTAT — ne pas la croire sur parole.** Mesuré le
+        **INACTIVE EN L'ÉTAT — ne pas la croire sur parole.** Mesuré le
         28/08 : le MRO de `res.partner` est
         `opex_innovation → opex_membership → opex_crowdfunding`, et la méthode
         d'`opex_membership` est l'implémentation d'origine : elle renvoie un
@@ -110,7 +110,7 @@ class ResPartner(models.Model):
         installé, la méthode parente n'existe pas et un appel direct lèverait
         un `AttributeError` sur un module qui doit rester installable seul.
 
-        ⚠ Ne donne accès à rien : le filtrage des messages reste celui du
+        Ne donne accès à rien : le filtrage des messages reste celui du
         Module 1, `_get_search_domain_share()`, qui écarte les `mt_note`. Les
         29 `message_post()` internes de ce module n'entreront donc jamais dans
         la cloche d'un porteur, quoi qu'il arrive ici.

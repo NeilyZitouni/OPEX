@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Le privilege se raccroche à la catégorie posée par le Module 1 : les
+        trois domaines du portail apparaissent au même endroit dans les droits
+        d'accès, et l'administrateur ne cherche pas « Missions » ailleurs que
+        « Membership » et « Innovation ».
+    -->
+    <record id="privilege_opex_intervenants" model="res.groups.privilege">
+        <field name="name">Missions</field>
+        <field name="sequence">20</field>
+        <field name="category_id" ref="opex_membership.module_category_opex"/>
+    </record>
+
+    <!--
+        DEUX GROUPES, PAS CINQ
+
+        Le Secrétariat du §2.2 **réutilise** `opex_membership.group_secretariat` :
+        c'est le même secrétariat, il instruit déjà les dossiers d'adhésion et
+        les projets d'innovation, et `opex_workflow.role_secretariat` y est
+        rattaché par `opex_innovation`. Un second groupe aurait signifié une
+        seconde population à peupler à la main.
+
+        Le Client (§2.1) et l'Intervenant (§3.4) n'ont **pas** de groupe. Ce sont
+        des comptes portail : leurs rôles s'attribuent dossier par dossier, par
+        une ligne `opex.workflow.instance.actor`. C'est le principe même des
+        droits dynamiques — être expert du vivier n'ouvre aucune mission, c'est
+        la candidature qui ouvre celle-ci.
+
+        L'Administrateur du §3.5 décrit des droits techniques, pas un métier :
+        `base.group_system` les porte déjà.
+    -->
+
+    <record id="group_mission_manager" model="res.groups">
+        <field name="name">Responsable de mission</field>
+        <field name="privilege_id" ref="privilege_opex_intervenants"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Analyse le besoin, publie l'appel, pilote le sourcing et la sélection, suit l'exécution et contrôle les livrables. §2.3 du Module 3.</field>
+    </record>
+
+    <record id="group_mission_committee" model="res.groups">
+        <field name="name">Comité de sélection</field>
+        <field name="privilege_id" ref="privilege_opex_intervenants"/>
+        <field name="implied_ids" eval="[(4, ref('base.group_user'))]"/>
+        <field name="comment">Compare les candidatures et rend la décision d'attribution. « L'IA recommande, l'humain décide » — §4 de la spécification Smart Missions.</field>
+    </record>
+
+    <!--
+        UN GROUPE VIDE BLOQUE LE PROCESSUS SANS RIEN DIRE
+
+        Leçon payée sur `opex_innovation` (`security/security.xml:24-66`) et
+        reconduite ici sans discussion.
+
+        Rattacher un rôle à un groupe ne suffit pas : encore faut-il que
+        quelqu'un soit dedans. À l'installation, ces deux groupes sont **vides**.
+        Personne ne porte `role_mission_manager` ni `role_decideur`, donc
+        `_check_transition_allowed()` refuse leurs transitions à tout le monde et
+        `available_transitions()` ne les propose à personne.
+
+        Le symptôme est muet et tardif : le dépôt marche, la qualification
+        marche — et le dossier s'arrête net sur « Publier l'appel ». Aucune
+        erreur : la configuration est correcte, elle n'est simplement portée par
+        personne.
+
+        Il ne s'agit pas de donner un pouvoir métier à l'administrateur, mais
+        d'éviter un processus sans issue à la première mise en service. Le
+        gestionnaire réel prend ensuite le relais, et l'administrateur peut se
+        retirer des groupes une fois quelqu'un nommé.
+
+        `<function>` et non `<record>` : la ligne `ir_model_data` de
+        `base.user_admin` appartient au module `base` et porte `noupdate=1`. Un
+        `<record id="base.user_admin">` serait créé à l'installation puis ignoré
+        à toute mise à jour — le rattachement ne serait jamais rejoué sur une
+        base existante, c'est-à-dire précisément sur celles qui sont bloquées.
+
+        `Command.link` et non `Command.set` : on **ajoute** à ses groupes. Un
+        `set` retirerait l'administrateur de tous les autres, `base.group_system`
+        compris.
+    -->
+    <function model="res.users" name="write"
+              eval="[[ref('base.user_admin')],
+                     {'group_ids': [Command.link(ref('group_mission_manager')),
+                                    Command.link(ref('group_mission_committee'))]}]"/>
+
+    <!--
+        Et le Secrétariat, qui existe depuis le Module 1 mais que **personne
+        ne porte** sur une base neuve.
+
+        Vérifié : aucun des trois modules précédents n'inscrit qui que ce soit
+        dans `opex_membership.group_secretariat`. Sur une base fraîche, la
+        deuxième transition du parcours — « Prendre en charge la demande » — est
+        donc infranchissable, et l'appel s'arrête juste après sa soumission.
+
+        C'est le même défaut que celui du bloc précédent, à une nuance près : le
+        groupe n'est pas neuf, il est simplement vide. Le symptôme est
+        identique, et le remède aussi.
+
+        On **ajoute** l'administrateur à un groupe du Module 1 sans toucher à un
+        seul de ses fichiers : `Command.link` est additif, et le Module 1 reste
+        gelé comme convenu. Le secrétariat réel prend ensuite le relais.
+    -->
+    <function model="res.users" name="write"
+              eval="[[ref('base.user_admin')],
+                     {'group_ids': [Command.link(ref('opex_membership.group_secretariat'))]}]"/>
+
+</odoo>

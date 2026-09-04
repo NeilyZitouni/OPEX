@@ -1,0 +1,852 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LA TUILE D'ACCUEIL DU PORTAIL
+
+        `config_card` n'est pas décoratif. `portal.portal_docs_entry` ajoute
+        `d-none` à toute entrée qui ne fournit ni compteur non nul, ni
+        `config_card` :
+
+            <t t-set="force_show" t-value="placeholder_count and
+                request.session.get('portal_counters', {}).get(placeholder_count)
+                and not show_count"/>
+
+        Or un client qui n'a encore déposé aucune demande en a précisément
+        zéro : la tuile disparaîtrait exactement pour celui qui en a le plus
+        besoin, et il n'aurait aucun chemin vers « Créer une demande ». Le
+        compteur reste déclaré pour afficher le nombre quand il y en a un ;
+        `config_card` garantit que l'entrée existe toujours.
+
+        Piège payé sur le Module 1, retrouvé intact sur le Module 2.
+
+        `placeholder_count` est **unique dans toute la base**. Relevé fait
+        sur les trois modules précédents avant de choisir ce nom.
+        `portal_home_counters.js` résout chaque compteur par
+        `querySelector()`, qui ne renvoie que le **premier** nœud : deux tuiles
+        partageant une clé laisseraient la seconde masquée jusqu'au
+        rechargement suivant.
+    -->
+    <template id="portal_my_home_mission" name="Portail : mes demandes de mission"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="60">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">OPEX Intervenants — demander une intervention</t>
+                <t t-set="url" t-value="'/my/missions'"/>
+                <t t-set="text">Exprimez un besoin d'audit, de conseil, d'expertise ou de formation. Le cluster qualifie votre demande, puis mobilise les intervenants.</t>
+                <t t-set="placeholder_count" t-value="'intervenants_mission_count'"/>
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!--
+         Le fil des cinq écrans, partagé par tous
+
+        Cinq pastilles, pas six. Le §7 demande « cinq écrans courts » puis
+        « Soumettre la demande » : le récapitulatif est la page de soumission,
+        pas un sixième écran de saisie. Il réaffiche ce fil avec les cinq
+        étapes franchies — `step_index` vaut alors 5.
+    -->
+    <template id="portal_mission_steps" name="Étapes de la demande">
+        <ul class="nav nav-pills mb-4 flex-wrap">
+            <t t-foreach="steps" t-as="s">
+                <li class="nav-item">
+                    <span t-att-class="
+                        'nav-link active' if s_index == step_index
+                        else ('nav-link text-success' if s_index &lt; step_index
+                              else 'nav-link text-muted')">
+                        <t t-esc="s[1]"/>
+                    </span>
+                </li>
+            </t>
+        </ul>
+    </template>
+
+    <!-- Bandeau d'erreur, identique sur les six pages. -->
+    <template id="portal_mission_error" name="Erreur de saisie">
+        <div t-if="error" class="alert alert-warning" role="alert">
+            <t t-out="error"/>
+        </div>
+    </template>
+
+    <!--
+        §6 — LE TABLEAU DE BORD CLIENT
+
+        Aucun `search()` ni `search_count()` dans ce gabarit. Une requête ORM
+        posée en QWeb s'exécute sous l'identité du visiteur et fait tomber **la
+        page entière** en `AccessError` — pas le bloc fautif. Les quatre
+        indicateurs arrivent tout calculés du controller.
+    -->
+    <template id="portal_my_missions" name="Mes demandes de mission">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0">OPEX Intervenants — mes demandes</h3>
+                    <a class="btn btn-primary" href="/my/missions/new">
+                        + Créer une demande de mission
+                    </a>
+                </div>
+
+                <!-- Les quatre indicateurs du §6, dans son ordre. -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="display-6" t-out="dashboard['demandes']"/>
+                                <div class="text-muted">Mes demandes</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="display-6" t-out="dashboard['appels']"/>
+                                <div class="text-muted">Appels en cours</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="display-6" t-out="dashboard['en_cours']"/>
+                                <div class="text-muted">Missions en cours</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="display-6" t-out="dashboard['terminees']"/>
+                                <div class="text-muted">Missions terminées</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!--
+                    Message de reprise. Sans lui, un client revenu deux jours
+                    plus tard recommencerait une saisie qu'il a déjà faite.
+                -->
+                <div t-if="draft" class="alert alert-info d-flex justify-content-between align-items-center">
+                    <span>
+                        Vous avez une demande en cours de saisie :
+                        <strong t-out="draft.title"/>.
+                    </span>
+                    <a class="btn btn-sm btn-primary"
+                       t-attf-href="/my/missions/#{draft.id}/profil">Reprendre</a>
+                </div>
+
+                <!--
+                    §8 — le dossier renvoyé. Il est à l'étape « Brouillon »
+                    comme la saisie en cours, mais ce n'est pas la même chose :
+                    le cluster attend une correction, et le motif est affiché.
+                -->
+                <div t-foreach="a_completer" t-as="m"
+                     class="alert alert-warning">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span>
+                            <strong>Action requise</strong> sur
+                            <strong t-out="m.title"/> —
+                            le cluster demande un complément.
+                        </span>
+                        <a class="btn btn-sm btn-warning"
+                           t-attf-href="/my/missions/#{m.id}">Voir le motif</a>
+                    </div>
+                    <div t-if="m.complement_reason()" class="small mt-2"
+                         t-out="m.complement_reason()"/>
+                </div>
+
+                <div t-if="not missions" class="alert alert-light border">
+                    Vous n'avez encore déposé aucune demande.
+                    <a href="/my/missions/new">Créez votre première demande</a>.
+                </div>
+
+                <div t-if="missions" class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Mission</th>
+                                <th>Type</th>
+                                <th>État</th>
+                                <th class="text-end">Candidatures</th>
+                                <th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="missions" t-as="m">
+                                <td class="text-nowrap text-muted" t-out="m.name"/>
+                                <td t-out="m.title"/>
+                                <td t-out="m.mission_type_id.name"/>
+                                <td>
+                                    <!-- Le libellé utilisateur, jamais le code
+                                         technique de l'étape. -->
+                                    <span class="badge text-bg-light"
+                                          t-out="m.workflow_stage_label"/>
+                                </td>
+                                <td class="text-end">
+                                    <t t-if="m.workflow_stage_id.code in open_stages"
+                                       t-out="m.received_application_count"/>
+                                    <span t-else="" class="text-muted">—</span>
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-secondary"
+                                       t-attf-href="/my/missions/#{m.id}">Suivre</a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §7 — LES CINQ ÉCRANS
+    -->
+
+    <!-- Écran 1 — Informations générales -->
+
+    <template id="portal_mission_step_general" name="Demande — informations générales">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Créer une demande de mission</h3>
+                <t t-call="opex_intervenants.portal_mission_steps"/>
+                <t t-call="opex_intervenants.portal_mission_error"/>
+
+                <div t-if="mission" class="alert alert-info">
+                    Vous reprenez une demande commencée le
+                    <t t-out="mission.create_date"
+                       t-options="{'widget': 'date'}"/>.
+                </div>
+
+                <form method="post" action="/my/missions/new" class="mt-3">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="title">
+                            Titre de la mission <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control" name="title" id="title"
+                               required="required" placeholder="Audit cybersécurité"
+                               t-att-value="posted.get('title') or (mission.title if mission else '')"/>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="mission_type_id">
+                            Type de mission <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" name="mission_type_id"
+                                id="mission_type_id" required="required">
+                            <option value="">— Choisir —</option>
+                            <t t-foreach="mission_types" t-as="t">
+                                <option t-att-value="t.id"
+                                        t-att-selected="'selected' if mission and mission.mission_type_id == t else None"
+                                        t-out="t.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="description">
+                            Description du besoin <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" name="description" id="description"
+                                  rows="4" required="required"
+                                  placeholder="Décrivez le contexte et le besoin."
+                                  t-out="posted.get('description') or (mission.description if mission else '')"/>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="objectifs">
+                            Objectifs <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" name="objectifs" id="objectifs"
+                                  rows="3" required="required"
+                                  placeholder="Qu'attendez-vous de cette intervention ?"
+                                  t-out="posted.get('objectifs') or (mission.objectifs if mission else '')"/>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a class="btn btn-light" href="/my/missions">Annuler</a>
+                        <button type="submit" class="btn btn-primary">
+                            Continuer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- Écran 2 — Profil recherché -->
+
+    <template id="portal_mission_step_profil" name="Demande — profil recherché">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-out="mission.title"/>
+                <t t-call="opex_intervenants.portal_mission_steps"/>
+                <t t-call="opex_intervenants.portal_mission_error"/>
+
+                <form method="post"
+                      t-attf-action="/my/missions/#{mission.id}/profil" class="mt-3">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="domaine_id">
+                            Domaine <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" name="domaine_id" id="domaine_id"
+                                required="required">
+                            <option value="">— Choisir —</option>
+                            <t t-foreach="domaines" t-as="d">
+                                <option t-att-value="d.id"
+                                        t-att-selected="'selected' if mission.domaine_id == d else None"
+                                        t-out="d.name"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Compétences recherchées <span class="text-danger">*</span>
+                        </label>
+                        <div class="row">
+                            <div class="col-md-6" t-foreach="competences" t-as="c">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           name="skill_ids" t-att-value="c.id"
+                                           t-attf-id="skill_#{c.id}"
+                                           t-att-checked="'checked' if c in mission.skill_ids else None"/>
+                                    <label class="form-check-label"
+                                           t-attf-for="skill_#{c.id}" t-out="c.name"/>
+                                </div>
+                            </div>
+                        </div>
+                        <div t-if="not competences" class="text-muted small">
+                            Aucune compétence n'est encore déclarée au référentiel.
+                            Contactez le cluster.
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="annees_experience_min">
+                                Expérience minimale (années)
+                            </label>
+                            <input type="number" min="0" class="form-control"
+                                   name="annees_experience_min"
+                                   id="annees_experience_min"
+                                   t-att-value="mission.annees_experience_min or ''"/>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="niveau_experience">
+                                Niveau souhaité
+                            </label>
+                            <select class="form-select" name="niveau_experience"
+                                    id="niveau_experience">
+                                <option value="">— Indifférent —</option>
+                                <t t-foreach="mission._fields['niveau_experience'].selection"
+                                   t-as="opt">
+                                    <option t-att-value="opt[0]"
+                                            t-att-selected="'selected' if mission.niveau_experience == opt[0] else None"
+                                            t-out="opt[1]"/>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="certifications_souhaitees">
+                            Certifications souhaitées
+                        </label>
+                        <textarea class="form-control" name="certifications_souhaitees"
+                                  id="certifications_souhaitees" rows="2"
+                                  t-out="mission.certifications_souhaitees or ''"/>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a class="btn btn-light" href="/my/missions/new">Retour</a>
+                        <button type="submit" class="btn btn-primary">Continuer</button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- Écran 3 — Organisation -->
+
+    <template id="portal_mission_step_organisation" name="Demande — organisation">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-out="mission.title"/>
+                <t t-call="opex_intervenants.portal_mission_steps"/>
+                <t t-call="opex_intervenants.portal_mission_error"/>
+
+                <form method="post"
+                      t-attf-action="/my/missions/#{mission.id}/organisation"
+                      class="mt-3">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="date_debut_souhaitee">
+                                Date souhaitée de début
+                            </label>
+                            <input type="date" class="form-control"
+                                   name="date_debut_souhaitee" id="date_debut_souhaitee"
+                                   t-att-value="mission.date_debut_souhaitee or ''"/>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="date_fin_souhaitee">
+                                Date souhaitée de fin
+                            </label>
+                            <input type="date" class="form-control"
+                                   name="date_fin_souhaitee" id="date_fin_souhaitee"
+                                   t-att-value="mission.date_fin_souhaitee or ''"/>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="localisation">Localisation</label>
+                            <input type="text" class="form-control" name="localisation"
+                                   id="localisation" placeholder="Site, ville, ou à distance"
+                                   t-att-value="mission.localisation or ''"/>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="wilaya">Wilaya</label>
+                            <input type="text" class="form-control" name="wilaya"
+                                   id="wilaya" t-att-value="mission.wilaya or ''"/>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="mode_intervention">
+                            Mode d'intervention
+                        </label>
+                        <select class="form-select" name="mode_intervention"
+                                id="mode_intervention">
+                            <t t-foreach="mission._fields['mode_intervention'].selection"
+                               t-as="opt">
+                                <option t-att-value="opt[0]"
+                                        t-att-selected="'selected' if mission.mode_intervention == opt[0] else None"
+                                        t-out="opt[1]"/>
+                            </t>
+                        </select>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a class="btn btn-light"
+                           t-attf-href="/my/missions/#{mission.id}/profil">Retour</a>
+                        <button type="submit" class="btn btn-primary">Continuer</button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- Écran 4 — Budget -->
+
+    <template id="portal_mission_step_budget" name="Demande — budget">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-out="mission.title"/>
+                <t t-call="opex_intervenants.portal_mission_steps"/>
+                <t t-call="opex_intervenants.portal_mission_error"/>
+
+                <form method="post"
+                      t-attf-action="/my/missions/#{mission.id}/budget" class="mt-3">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="budget_estimatif">
+                                Budget estimatif
+                            </label>
+                            <div class="input-group">
+                                <input type="text" class="form-control"
+                                       name="budget_estimatif" id="budget_estimatif"
+                                       t-att-value="mission.budget_estimatif or ''"/>
+                                <span class="input-group-text"
+                                      t-out="mission.currency_id.symbol or ''"/>
+                            </div>
+                            <div class="form-text">
+                                Une estimation suffit. Elle reste confidentielle
+                                jusqu'à la publication de l'appel.
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="type_remuneration">
+                                Type de rémunération
+                            </label>
+                            <select class="form-select" name="type_remuneration"
+                                    id="type_remuneration">
+                                <option value="">— Indifférent —</option>
+                                <t t-foreach="mission._fields['type_remuneration'].selection"
+                                   t-as="opt">
+                                    <option t-att-value="opt[0]"
+                                            t-att-selected="'selected' if mission.type_remuneration == opt[0] else None"
+                                            t-out="opt[1]"/>
+                                </t>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="conditions_financieres">
+                            Modalités financières
+                        </label>
+                        <textarea class="form-control" name="conditions_financieres"
+                                  id="conditions_financieres" rows="3"
+                                  placeholder="Échéancier, conditions de règlement…"
+                                  t-out="mission.conditions_financieres or ''"/>
+                    </div>
+
+                    <div class="d-flex justify-content-between">
+                        <a class="btn btn-light"
+                           t-attf-href="/my/missions/#{mission.id}/organisation">Retour</a>
+                        <button type="submit" class="btn btn-primary">Continuer</button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!-- Écran 5 — Documents -->
+
+    <template id="portal_mission_step_documents" name="Demande — documents">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 t-out="mission.title"/>
+                <t t-call="opex_intervenants.portal_mission_steps"/>
+                <t t-call="opex_intervenants.portal_mission_error"/>
+
+                <div t-if="mission.document_ids" class="table-responsive mb-3">
+                    <table class="table table-sm align-middle">
+                        <thead>
+                            <tr><th>Type</th><th>Intitulé</th><th>Fichier</th><th/></tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="mission.document_ids" t-as="d">
+                                <td t-out="dict(document_types).get(d.document_type, d.document_type)"/>
+                                <td t-out="d.name"/>
+                                <td class="text-muted small" t-out="d.filename"/>
+                                <td class="text-end">
+                                    <form method="post"
+                                          t-attf-action="/my/missions/#{mission.id}/documents">
+                                        <input type="hidden" name="csrf_token"
+                                               t-att-value="request.csrf_token()"/>
+                                        <input type="hidden" name="action" value="remove"/>
+                                        <input type="hidden" name="document_id"
+                                               t-att-value="d.id"/>
+                                        <button type="submit"
+                                                class="btn btn-sm btn-outline-danger">
+                                            Retirer
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Ajouter une pièce</h6>
+                        <form method="post"
+                              t-attf-action="/my/missions/#{mission.id}/documents"
+                              enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="action" value="add"/>
+                            <div class="row">
+                                <div class="col-md-4 mb-2">
+                                    <label class="form-label" for="document_type">Type</label>
+                                    <select class="form-select" name="document_type"
+                                            id="document_type">
+                                        <t t-foreach="document_types" t-as="dt">
+                                            <option t-att-value="dt[0]" t-out="dt[1]"/>
+                                        </t>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <label class="form-label" for="doc_name">Intitulé</label>
+                                    <input type="text" class="form-control" name="name"
+                                           id="doc_name"/>
+                                </div>
+                                <div class="col-md-4 mb-2">
+                                    <label class="form-label" for="doc_file">Fichier</label>
+                                    <input type="file" class="form-control" name="file"
+                                           id="doc_file"/>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-outline-primary btn-sm">
+                                Déposer
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <form method="post"
+                      t-attf-action="/my/missions/#{mission.id}/documents">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+                    <div class="d-flex justify-content-between">
+                        <a class="btn btn-light"
+                           t-attf-href="/my/missions/#{mission.id}/budget">Retour</a>
+                        <button type="submit" class="btn btn-primary">
+                            Vérifier et soumettre
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!--
+         Récapitulatif et soumission
+
+        §7 : « Puis : Soumettre la demande ». Ce n'est pas un sixième écran de
+        saisie — rien ne s'y modifie — mais on ne soumet pas à l'aveugle une
+        demande qu'on ne pourra plus réécrire.
+    -->
+    <template id="portal_mission_step_recap" name="Demande — récapitulatif">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Vérifier et soumettre</h3>
+                <t t-call="opex_intervenants.portal_mission_steps"/>
+                <t t-call="opex_intervenants.portal_mission_error"/>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-4">Référence</dt>
+                            <dd class="col-sm-8" t-out="mission.name"/>
+                            <dt class="col-sm-4">Titre</dt>
+                            <dd class="col-sm-8" t-out="mission.title"/>
+                            <dt class="col-sm-4">Type</dt>
+                            <dd class="col-sm-8" t-out="mission.mission_type_id.name"/>
+                            <dt class="col-sm-4">Domaine</dt>
+                            <dd class="col-sm-8"
+                                t-out="mission.domaine_id.name or 'Non précisé'"/>
+                            <dt class="col-sm-4">Compétences</dt>
+                            <dd class="col-sm-8">
+                                <span t-foreach="mission.skill_ids" t-as="c"
+                                      class="badge text-bg-light me-1" t-out="c.name"/>
+                                <span t-if="not mission.skill_ids" class="text-muted">
+                                    Aucune
+                                </span>
+                            </dd>
+                            <dt class="col-sm-4">Période souhaitée</dt>
+                            <dd class="col-sm-8">
+                                <t t-out="mission.date_debut_souhaitee or '—'"/>
+                                →
+                                <t t-out="mission.date_fin_souhaitee or '—'"/>
+                            </dd>
+                            <dt class="col-sm-4">Mode d'intervention</dt>
+                            <dd class="col-sm-8">
+                                <t t-out="dict(mission._fields['mode_intervention'].selection).get(mission.mode_intervention, '—')"/>
+                            </dd>
+                            <dt class="col-sm-4">Budget estimatif</dt>
+                            <dd class="col-sm-8">
+                                <t t-out="mission.budget_estimatif"/>
+                                <t t-out="mission.currency_id.symbol or ''"/>
+                            </dd>
+                            <dt class="col-sm-4">Pièces jointes</dt>
+                            <dd class="col-sm-8" t-out="len(mission.document_ids)"/>
+                        </dl>
+                    </div>
+                </div>
+
+                <!--
+                    §8 — dit au client avant qu'il ne clique. Sa demande ne
+                    devient pas publique : elle part en qualification, et c'est
+                    le cluster qui décidera de la publier.
+                -->
+                <div class="alert alert-info">
+                    <strong>Ce qui se passe ensuite.</strong>
+                    Votre demande est transmise au cluster, qui la vérifie. Elle
+                    <strong>ne devient pas publique automatiquement</strong> : si
+                    elle est retenue, le cluster en fait un appel à mission et
+                    recherche les intervenants. Si un élément manque, la demande
+                    vous revient avec le motif.
+                    <br/>
+                    Une fois soumise, vous ne pourrez plus la modifier tant que
+                    le cluster ne vous la renvoie pas.
+                </div>
+
+                <form method="post"
+                      t-attf-action="/my/missions/#{mission.id}/recap">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox"
+                               name="confirm" id="confirm" value="1"/>
+                        <label class="form-check-label" for="confirm">
+                            Je confirme que les informations ci-dessus sont exactes.
+                        </label>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <a class="btn btn-light"
+                           t-attf-href="/my/missions/#{mission.id}/documents">Retour</a>
+                        <button type="submit" class="btn btn-primary">
+                            Soumettre la demande
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        LE SUIVI D'UNE DEMANDE
+
+        La progression et la prochaine action viennent du **moteur** —
+        `progress_steps()` et `next_action_label()`. Le métier n'écrit pas sa
+        propre version de « où en est mon dossier », et le client lit des
+        libellés utilisateur, jamais des codes d'étape.
+    -->
+    <template id="portal_mission_detail" name="Suivi de ma demande">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small" t-out="mission.name"/>
+                        <h3 class="mb-0" t-out="mission.title"/>
+                    </div>
+                    <a class="btn btn-light" href="/my/missions">Mes demandes</a>
+                </div>
+
+                <!-- §8 — le motif du retour, en évidence et pas au fond de
+                     l'historique. -->
+                <div t-if="complement" class="alert alert-warning">
+                    <strong>Le cluster demande un complément.</strong>
+                    <div class="mt-1" t-out="complement"/>
+                    <a t-if="editable" class="btn btn-sm btn-warning mt-2"
+                       t-attf-href="/my/missions/#{mission.id}/profil">
+                        Compléter ma demande
+                    </a>
+                </div>
+
+                <!--
+                    §40 — LA BARRE DE PROGRESSION DE LA FICHE DE MISSION
+
+                    > Demande — Appel — Sélection — Contrat —
+                    > Mission — Validation — Facturation — Évaluation
+
+                    Elle **ne remplace pas** la liste ci-dessous, elle la
+                    surplombe. Les deux répondent à deux questions
+                    différentes : la barre dit *où l'on en est dans le cycle
+                    de vie*, huit jalons pour tout le monde ; la liste dit
+                    *ce qu'il reste à faire sur ce dossier-ci*, en libellés
+                    d'étape. Le §40 demande la première, le §35 du Module 2 —
+                    dont ce gabarit hérite — demandait la seconde.
+
+                    Les huit jalons viennent du **modèle**
+                    (`mission_progress_bar()`), jamais d'un calcul en QWeb :
+                    une projection d'affichage se teste, un `t-if` en cascade
+                    dans un gabarit ne se teste pas.
+
+                    Un `search()` en QWeb ferait tomber la page entière en
+                    `AccessError` ; ici on appelle une méthode du dossier déjà
+                    résolu par le controller, ce qui est le cas admis.
+                -->
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Cycle de vie de la mission</h6>
+                        <div class="d-flex flex-wrap gap-3">
+                            <t t-foreach="mission.mission_progress_bar()" t-as="jalon">
+                                <div class="text-center">
+                                    <div>
+                                        <t t-if="jalon['etat'] == 'fait'">
+                                            <span class="text-success fs-5"></span>
+                                        </t>
+                                        <t t-elif="jalon['etat'] == 'en_cours'">
+                                            <span class="text-primary fs-5"></span>
+                                        </t>
+                                        <t t-else="">
+                                            <span class="text-muted fs-5"></span>
+                                        </t>
+                                    </div>
+                                    <small t-attf-class="d-block #{'fw-bold' if jalon['etat'] == 'en_cours' else 'text-muted'}"
+                                           t-out="jalon['libelle']"/>
+                                </div>
+                            </t>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">Où en est ma demande</h6>
+                        <ul class="list-unstyled mb-3">
+                            <li t-foreach="steps" t-as="s" class="mb-1">
+                                <t t-if="s['state'] == 'done'">
+                                    <span class="text-success"></span>
+                                    <span t-out="s['label']"/>
+                                </t>
+                                <t t-elif="s['state'] == 'current'">
+                                    <span class="text-primary"></span>
+                                    <strong t-out="s['label']"/>
+                                </t>
+                                <t t-else="">
+                                    <span class="text-muted"></span>
+                                    <span class="text-muted" t-out="s['label']"/>
+                                </t>
+                            </li>
+                        </ul>
+                        <p class="mb-0 text-muted" t-out="next_action"/>
+                    </div>
+                </div>
+
+                <div t-if="editable and not complement" class="alert alert-info d-flex justify-content-between align-items-center">
+                    <span>Cette demande est encore en cours de saisie.</span>
+                    <a class="btn btn-sm btn-primary"
+                       t-attf-href="/my/missions/#{mission.id}/profil">Reprendre</a>
+                </div>
+
+                <!--
+                    L'historique, préparé par le modèle sous forme de
+                    dictionnaires : c'est lui qui décide ce que le client a le
+                    droit de lire, pas cette page.
+                -->
+                <div class="mt-4">
+                    <h6>Historique</h6>
+                    <t t-set="entries" t-value="mission.history_entries()"/>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th style="width: 12rem;">Date</th>
+                                    <th>Événement</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr t-foreach="entries" t-as="entry">
+                                    <td class="text-nowrap text-muted">
+                                        <span t-out="entry['date']"
+                                              t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                                    </td>
+                                    <td>
+                                        <div t-out="entry['body']"/>
+                                        <div t-if="entry['comment']" class="small text-muted"
+                                             t-out="entry['comment']"/>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

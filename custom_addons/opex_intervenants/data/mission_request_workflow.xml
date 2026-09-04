@@ -1,0 +1,797 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LE WORKFLOW DE LA MISSION — 14 étapes, 32 transitions, en données
+
+            §12.1 de la spécification Smart Missions, arbitrage rendu :
+
+                DRAFT → QUALIFIED → SOURCING → OPEN → SELECTION → AWARDED
+                      → CONTRACTING → IN_PROGRESS → DELIVERED → ACCEPTED
+                      → CLOSED
+
+                Branches : ON_HOLD · CANCELLED · UNSUCCESSFUL
+
+            Pas une ligne de Python ne décrit ce processus. `MissionRequest` ne
+            connaît de lui qu'une chaîne de caractères, `mission_request`, et
+            n'a **aucun champ `state`**.
+
+            Les `user_label` viennent du document UX : le graphe système peut
+            être détaillé, ce que le client lit ne doit pas l'être. La table de
+            correspondance du CLAUDE.md dit où sont passés les noms d'états du
+            Module 3 — ils sont ici, en libellés, pas en étapes.
+
+             Quatre boucles, volontairement conservées
+
+            1. QUALIFIED → DRAFT → QUALIFIED — le « Informations manquantes →
+               retour au client » du Schéma 3, que ni le §38 ni le §12.1 ne
+               nomment. Le retour se fait en `draft` et non dans une étape
+               dédiée : c'est la seule étape où l'`ir.rule` rend au client le
+               droit d'écrire, et une étape de plus aurait dupliqué ce droit.
+            2. SELECTION → OPEN — rouvrir un appel dont la short-list ne vaut
+               rien.
+            3. AWARDED → SELECTION et CONTRACTING → SELECTION — le désistement
+               de l'intervenant retenu, exigé par le §2.4 (« accepter ou
+               refuser une mission attribuée »).
+            4. DELIVERED → IN_PROGRESS — les corrections du §25.
+
+            Sans elles, ce serait une file, pas un graphe.
+
+             Ce que ce fichier ne contient PAS, et pourquoi
+
+            **Aucune action.** L'Extension 1 pose les étapes, les transitions,
+            les rôles et les conditions ; les actions viennent avec les objets
+            qu'elles manipulent — matching (E4), contrat (E7), notifications
+            (E11). Elles se rattacheront à ces transitions-ci par
+            `<function name="write">`, exactement comme `matching_criteria.xml`
+            le fait dans `opex_innovation`. Une notification à moitié câblée
+            aujourd'hui serait une notification qui part au mauvais moment
+            demain.
+        -->
+
+        <!--
+             LES RÈGLES
+              -->
+
+        <record id="rule_mission_ready_to_submit" model="opex.workflow.rule">
+            <field name="name">Demande complète</field>
+            <field name="code">mission_ready_to_submit</field>
+            <field name="expression">bool(field('title') and field('mission_type_id') and field('description') and field('objectifs') and field('domaine_id') and field('skill_ids'))</field>
+            <field name="message">Complétez le titre, le type de mission, la description, les objectifs, le domaine et au moins une compétence recherchée avant de soumettre.</field>
+        </record>
+
+        <record id="rule_mission_has_deadline" model="opex.workflow.rule">
+            <field name="name">Conditions de sourcing définies</field>
+            <field name="code">mission_has_deadline</field>
+            <field name="expression">bool(field('date_limite_candidature') and field('sourcing_mode'))</field>
+            <field name="message">Fixez la date limite de candidature et le mode de sourcing avant de publier l'appel.</field>
+        </record>
+
+        <!--
+            Cette règle lit un champ calculé **non stocké**, et c'est ce qui
+            la rend juste.
+
+            `safe_eval` n'expose aucune date : `_BUILTINS`
+            (`odoo/tools/safe_eval.py`) ne contient ni `datetime`, ni `time`,
+            ni rien qui permette d'écrire « aujourd'hui » dans une expression.
+            Une condition ne peut donc pas comparer à la date du jour — c'est au
+            modèle de lui livrer le fait déjà calculé.
+
+            `date_limite_is_open` est recalculé à chaque lecture, donc à chaque
+            évaluation de cette condition. Un champ stocké se serait figé au
+            dernier recalcul et aurait laissé publier un appel dont la date
+            limite était passée depuis des semaines.
+        -->
+        <record id="rule_mission_deadline_open" model="opex.workflow.rule">
+            <field name="name">Date limite encore ouverte</field>
+            <field name="code">mission_deadline_open</field>
+            <field name="expression">bool(field('date_limite_is_open'))</field>
+            <field name="message">La date limite de candidature est déjà passée : reportez-la avant de publier l'appel.</field>
+        </record>
+
+        <record id="rule_mission_has_applications" model="opex.workflow.rule">
+            <field name="name">Au moins une candidature reçue</field>
+            <field name="code">mission_has_applications</field>
+            <field name="expression">field('received_application_count') &gt;= 1</field>
+            <field name="message">Aucune candidature n'a encore été déposée : il n'y a rien à sélectionner. Déclarez l'appel infructueux si la date limite est passée.</field>
+        </record>
+
+        <!--
+            Règle 4 du §39, en **deux** règles et non une.
+
+            Le moteur évalue toutes les conditions d'une transition et affiche
+            **tous** les messages qui bloquent (`_evaluate_conditions`,
+            `workflow_instance.py:378`). Deux règles donnent donc deux
+            diagnostics distincts — « vous n'avez retenu personne » et « vous en
+            avez retenu deux » — là où une expression unique aurait produit un
+            message qui décrit les deux cas et n'en explique aucun.
+        -->
+        <record id="rule_mission_has_selected" model="opex.workflow.rule">
+            <field name="name">Une candidature retenue</field>
+            <field name="code">mission_has_selected</field>
+            <field name="expression">field('selected_application_count') &gt;= 1</field>
+            <field name="message">Retenez d'abord une candidature : la mission ne peut pas être attribuée sans intervenant.</field>
+        </record>
+
+        <record id="rule_mission_single_selected" model="opex.workflow.rule">
+            <field name="name">Un seul intervenant retenu</field>
+            <field name="code">mission_single_selected</field>
+            <field name="expression">bool(field('type_multi_intervenants')) or field('selected_application_count') &lt;= 1</field>
+            <field name="message">Plusieurs candidatures sont retenues alors que ce type de mission n'autorise qu'un seul intervenant (règle 4 du §39). Écartez-en, ou autorisez plusieurs intervenants sur le type de mission.</field>
+        </record>
+
+        <!--
+            TROIS RÈGLES DÉCLARÉES ICI ET RATTACHÉES PLUS TARD
+
+            Les règles 5 et 6 du §39, et la condition de dépôt des livrables,
+            portent sur des objets qui n'existent pas encore : le contrat
+            (Extension 7) et les livrables (Extension 8).
+
+            Elles sont **déclarées maintenant** — pour qu'on sache qu'elles
+            existent et où elles iront — mais **rattachées à aucune transition**.
+            La raison est concrète : `subworkflow_done('mission_contract')`
+            renvoie `False` tant que la définition `mission_contract` n'existe
+            pas (`_subworkflow_done` est tolérant par construction,
+            `workflow_instance.py:290`). Attachée aujourd'hui, cette condition
+            rendrait « Démarrer la mission » définitivement infranchissable —
+            et le critère d'arrêt de cette extension, dérouler le graphe de bout
+            en bout à la main, deviendrait impossible à tenir.
+
+            Le rattachement se fera par `<function name="write">` sur la
+            transition, hors bloc `noupdate`, comme `matching_criteria.xml` le
+            fait dans `opex_innovation`. C'est le motif éprouvé.
+
+            Même parti que celui d'`opex_innovation`, qui déclare
+            `rule_project_score_70` et `rule_project_ceo_approval` bien avant
+            l'étape Demo Day qui les utilisera.
+        -->
+
+        <record id="rule_mission_contract_validated" model="opex.workflow.rule">
+            <field name="name">Contrat validé</field>
+            <field name="code">mission_contract_validated</field>
+            <field name="expression">subworkflow_done('mission_contract')</field>
+            <field name="message">Le contrat n'est pas validé : la mission ne peut pas démarrer (règle 5 du §39).</field>
+        </record>
+
+        <!--
+            Le second argument de `field()` n'est pas décoratif : c'est ce qui
+            rend ces deux règles **fermées par défaut**.
+
+            `_field(name, default=False)` renvoie son défaut quand le champ
+            n'existe pas encore (`workflow_instance.py:251`). Écrite
+            `field('deliverable_pending_count') == 0`, la règle comparerait
+            `False == 0` — vrai en Python — et **passerait** tant que
+            l'Extension 8 n'a pas créé le champ. Une condition censée protéger
+            la clôture serait inopérante, sans le dire.
+
+            Avec un défaut à 1, un champ absent bloque. C'est le bon sens de
+            l'asymétrie : une condition qu'on ne sait pas évaluer refuse, elle
+            n'autorise pas.
+        -->
+        <record id="rule_mission_deliverables_submitted" model="opex.workflow.rule">
+            <field name="name">Livrables obligatoires déposés</field>
+            <field name="code">mission_deliverables_submitted</field>
+            <field name="expression">field('deliverable_pending_count', 1) == 0</field>
+            <field name="message">Tous les livrables obligatoires n'ont pas été déposés.</field>
+        </record>
+
+        <record id="rule_mission_deliverables_validated" model="opex.workflow.rule">
+            <field name="name">Livrables obligatoires validés</field>
+            <field name="code">mission_deliverables_validated</field>
+            <field name="expression">field('deliverable_unvalidated_count', 1) == 0</field>
+            <field name="message">La mission ne peut pas être déclarée terminée tant que les livrables obligatoires ne sont pas validés (règle 6 du §39).</field>
+        </record>
+
+        <!--
+             LA DÉFINITION
+              -->
+
+        <!--
+            **`initiator_role_id` volontairement absent.**
+
+            Le moteur poserait l'acteur sur `instance.initiator_id`,
+            c'est-à-dire sur celui qui exécute le `create()`
+            (`workflow_definition.py:89-97`). Quand le secrétariat ouvre un
+            appel pour un client (§9), c'est le secrétariat qui recevrait le
+            rôle `client` en accès `full`.
+
+            L'acteur est donc posé par `MissionRequest._grant_client_actor()`,
+            depuis `client_id` et jamais depuis l'utilisateur courant. Même
+            parti qu'`opex_innovation`, dont `project_workflow.xml` ne renseigne
+            pas ce champ non plus.
+        -->
+        <record id="wf_mission_request" model="opex.workflow.definition">
+            <field name="name">Appel à mission</field>
+            <field name="code">mission_request</field>
+            <field name="model_id" ref="model_opex_mission_request"/>
+            <field name="description">Parcours complet d'un appel à mission : expression du besoin, qualification, sourcing, candidatures, sélection, attribution, contractualisation, exécution, livrables, service fait et clôture. §12.1 de la spécification OPEX Smart Missions.</field>
+        </record>
+
+        <!--
+             LES 14 ÉTAPES
+              -->
+
+        <record id="mstage_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">draft</field>
+            <field name="name">Brouillon</field>
+            <field name="user_label">Compléter ma demande</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="description">La demande en cours de rédaction par le client. C'est aussi l'étape de retour lorsqu'un complément lui est demandé — la seule où il retrouve le droit d'écrire.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_client')])]"/>
+        </record>
+
+        <record id="mstage_qualified" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">qualified</field>
+            <field name="name">Qualification</field>
+            <field name="user_label">Demande en cours de qualification</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">5</field>
+            <field name="description">Absorbe SUBMITTED, la vérification du Schéma 3 et VALIDATED du document UX. Le secrétariat contrôle la complétude, le responsable décide de publier ou non.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mstage_sourcing" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">sourcing</field>
+            <field name="name">Sourcing</field>
+            <field name="user_label">Appel publié — recherche d'intervenants</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">3</field>
+            <field name="description">PUBLISHED du document UX. Le matching propose des experts, les invitations partent, l'appel est visible au portail selon le mode de sourcing.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mstage_open" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">open</field>
+            <field name="name">Appel ouvert</field>
+            <field name="user_label">Candidatures en cours</field>
+            <field name="sequence">40</field>
+            <field name="description">APPLICATIONS du document UX. Le pool se remplit par les deux canaux du §8 ; c'est le champ `source` qui les distingue, pas l'étape.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mstage_selection" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">selection</field>
+            <field name="name">Sélection</field>
+            <field name="user_label">Sélection en cours</field>
+            <field name="sequence">50</field>
+            <field name="sla_days">7</field>
+            <field name="description">L'étape qui démontre l'indépendance des deux machines : la mission y reste pendant que chaque candidature avance de son côté, vers la short-list ou vers le refus.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_decideur')])]"/>
+        </record>
+
+        <record id="mstage_awarded" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">awarded</field>
+            <field name="name">Attribuée</field>
+            <field name="user_label">Intervenant retenu</field>
+            <field name="sequence">60</field>
+            <field name="sla_days">3</field>
+            <field name="description">CONTRACT_PENDING du document UX. La décision est prise, la contractualisation n'a pas commencé.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="mstage_contracting" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">contracting</field>
+            <field name="name">Contractualisation</field>
+            <field name="user_label">Contrat en cours de signature</field>
+            <field name="sequence">70</field>
+            <field name="sla_days">5</field>
+            <field name="description">CONTRACT_SIGNED et la fin de SCHEDULED du document UX. Le cycle de validation du contrat lui-même (Schéma 7) est un sous-workflow, pas une suite d'étapes de la mission. « Missions à venir » du §5 se lit ici : étape `contracting`, contrat validé, date de début non atteinte.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="mstage_in_progress" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">in_progress</field>
+            <field name="name">Exécution</field>
+            <field name="user_label">Mission en cours</field>
+            <field name="sequence">80</field>
+            <field name="description">L'intervenant réalise, renseigne son avancement et dépose ses livrables. §21 et §40.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mstage_delivered" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">delivered</field>
+            <field name="name">Livrables remis</field>
+            <field name="user_label">Livrables en validation</field>
+            <field name="sequence">90</field>
+            <field name="sla_days">7</field>
+            <field name="description">DELIVERABLE_VALIDATION du document UX. Deux issues : la validation, ou la demande de corrections qui renvoie en exécution (§25).</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_client')])]"/>
+        </record>
+
+        <record id="mstage_accepted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">accepted</field>
+            <field name="name">Service fait</field>
+            <field name="user_label">Mission terminée</field>
+            <field name="sequence">100</field>
+            <field name="description">COMPLETED du document UX. La réalisation est validée ; reste la facturation, qui est une action de la transition de clôture et non une étape (table de correspondance du CLAUDE.md).</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <record id="mstage_closed" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">closed</field>
+            <field name="name">Clôturée</field>
+            <field name="user_label">Mission clôturée</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">110</field>
+            <field name="description">Fin nominale. La transition qui y mène portera la facturation, la demande d'évaluation et la mise à jour de la réputation (Extensions 9 et 10).</field>
+        </record>
+
+        <!-- Les trois branches -->
+
+        <!--
+            `on_hold` n'est atteignable que depuis `in_progress` et
+            `delivered`, et c'est un choix.
+
+            Le §26 — « Gestion des incidents / retards » — décrit une suspension
+            **pendant** une mission : retard, blocage, problème de disponibilité
+            ou de livrable. Avant le démarrage, les bonnes branches sont
+            l'annulation ou l'appel infructueux, pas la suspension d'une mission
+            qui n'a pas commencé.
+
+            Deux entrées de plus sont deux enregistrements au configurateur si
+            le cluster veut pouvoir suspendre plus tôt.
+        -->
+        <record id="mstage_on_hold" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">on_hold</field>
+            <field name="name">Suspendue</field>
+            <field name="user_label">Mission suspendue</field>
+            <field name="sequence">200</field>
+            <field name="description">SUSPENDED du document UX. Deux reprises distinctes : vers l'exécution ou vers la validation des livrables, selon d'où l'on vient. Une reprise unique aurait renvoyé en exécution une mission suspendue pendant sa validation.</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mstage_cancelled" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">cancelled</field>
+            <field name="name">Annulée</field>
+            <field name="user_label">Mission annulée</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">210</field>
+        </record>
+
+        <!--
+            Une seule fin d'échec, quatre portes d'entrée.
+
+            La table de correspondance du CLAUDE.md fait de REJECTED du document
+            UX un UNSUCCESSFUL. Une demande refusée à la qualification et un
+            appel qui ne trouve personne aboutissent donc à la même étape.
+
+            La distinction n'est pas perdue pour autant : elle vit dans le
+            **code de transition** consigné à l'historique par
+            `opex.workflow.history`, qui est immuable. C'est là que le KPI
+            « taux de réussite » de l'US-20 ira la chercher.
+        -->
+        <record id="mstage_unsuccessful" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">unsuccessful</field>
+            <field name="name">Sans suite</field>
+            <field name="user_label">Demande sans suite</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">220</field>
+            <field name="description">UNSUCCESSFUL du §12.1, qui absorbe REJECTED du document UX. Atteinte par quatre transitions distinctes : refus de la demande, sourcing infructueux, appel infructueux, aucun candidat retenu.</field>
+        </record>
+
+        <!--
+             LES 32 TRANSITIONS
+              -->
+
+        <!-- Depuis DRAFT -->
+
+        <record id="mtr_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_submit</field>
+            <field name="name">Soumettre ma demande</field>
+            <field name="source_stage_id" ref="mstage_draft"/>
+            <field name="target_stage_id" ref="mstage_qualified"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_client')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_mission_ready_to_submit')])]"/>
+        </record>
+
+        <record id="mtr_cancel_draft" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_draft</field>
+            <field name="name">Abandonner ma demande</field>
+            <field name="source_stage_id" ref="mstage_draft"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_client'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis QUALIFIED — quatre sorties -->
+
+        <!-- 1. La boucle du Schéma 3. Retour en `draft`, la seule étape où
+             l'`ir.rule` rend au client le droit d'écrire. -->
+        <record id="mtr_request_complement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_request_complement</field>
+            <field name="name">Demander un complément</field>
+            <field name="source_stage_id" ref="mstage_qualified"/>
+            <field name="target_stage_id" ref="mstage_draft"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="description">Le motif est obligatoire : sans lui, le client reçoit une décision qu'il ne peut pas corriger. C'est ce texte qu'il lira.</field>
+        </record>
+
+        <record id="mtr_start_sourcing" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_start_sourcing</field>
+            <field name="name">Publier l'appel</field>
+            <field name="source_stage_id" ref="mstage_qualified"/>
+            <field name="target_stage_id" ref="mstage_sourcing"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_mission_has_deadline'), ref('rule_mission_deadline_open')])]"/>
+            <field name="description">§8 : une demande créée par le client ne devient pas automatiquement publique. C'est ici que la qualification du cluster décide.</field>
+        </record>
+
+        <record id="mtr_reject_request" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_reject_request</field>
+            <field name="name">Refuser la demande</field>
+            <field name="source_stage_id" ref="mstage_qualified"/>
+            <field name="target_stage_id" ref="mstage_unsuccessful"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_cancel_qualified" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_qualified</field>
+            <field name="name">Annuler la demande</field>
+            <field name="source_stage_id" ref="mstage_qualified"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis SOURCING -->
+
+        <record id="mtr_open_applications" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_open_applications</field>
+            <field name="name">Ouvrir les candidatures</field>
+            <field name="source_stage_id" ref="mstage_sourcing"/>
+            <field name="target_stage_id" ref="mstage_open"/>
+            <field name="sequence">70</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mtr_sourcing_unsuccessful" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_sourcing_unsuccessful</field>
+            <field name="name">Aucun intervenant identifié</field>
+            <field name="source_stage_id" ref="mstage_sourcing"/>
+            <field name="target_stage_id" ref="mstage_unsuccessful"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_cancel_sourcing" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_sourcing</field>
+            <field name="name">Annuler l'appel</field>
+            <field name="source_stage_id" ref="mstage_sourcing"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">90</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis OPEN -->
+
+        <record id="mtr_close_applications" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_close_applications</field>
+            <field name="name">Clore les candidatures</field>
+            <field name="source_stage_id" ref="mstage_open"/>
+            <field name="target_stage_id" ref="mstage_selection"/>
+            <field name="sequence">100</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_mission_has_applications')])]"/>
+        </record>
+
+        <record id="mtr_open_unsuccessful" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_open_unsuccessful</field>
+            <field name="name">Déclarer l'appel infructueux</field>
+            <field name="source_stage_id" ref="mstage_open"/>
+            <field name="target_stage_id" ref="mstage_unsuccessful"/>
+            <field name="sequence">110</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_cancel_open" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_open</field>
+            <field name="name">Annuler l'appel</field>
+            <field name="source_stage_id" ref="mstage_open"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">120</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis SELECTION — quatre sorties -->
+
+        <record id="mtr_award" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_award</field>
+            <field name="name">Attribuer la mission</field>
+            <field name="source_stage_id" ref="mstage_selection"/>
+            <field name="target_stage_id" ref="mstage_awarded"/>
+            <field name="sequence">130</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_mission_has_selected'), ref('rule_mission_single_selected')])]"/>
+            <field name="description">Le point de contact unique entre les deux machines, et il va dans un seul sens : la mission compte les candidatures retenues. Aucune candidature ne lit l'étape de la mission pour décider de la sienne.</field>
+        </record>
+
+        <!-- 2. Rouvrir un appel dont la short-list ne vaut rien. -->
+        <record id="mtr_reopen" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_reopen</field>
+            <field name="name">Rouvrir l'appel</field>
+            <field name="source_stage_id" ref="mstage_selection"/>
+            <field name="target_stage_id" ref="mstage_open"/>
+            <field name="sequence">140</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_selection_unsuccessful" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_selection_unsuccessful</field>
+            <field name="name">Aucun candidat retenu</field>
+            <field name="source_stage_id" ref="mstage_selection"/>
+            <field name="target_stage_id" ref="mstage_unsuccessful"/>
+            <field name="sequence">150</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_decideur')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_cancel_selection" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_selection</field>
+            <field name="name">Annuler l'appel</field>
+            <field name="source_stage_id" ref="mstage_selection"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">160</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis AWARDED -->
+
+        <record id="mtr_start_contracting" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_start_contracting</field>
+            <field name="name">Lancer la contractualisation</field>
+            <field name="source_stage_id" ref="mstage_awarded"/>
+            <field name="target_stage_id" ref="mstage_contracting"/>
+            <field name="sequence">170</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="description">L'Extension 7 y rattachera l'action `launch_subworkflow` qui démarre le cycle de validation du contrat (Schéma 7).</field>
+        </record>
+
+        <!-- 3. Le désistement, exigé par le §2.4. -->
+        <record id="mtr_back_to_selection" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_back_to_selection</field>
+            <field name="name">L'intervenant s'est désisté</field>
+            <field name="source_stage_id" ref="mstage_awarded"/>
+            <field name="target_stage_id" ref="mstage_selection"/>
+            <field name="sequence">180</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_cancel_awarded" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_awarded</field>
+            <field name="name">Annuler la mission</field>
+            <field name="source_stage_id" ref="mstage_awarded"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">190</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis CONTRACTING -->
+
+        <!--
+            Sans condition à ce stade, et c'est documenté plus haut : la règle
+            5 est déclarée (`rule_mission_contract_validated`) et sera rattachée
+            ici par l'Extension 7, quand la définition `mission_contract`
+            existera. L'attacher avant rendrait la transition définitivement
+            infranchissable.
+        -->
+        <record id="mtr_start_mission" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_start</field>
+            <field name="name">Démarrer la mission</field>
+            <field name="source_stage_id" ref="mstage_contracting"/>
+            <field name="target_stage_id" ref="mstage_in_progress"/>
+            <field name="sequence">200</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="mtr_contracting_failed" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_contracting_failed</field>
+            <field name="name">Contractualisation échouée</field>
+            <field name="source_stage_id" ref="mstage_contracting"/>
+            <field name="target_stage_id" ref="mstage_selection"/>
+            <field name="sequence">210</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_cancel_contracting" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_contracting</field>
+            <field name="name">Annuler la mission</field>
+            <field name="source_stage_id" ref="mstage_contracting"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">220</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <!-- Depuis IN_PROGRESS -->
+
+        <record id="mtr_deliver" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_deliver</field>
+            <field name="name">Soumettre les livrables</field>
+            <field name="source_stage_id" ref="mstage_in_progress"/>
+            <field name="target_stage_id" ref="mstage_delivered"/>
+            <field name="sequence">230</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mtr_hold_progress" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_hold_progress</field>
+            <field name="name">Suspendre la mission</field>
+            <field name="source_stage_id" ref="mstage_in_progress"/>
+            <field name="target_stage_id" ref="mstage_on_hold"/>
+            <field name="sequence">240</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="description">§26 — retard, blocage, problème de disponibilité, de livrable ou contractuel. Le motif est obligatoire : c'est lui qui documente l'incident.</field>
+        </record>
+
+        <record id="mtr_cancel_progress" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_progress</field>
+            <field name="name">Résilier la mission</field>
+            <field name="source_stage_id" ref="mstage_in_progress"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">250</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <!-- Depuis DELIVERED -->
+
+        <record id="mtr_accept_service" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_accept_service</field>
+            <field name="name">Valider le service fait</field>
+            <field name="source_stage_id" ref="mstage_delivered"/>
+            <field name="target_stage_id" ref="mstage_accepted"/>
+            <field name="sequence">260</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_client')])]"/>
+            <field name="description">§28 — la validation finale confirme que les objectifs sont atteints, les livrables complets et la prestation conforme. La règle 6 y sera rattachée par l'Extension 9.</field>
+        </record>
+
+        <!-- 4. Les corrections du §25. -->
+        <record id="mtr_request_corrections" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_request_corrections</field>
+            <field name="name">Demander des corrections</field>
+            <field name="source_stage_id" ref="mstage_delivered"/>
+            <field name="target_stage_id" ref="mstage_in_progress"/>
+            <field name="sequence">270</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_client')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <record id="mtr_hold_delivered" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_hold_delivered</field>
+            <field name="name">Suspendre la validation</field>
+            <field name="source_stage_id" ref="mstage_delivered"/>
+            <field name="target_stage_id" ref="mstage_on_hold"/>
+            <field name="sequence">280</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+        <!-- Depuis ACCEPTED -->
+
+        <record id="mtr_close" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_close</field>
+            <field name="name">Facturer et clôturer</field>
+            <field name="source_stage_id" ref="mstage_accepted"/>
+            <field name="target_stage_id" ref="mstage_closed"/>
+            <field name="sequence">290</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="description">INVOICED du document UX est ici : la facturation est une **action** portée par cette transition, pas une étape. L'Extension 9 y rattachera la création du `sale.order`, l'Extension 10 la demande d'évaluation et la mise à jour de la réputation.</field>
+        </record>
+
+        <!-- Depuis ON_HOLD -->
+
+        <record id="mtr_resume_progress" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_resume_progress</field>
+            <field name="name">Reprendre l'exécution</field>
+            <field name="source_stage_id" ref="mstage_on_hold"/>
+            <field name="target_stage_id" ref="mstage_in_progress"/>
+            <field name="sequence">300</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mtr_resume_delivered" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_resume_delivered</field>
+            <field name="name">Reprendre la validation</field>
+            <field name="source_stage_id" ref="mstage_on_hold"/>
+            <field name="target_stage_id" ref="mstage_delivered"/>
+            <field name="sequence">310</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="mtr_cancel_hold" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="code">mission_cancel_hold</field>
+            <field name="name">Résilier la mission suspendue</field>
+            <field name="source_stage_id" ref="mstage_on_hold"/>
+            <field name="target_stage_id" ref="mstage_cancelled"/>
+            <field name="sequence">320</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+        </record>
+
+    </data>
+
+    <!--
+        Publication **hors** du bloc `noupdate="1"`, et c'est indispensable.
+
+        `odoo/tools/convert.py`, `_tag_function` :
+
+            if self.noupdate and self.mode != 'init':
+                return                     # silencieusement sauté
+
+        Une définition publiée depuis l'intérieur de son bloc `noupdate` reste
+        donc **en brouillon** après le premier `-u` — donc introuvable par
+        `start_workflow()`, sans qu'aucune erreur ne le signale au chargement.
+        C'est le piège qui marche à l'installation et échoue partout ailleurs,
+        c'est-à-dire qu'on le découvre le jour de la démonstration.
+
+        Ici, la publication est rejouée à chaque mise à jour. C'est sans risque
+        — `action_publish()` est idempotent — et c'est même utile : le graphe
+        est revalidé à chaque déploiement, et une configuration devenue
+        incohérente fait échouer la mise à jour au lieu de se découvrir en
+        démonstration.
+    -->
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_mission_request')]]"/>
+
+</odoo>

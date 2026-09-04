@@ -106,7 +106,7 @@ class ResPartner(models.Model):
         ce correctif : des acteurs centraux du parcours étaient notifiés et ne
         voyaient rien nulle part.
 
-        ⚠ **Ce que cette source n'ouvre pas.** Le critère est `partner_ids`,
+        **Ce que cette source n'ouvre pas.** Le critère est `partner_ids`,
         c'est-à-dire les destinataires **passés explicitement** à
         `message_post()`. Vérifié sur les données du 28/08 : une note adressée
         au Secrétariat sur le projet d'un porteur porte `partner_ids = [3, 15]`
@@ -141,7 +141,7 @@ class ResPartner(models.Model):
            `_opex_notification_addressed_messages()`, notes comprises, y
            compris sur des enregistrements qui ne sont pas les siens.
 
-        ⚠ La règle n'est donc plus *identique* à celle de l'historique, elle la
+        La règle n'est donc plus *identique* à celle de l'historique, elle la
         **contient**. La différence tient en une phrase : la cloche montre en
         plus ce qui vous a été adressé nommément. Rien d'autre n'a bougé — la
         source 1 conserve son filtre de partage et sa double vérification
@@ -170,7 +170,7 @@ class ResPartner(models.Model):
         }
         messages = messages.filtered(lambda m: (m.model, m.res_id) in allowed)
 
-        # ⚠ L'union vient **après** les filtres de la source 1, jamais avant :
+        # L'union vient **après** les filtres de la source 1, jamais avant :
         # les appliquer à la source 2 lui retirerait précisément ce qu'elle
         # apporte — les notes adressées.
         messages |= self._opex_notification_addressed_messages()

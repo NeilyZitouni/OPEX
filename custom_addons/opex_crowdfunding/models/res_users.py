@@ -49,7 +49,7 @@ class ResUsers(models.Model):
         les comptes partagés. D'où la garde `share = False`, sans laquelle un
         compte portail ferait échouer la mise à jour du module.
 
-        ⚠ Méthode propre à ce module, malgré son air de doublon avec celle
+        Méthode propre à ce module, malgré son air de doublon avec celle
         d'`opex_innovation`. La règle d'isolation interdit à ce module
         d'importer quoi que ce soit des autres, et les deux ne parlent pas des
         mêmes groupes. Deux listes de rôles distinctes, deux méthodes.

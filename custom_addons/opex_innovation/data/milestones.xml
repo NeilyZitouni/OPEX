@@ -3,24 +3,22 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LES SEPT JALONS DE LA SECTION 35
-            ═══════════════════════════════════════════════════════════════
 
                 Smart Factory
-                ✓ Déposé
-                ✓ Contrôle terminé
-                ● Évaluation en cours
-                ○ Décision
-                ○ Accompagnement
-                ○ Financement
-                ○ Industrialisation
+                Déposé
+                Contrôle terminé
+                Évaluation en cours
+                Décision
+                Accompagnement
+                Financement
+                Industrialisation
 
             Quinze étapes techniques, sept lignes lues par le porteur. La
             correspondance est ici, en données : ajouter une étape au workflow
             ne demande que de la cocher dans le jalon voulu.
 
-            ⚠ **Trois étapes ne sont rattachées à aucun jalon**, et c'est
+            **Trois étapes ne sont rattachées à aucun jalon**, et c'est
             voulu : `complement_requested`, `remediation` et `resubmitted` sont
             des allers-retours internes au contrôle et à l'évaluation. Les
             afficher ferait apparaître et disparaître des lignes sur la carte
@@ -35,7 +33,7 @@
             <field name="name">Déposé</field>
             <field name="sequence">10</field>
             <!--
-                ⚠ **Volontairement sans phrase d'état.**
+                **Volontairement sans phrase d'état.**
 
                 Ce jalon couvre deux situations opposées : le brouillon en cours
                 de saisie et le dossier soumis. Une phrase unique mentirait sur

@@ -8,7 +8,7 @@ from .common import WorkflowCase
 class TestDynamicAccess(WorkflowCase):
     """Extension 5 — identité + rôle + relation au dossier → droits d'accès.
 
-    ⚠ **Tous les tests passent par de vrais comptes non-admin.** Une `ir.rule`
+    **Tous les tests passent par de vrais comptes non-admin.** Une `ir.rule`
     ne se voit pas en administrateur : `base.group_system` les contourne
     toutes. Un test écrit en admin passerait en affirmant exactement rien.
     """
@@ -148,7 +148,7 @@ class TestDynamicAccess(WorkflowCase):
         self.assertNotIn(self.role_expert, self.instance._user_roles(self.expert))
 
     def test_revocation_of_one_actor_does_not_affect_the_others(self):
-        """⚠ Le piège du domaine à deux conditions sur un One2many.
+        """Le piège du domaine à deux conditions sur un One2many.
 
         Écrite `['&', ('actor_ids.user_id','=',user.id),
         ('actor_ids.access_level','!=','none')]`, la règle serait fausse : les

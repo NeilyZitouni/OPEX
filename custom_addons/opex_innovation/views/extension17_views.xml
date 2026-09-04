@@ -2,9 +2,7 @@
 <odoo>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Le projet — financement, industrialisation, clôture
-        ═══════════════════════════════════════════════════════════════
     -->
     <record id="view_innovation_project_form_ext17" model="ir.ui.view">
         <field name="name">opex.innovation.project.form.financement</field>
@@ -41,7 +39,7 @@
                         </group>
                     </group>
                     <!--
-                        ⚠ `financement_recherche` n'est pas affiché ici, et ce
+                        `financement_recherche` n'est pas affiché ici, et ce
                         n'est pas un oubli : c'est le **même stockage** que
                         « Montant recherché ». Deux champs côte à côte portant
                         la même valeur donneraient l'impression qu'on peut les
@@ -68,9 +66,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Industrialisation — section 27
-        ═══════════════════════════════════════════════════════════════
     -->
     <record id="view_industrialisation_form" model="ir.ui.view">
         <field name="name">opex.innovation.industrialisation.form</field>
@@ -160,9 +156,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Bilan de clôture — section 28
-        ═══════════════════════════════════════════════════════════════
     -->
     <record id="view_closure_form" model="ir.ui.view">
         <field name="name">opex.innovation.closure.form</field>
@@ -228,9 +222,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Évaluation finale — section 29
-        ═══════════════════════════════════════════════════════════════
     -->
     <record id="view_final_evaluation_form" model="ir.ui.view">
         <field name="name">opex.innovation.final.evaluation.form</field>
@@ -325,7 +317,7 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <!-- ══════════ Menus ══════════ -->
+    <!-- Menus -->
 
     <menuitem id="menu_industrialisation"
               name="Industrialisations"

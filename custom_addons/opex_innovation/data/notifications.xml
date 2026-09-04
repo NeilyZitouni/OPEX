@@ -3,9 +3,7 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LES 14 NOTIFICATIONS DE LA SECTION 30
-            ═══════════════════════════════════════════════════════════════
 
             « Chacun est une action `notify` configurée sur une transition, pas
             un `message_post()` dispersé dans le code métier. C'est la
@@ -15,13 +13,13 @@
             Ce fichier **est** ces quinze endroits, réduits à un. Pour savoir
             pourquoi un message part, on lit ce fichier, et rien d'autre.
 
-            ⚠ **Sous-type.** `note` pour tout ce qui est interne, `comment`
+            **Sous-type.** `note` pour tout ce qui est interne, `comment`
             uniquement pour ce que le porteur ou le candidat doit réellement
             recevoir par email. Un message de coordination interne posté en
             `comment` sur un enregistrement que le porteur suit lui part par
             courriel — bug déjà rencontré et corrigé sur le Module 1.
 
-            ⚠ **Pas de SMS.** Décision reprise du Module 1. Aucun canal autre
+            **Pas de SMS.** Décision reprise du Module 1. Aucun canal autre
             que le portail et le courriel n'est configuré, et il n'y a rien à
             désactiver : le moteur n'en connaît pas d'autre.
 
@@ -31,9 +29,9 @@
             notifie personne, et c'est le comportement voulu.
         -->
 
-        <!-- ══════════ ① Projet soumis ══════════ -->
+        <!-- 1. Projet soumis -->
         <record id="notify_projet_soumis" model="opex.workflow.action">
-            <field name="name">① Projet soumis</field>
+            <field name="name">1. Projet soumis</field>
             <field name="code">innovation_notify_projet_soumis</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">note</field>
@@ -41,9 +39,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
         </record>
 
-        <!-- ══════════ ② Complément demandé ══════════ -->
+        <!-- 2. Complément demandé -->
         <record id="notify_complement_demande" model="opex.workflow.action">
-            <field name="name">② Complément demandé</field>
+            <field name="name">2. Complément demandé</field>
             <field name="code">innovation_notify_complement_demande</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -51,9 +49,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ③ Projet qualifié ══════════ -->
+        <!-- 3. Projet qualifié -->
         <record id="notify_projet_qualifie" model="opex.workflow.action">
-            <field name="name">③ Projet qualifié</field>
+            <field name="name">3. Projet qualifié</field>
             <field name="code">innovation_notify_projet_qualifie</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -61,9 +59,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ④ Projet évalué ══════════ -->
+        <!-- 4. Projet évalué -->
         <record id="notify_projet_evalue" model="opex.workflow.action">
-            <field name="name">④ Projet évalué</field>
+            <field name="name">4. Projet évalué</field>
             <field name="code">innovation_notify_projet_evalue</field>
             <field name="action_type">notify</field>
             <!-- Interne : le porteur n'apprend pas qu'il est évalué, il
@@ -73,9 +71,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
         </record>
 
-        <!-- ══════════ ⑤ Décision du comité ══════════ -->
+        <!-- 5. Décision du comité -->
         <record id="notify_decision_comite" model="opex.workflow.action">
-            <field name="name">⑤ Décision du comité</field>
+            <field name="name">5. Décision du comité</field>
             <field name="code">innovation_notify_decision_comite</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -83,9 +81,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑥ Remédiation demandée ══════════ -->
+        <!-- 6. Remédiation demandée -->
         <record id="notify_remediation_demandee" model="opex.workflow.action">
-            <field name="name">⑥ Remédiation demandée</field>
+            <field name="name">6. Remédiation demandée</field>
             <field name="code">innovation_notify_remediation_demandee</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -96,9 +94,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑦ Projet accepté ══════════ -->
+        <!-- 7. Projet accepté -->
         <record id="notify_projet_accepte" model="opex.workflow.action">
-            <field name="name">⑦ Projet accepté</field>
+            <field name="name">7. Projet accepté</field>
             <field name="code">innovation_notify_projet_accepte</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -106,9 +104,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑧ Matching proposé ══════════ -->
+        <!-- 8. Matching proposé -->
         <record id="notify_matching_propose" model="opex.workflow.action">
-            <field name="name">⑧ Matching proposé</field>
+            <field name="name">8. Matching proposé</field>
             <field name="code">innovation_notify_matching_propose</field>
             <field name="action_type">notify</field>
             <!-- Interne : « L'IA recommande, elle ne décide pas. » Le
@@ -119,9 +117,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_ceo')])]"/>
         </record>
 
-        <!-- ══════════ ⑨ Expert intéressé ══════════ -->
+        <!-- 9. Expert intéressé -->
         <record id="notify_expert_interesse" model="opex.workflow.action">
-            <field name="name">⑨ Expert intéressé</field>
+            <field name="name">9. Expert intéressé</field>
             <field name="code">innovation_notify_expert_interesse</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">note</field>
@@ -130,9 +128,9 @@
         </record>
 
         <!--
-            ══════════ ⑩ ⑪ ⑫ Les trois livrables ══════════
+             10. 11. 12. Les trois livrables
 
-            ⚠ **Configurées, mais non branchées.** Ces trois événements portent
+            **Configurées, mais non branchées.** Ces trois événements portent
             sur `opex.innovation.deliverable`, modèle de l'Extension 16, qui
             n'a pas été réalisée. Il n'existe donc aucune transition à laquelle
             les rattacher.
@@ -147,7 +145,7 @@
             tairait sur ses trous serait pire que pas de liste.
         -->
         <record id="notify_nouveau_livrable" model="opex.workflow.action">
-            <field name="name">⑩ Nouveau livrable</field>
+            <field name="name">10. Nouveau livrable</field>
             <field name="code">innovation_notify_nouveau_livrable</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">note</field>
@@ -156,7 +154,7 @@
         </record>
 
         <record id="notify_livrable_valide" model="opex.workflow.action">
-            <field name="name">⑪ Livrable validé</field>
+            <field name="name">11. Livrable validé</field>
             <field name="code">innovation_notify_livrable_valide</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -165,7 +163,7 @@
         </record>
 
         <record id="notify_correction_demandee" model="opex.workflow.action">
-            <field name="name">⑫ Correction demandée</field>
+            <field name="name">12. Correction demandée</field>
             <field name="code">innovation_notify_correction_demandee</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -173,9 +171,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑬ Évolution du financement ══════════ -->
+        <!-- 13. Évolution du financement -->
         <record id="notify_evolution_financement" model="opex.workflow.action">
-            <field name="name">⑬ Évolution du financement</field>
+            <field name="name">13. Évolution du financement</field>
             <field name="code">innovation_notify_evolution_financement</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -183,9 +181,9 @@
             <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_porteur')])]"/>
         </record>
 
-        <!-- ══════════ ⑭ Projet clôturé ══════════ -->
+        <!-- 14. Projet clôturé -->
         <record id="notify_projet_cloture" model="opex.workflow.action">
-            <field name="name">⑭ Projet clôturé</field>
+            <field name="name">14. Projet clôturé</field>
             <field name="code">innovation_notify_projet_cloture</field>
             <field name="action_type">notify</field>
             <field name="notify_subtype">comment</field>
@@ -194,15 +192,13 @@
         </record>
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LES MOMENTS QUI NE DISAIENT RIEN
-            ═══════════════════════════════════════════════════════════════
 
             Les quatorze notifications de la section 30 sont au-dessus. Les
             suivantes comblent des transitions qui ne notifiaient personne :
             le dossier avançait, et l'intéressé l'apprenait en rouvrant sa page.
 
-            ⚠ Sous-type : `comment` vers le porteur, `note` partout ailleurs.
+            Sous-type : `comment` vers le porteur, `note` partout ailleurs.
             Ce n'est pas une question d'email seulement. Un `message_post` en
             `mt_comment` part **aussi aux followers** de l'enregistrement, et
             le porteur en est un : une coordination interne postée en
@@ -247,7 +243,7 @@
         </record>
 
         <!--
-            ⚠ Le rôle `evaluateur` ne recevait rien, sur aucune définition.
+            Le rôle `evaluateur` ne recevait rien, sur aucune définition.
 
             Section 15 : « les évaluateurs apportent une expertise
             complémentaire lorsque le Comité l'estime nécessaire ». Les
@@ -270,11 +266,9 @@
     </data>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Le branchement sur les transitions
-        ═══════════════════════════════════════════════════════════════
 
-        ⚠ Hors du bloc `noupdate`, et par `<function>` plutôt que par
+        Hors du bloc `noupdate`, et par `<function>` plutôt que par
         `<record>`.
 
         Les transitions existent déjà et portent le drapeau `noupdate` de leur
@@ -290,32 +284,32 @@
         remplace volontairement le message générique par le message précis.
     -->
 
-    <!-- ① -->
+    <!-- 1. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_submit')], {'action_ids': [
                   Command.set([ref('notify_projet_soumis')])]}]"/>
 
-    <!-- ② — et la resoumission après complément suit le même chemin retour. -->
+    <!-- 2. — et la resoumission après complément suit le même chemin retour. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_request_complement')], {'action_ids': [
                   Command.set([ref('notify_complement_demande')])]}]"/>
 
-    <!-- ③ -->
+    <!-- 3. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_qualify')], {'action_ids': [
                   Command.set([ref('notify_projet_qualifie')])]}]"/>
 
-    <!-- ④ — les deux chemins d'évaluation, avec ou sans experts. -->
+    <!-- 4. — les deux chemins d'évaluation, avec ou sans experts. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_evaluate_with_experts'), ref('ptr_evaluate_directly')],
                      {'action_ids': [Command.set([ref('notify_projet_evalue')])]}]"/>
 
-    <!-- ⑤ — le refus est une décision du comité, et rien de plus. -->
+    <!-- 5. — le refus est une décision du comité, et rien de plus. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_reject')], {'action_ids': [
                   Command.set([ref('notify_decision_comite')])]}]"/>
 
-    <!-- ⑤ + ⑥ — l'ajournement est une décision **et** une remédiation. Deux
+    <!-- 5. + 6. — l'ajournement est une décision **et** une remédiation. Deux
          événements distincts de la section 30 sur la même transition : c'est
          le moteur qui les enchaîne, il n'y a pas à choisir. -->
     <function model="opex.workflow.transition" name="write"
@@ -324,17 +318,17 @@
                   ref('notify_remediation_demandee'),
               ])]}]"/>
 
-    <!-- ⑦ -->
+    <!-- 7. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_accept')], {'action_ids': [
                   Command.set([ref('notify_projet_accepte')])]}]"/>
 
-    <!-- ⑧ — `link` et non `set` : les trois actions de matching sont déjà là. -->
+    <!-- 8. — `link` et non `set` : les trois actions de matching sont déjà là. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_start_matching')], {'action_ids': [
                   Command.link(ref('notify_matching_propose'))]}]"/>
 
-    <!-- ⑭ -->
+    <!-- 14. -->
     <function model="opex.workflow.transition" name="write"
               eval="[[ref('ptr_close')], {'action_ids': [
                   Command.set([ref('notify_projet_cloture')])]}]"/>
@@ -364,9 +358,7 @@
                   Command.link(ref('notify_industrialisation_lancee'))]}]"/>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Le canal par lequel le personnel reçoit
-        ═══════════════════════════════════════════════════════════════
 
         Poster un message ne suffit pas : encore faut-il qu'il s'affiche
         quelque part. Les comptes internes créés par un administrateur sont en

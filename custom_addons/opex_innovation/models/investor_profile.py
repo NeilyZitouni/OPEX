@@ -11,7 +11,7 @@ INVESTOR_WORKFLOW_CODE = 'profile_request_investor'
 class InvestorProfile(models.Model):
     """Demande de profil Investisseur — Modification 5 du PDF.
 
-    ⚠ **Aucun champ `state`**, pour la même raison que le profil Expert.
+    **Aucun champ `state`**, pour la même raison que le profil Expert.
 
     Les deux profils partagent **la même définition de workflow**
     (`profile_request`), et c'est un point de démonstration à lui seul : deux

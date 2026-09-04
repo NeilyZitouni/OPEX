@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            La première `ir.sequence` du projet : ni le Module 1 ni le Module 2
+            n'en utilisent. Le format vient du §40 du document UX, qui affiche
+            « MISSION #MIS-2026-001 » en en-tête de fiche.
+
+            Quatre chiffres et non trois : trois plafonnent à 999 appels par an,
+            et un compteur qui déborde produit des références en double sans
+            rien signaler. Le zéro-padding ne coûte rien.
+
+            `noupdate="1"` : la séquence porte un état — son compteur. Le
+            réinitialiser à chaque mise à jour du module réémettrait des
+            références déjà attribuées.
+        -->
+        <record id="seq_mission_request" model="ir.sequence">
+            <field name="name">Appel à mission OPEX</field>
+            <field name="code">opex.mission.request</field>
+            <field name="prefix">MIS-%(year)s-</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!--
+            Extension 8 — l'incident du §26, dont le document donne l'exemple
+            « Incident #001 ». Quatre chiffres pour la même raison que
+            ci-dessus : un compteur qui déborde produit des références en
+            double sans rien signaler.
+        -->
+        <record id="seq_mission_incident" model="ir.sequence">
+            <field name="name">Incident de mission OPEX</field>
+            <field name="code">opex.mission.incident</field>
+            <field name="prefix">INC-%(year)s-</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!--
+            Extension 9 — le constat de service fait du §28. « SF » plutôt que
+            « SER » : c'est ainsi que le cluster le nomme, et la référence sert
+            à le retrouver, pas à le décrire.
+        -->
+        <record id="seq_service_acceptance" model="ir.sequence">
+            <field name="name">Constat de service fait OPEX</field>
+            <field name="code">opex.service.acceptance</field>
+            <field name="prefix">SF-%(year)s-</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!-- Extension 10 - les évaluations des §30 et §31. Une mission en
+             produit au moins deux, et davantage si elle a plusieurs
+             intervenants : le compteur monte plus vite que les autres. -->
+        <record id="seq_mission_evaluation" model="ir.sequence">
+            <field name="name">Évaluation de mission OPEX</field>
+            <field name="code">opex.mission.evaluation</field>
+            <field name="prefix">EVA-%(year)s-</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+    </data>
+</odoo>

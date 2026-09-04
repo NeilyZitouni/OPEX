@@ -9,7 +9,7 @@ OPEX Innovation (Innovation Booster)
 Profils Expert et Investisseur, projets d'innovation, évaluation,
 accompagnement et financement.
 
-⚠ Ce module ne code aucun workflow. Les processus sont **configurés** sur le
+Ce module ne code aucun workflow. Les processus sont **configurés** sur le
 moteur `opex_workflow` : c'est là toute la démonstration. Un modèle métier de ce
 module qui porterait un `state = fields.Selection(...)` décrivant son
 avancement annulerait le travail.
@@ -19,7 +19,7 @@ avancement annulerait le travail.
     'website': "https://www.deltalog-conseil.com",
 
     'category': 'Services/Innovation',
-    # ⚠ Monotone, pas chronologique par numéro d'extension. L'Extension 17 est
+    # Monotone, pas chronologique par numéro d'extension. L'Extension 17 est
     # écrite après la 20 ; revenir à 19.0.1.17.0 serait un retour en arrière de
     # version, qu'Odoo interprète comme « rien à faire ».
     'version': '19.0.1.24.0',
@@ -53,7 +53,7 @@ avancement annulerait le travail.
         # Extension 19 — les jalons lisibles par le porteur.
         'data/milestones.xml',
         # Extension 16 — cinquième instance du moteur. Chargée **après**
-        # `notifications.xml` : elle y rebranche les trois actions ⑩ ⑪ ⑫ restées
+        # `notifications.xml` : elle y rebranche les trois actions 10. 11. 12. restées
         # orphelines faute de transitions auxquelles les accrocher.
         'data/roadmap_phases.xml',
         'data/deliverable_workflow.xml',

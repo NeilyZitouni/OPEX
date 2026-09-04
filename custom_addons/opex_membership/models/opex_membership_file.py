@@ -297,7 +297,7 @@ class OpexMembershipFile(models.Model):
     def _check_no_engaged_file(self, partner):
         """Refuse un second dossier à un contact qui en a déjà un engagé.
 
-        ⚠ **C'est ici le vrai rempart, pas le `t-if` du menu.** Masquer
+        **C'est ici le vrai rempart, pas le `t-if` du menu.** Masquer
         « Devenir membre » évite le clic malheureux ; ça n'empêche rien —
         une requête POST forgée sur `/my/membership/new`, un signet gardé
         d'avant la validation ou un formulaire du backend n'ont jamais vu le

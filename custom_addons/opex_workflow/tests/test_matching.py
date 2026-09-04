@@ -127,7 +127,7 @@ class TestMatching(WorkflowCase):
         tag = self.env['res.partner.category'].create({'name': "IA"})
         self.perfect.category_id = [(6, 0, tag.ids)]
 
-        # ⚠ Recherche **bornée à cette définition**.
+        # Recherche **bornée à cette définition**.
         #
         # Chercher par `code` seul parcourait toute la base : depuis que le
         # module métier sème ses propres critères, un code aussi banal que
@@ -141,10 +141,10 @@ class TestMatching(WorkflowCase):
                 ('code', '=', 'competences'),
             ]))
         self.assertAlmostEqual(score, 100.0, places=2)
-        self.assertIn("✓", detail)
+        self.assertIn("", detail)
 
     # ------------------------------------------------------------
-    # ⚠ Le détail est obligatoire et explique le score
+    # Le détail est obligatoire et explique le score
     # ------------------------------------------------------------
 
     def test_detail_lists_every_criterion_with_its_weight(self):
@@ -158,8 +158,8 @@ class TestMatching(WorkflowCase):
         # Chaque critère y figure, avec son issue et son poids.
         self.assertIn("Secteur", detail)
         self.assertIn("Localisation", detail)
-        self.assertIn("✓", detail)
-        self.assertIn("✗", detail)
+        self.assertIn("", detail)
+        self.assertIn("", detail)
         self.assertIn("poids 3", detail)
         # Et le total est lisible sans recalcul.
         self.assertIn("75", detail)
@@ -213,7 +213,7 @@ class TestMatching(WorkflowCase):
         self.assertIn("critère", str(error.exception))
 
     # ------------------------------------------------------------
-    # ⚠ L'IA recommande, elle ne décide pas
+    # L'IA recommande, elle ne décide pas
     # ------------------------------------------------------------
 
     def test_matching_triggers_no_transition(self):

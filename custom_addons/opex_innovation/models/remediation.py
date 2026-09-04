@@ -33,7 +33,7 @@ class RemediationPoint(models.Model):
 class Remediation(models.Model):
     """Demande de remédiation adressée au porteur — section 18.
 
-    ⚠ **Une remédiation sans point ne peut pas être envoyée.** C'est la
+    **Une remédiation sans point ne peut pas être envoyée.** C'est la
     contrainte qui donne son sens à toute l'extension : sans elle, le comité
     retomberait dans le « améliorez votre projet » que la spécification
     proscrit explicitement.
@@ -80,7 +80,7 @@ class Remediation(models.Model):
 
     @api.constrains('point_ids')
     def _check_points(self):
-        """⚠ La contrainte centrale de la section 18.
+        """La contrainte centrale de la section 18.
 
         Au niveau du modèle et non du formulaire : une demande créée depuis le
         back-office, depuis le portail ou par une requête forgée passe par la
@@ -95,7 +95,7 @@ class Remediation(models.Model):
 
     @api.model_create_multi
     def create(self, vals_list):
-        """⚠ Le contrôle est **rappelé explicitement** à la création.
+        """Le contrôle est **rappelé explicitement** à la création.
 
         Piège Odoo : `@api.constrains` sur un Many2many ne se déclenche que si
         le champ figure dans les valeurs écrites. Créer une remédiation **sans

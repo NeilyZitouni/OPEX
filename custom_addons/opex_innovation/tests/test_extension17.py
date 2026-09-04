@@ -89,7 +89,7 @@ class TestFinancement(Extension17Case):
     """Section 25 — le suivi du financement."""
 
     def test_the_alias_shares_the_storage_of_the_existing_field(self):
-        """⚠ Le point qui aurait pu faire deux vérités.
+        """Le point qui aurait pu faire deux vérités.
 
         Le cahier des charges nomme le champ `financement_recherche` ; le
         montant recherché existe déjà sous `montant_recherche` depuis la
@@ -177,7 +177,7 @@ class TestIndustrialisation(Extension17Case):
     """Section 27 — l'industrialisation, pilotée par le moteur."""
 
     def test_the_model_has_no_state_field(self):
-        """⚠ Le piège que ce modèle aurait pu tendre.
+        """Le piège que ce modèle aurait pu tendre.
 
         La section 27 demande de suivre « l'état d'industrialisation ». Un
         `industrialisation_etat = fields.Selection([...])` aurait fait l'affaire
@@ -370,7 +370,7 @@ class TestClosure(Extension17Case):
         self.assertEqual(closure.financement_obtenu, 300000)
 
     def test_the_duration_counts_every_stay_not_the_distinct_stages(self):
-        """⚠ Le piège `mapped()`, sur le calcul qui en dépend le plus.
+        """Le piège `mapped()`, sur le calcul qui en dépend le plus.
 
         Un projet qui repasse par l'accompagnement après une réévaluation y
         entre deux fois. `mapped('to_stage_id.code')` dédoublonnerait sur un
@@ -389,7 +389,7 @@ class TestClosure(Extension17Case):
 
         # Deux séjours de 10 jours chacun, séparés par un retour au matching.
         #
-        # ⚠ La date est posée **à la création**. Le journal d'audit du moteur
+        # La date est posée **à la création**. Le journal d'audit du moteur
         # refuse toute écriture ultérieure, administrateur compris — écrire
         # `ligne.date = ...` lève une `UserError`. C'est la garantie qui donne
         # sa valeur à l'historique, et elle vaut aussi contre les tests.
@@ -454,7 +454,7 @@ class TestFinalEvaluation(Extension17Case):
         self.assertFalse(project.can_evaluate_finally(self.investisseur))
 
     def test_the_side_is_deduced_never_taken_from_the_form(self):
-        """⚠ Le point de sécurité de cette section.
+        """Le point de sécurité de cette section.
 
         `submit_final_evaluation()` reçoit un dictionnaire venu du formulaire.
         Si le côté y était lu, un porteur pourrait déposer l'avis du cluster
@@ -657,7 +657,7 @@ class TestInvestorSpace(HttpCase):
         self.assertIn("Manifester mon intérêt", body)
 
     def test_an_expert_never_receives_the_funding_target(self):
-        """⚠ Section 32 : les informations financières sont **autorisées à
+        """Section 32 : les informations financières sont **autorisées à
         l'acteur financier**, pas à tout candidat.
 
         `_matching_teaser()` ne met les clés financières dans le dictionnaire
@@ -725,7 +725,7 @@ class TestInvestorSpace(HttpCase):
         self.assertNotIn("Marché cible", raw)
 
     def test_revoking_the_actor_closes_the_door_immediately(self):
-        """⚠ Le trou que l'Extension 15 laissait ouvert.
+        """Le trou que l'Extension 15 laissait ouvert.
 
         Le filtre ne consultait que la table des candidats : `partner_id` et
         `state = 'accepted'`. Retirer l'investisseur du dossier supprime sa

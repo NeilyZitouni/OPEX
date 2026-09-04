@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        REBRANCHEMENT `sale` — ce fichier créait le produit de service :
+
+            <record id="product_mission_service" model="product.product">
+                <field name="name">Prestation de mission OPEX</field>
+                <field name="type">service</field>
+                <field name="invoice_policy">order</field>
+                <field name="list_price">0.0</field>
+                <field name="purchase_ok" eval="False"/>
+            </record>
+
+        Deux raisons de le retirer de l'installation, et la seconde est celle
+        qui compte :
+
+        1. `invoice_policy` est un champ apporté par `sale`. Sur une base sans
+           ce module, le champ n'existe pas et le chargement du fichier échoue
+           - donc le module entier ne s'installe pas.
+
+        2. `product.product` lui-même vient du module `product`, qui n'est pas
+           déclaré au manifeste et qui n'est installé, en pratique, que parce
+           que `sale`, `account` ou `stock` l'amènent. Le déclarer pour un seul
+           enregistrement qui ne sert qu'à la facturation ferait dépendre tout
+           le portail d'une fonctionnalité éteinte.
+
+        Le produit est donc créé **à la demande**, par
+        `MissionRequestInvoicing._service_product()`, au moment où la première
+        commande de vente est émise. Il y reçoit son `invoice_policy` et son
+        `ir.model.data`, ce qui lui rend le même identifiant externe
+        `opex_intervenants.product_mission_service` qu'ici.
+
+        Attention : `invoice_policy = 'order'` n'est pas un détail de confort : en
+        `'delivery'`, `_create_invoices()` refuserait de facturer une quantité
+        livrée nulle et la facturation échouerait sur **chaque** mission. Le
+        jour du rebranchement, cette valeur doit suivre, qu'on rétablisse ce
+        fichier ou qu'on garde la création à la demande.
+
+        Le fichier est conservé, et conservé au manifeste, pour que le
+        rebranchement soit un rétablissement plutôt qu'une reconstitution.
+    -->
+</odoo>

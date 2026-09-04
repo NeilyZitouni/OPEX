@@ -15,7 +15,7 @@ class WorkflowTransitionWizard(models.TransientModel):
     Le statusbar donne le « où j'en suis », ce wizard donne le « que puis-je
     faire ». Ensemble, ça couvre le besoin sans une ligne de JavaScript.
 
-    ⚠ **Aucun contrôle d'accès ici.** Le wizard construit sa liste avec
+    **Aucun contrôle d'accès ici.** Le wizard construit sa liste avec
     `available_transitions()` et confirme avec `do_transition()`, qui appelle
     `_check_transition_allowed()`. Ajouter une vérification dans ce fichier
     créerait un second endroit où le droit de transition se décide — et c'est
@@ -75,7 +75,7 @@ class WorkflowTransitionWizard(models.TransientModel):
     def _selection_transitions(self):
         """Les transitions proposées, chacune avec son état.
 
-        ⚠ Les transitions **bloquées par une condition sont présentes**, avec
+        Les transitions **bloquées par une condition sont présentes**, avec
         le motif dans leur libellé. Les retirer laisserait l'utilisateur devant
         une liste amputée sans savoir ce qui manque ni quoi faire pour le
         débloquer. C'est le même principe que `available_transitions()`, dont

@@ -94,7 +94,7 @@ class TestDynamicForms(WorkflowCase):
         self.assertFalse(self.record.website)
 
     # ------------------------------------------------------------
-    # ⚠ Champ conditionnellement invisible : ABSENT du HTML
+    # Champ conditionnellement invisible : ABSENT du HTML
     # ------------------------------------------------------------
 
     def test_invisible_field_is_not_rendered_at_all(self):

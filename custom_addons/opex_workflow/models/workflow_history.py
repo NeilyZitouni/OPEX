@@ -5,7 +5,7 @@ from odoo.exceptions import UserError
 class WorkflowHistory(models.Model):
     """Le journal d'audit : qui a fait quoi, quand, et pourquoi c'était permis.
 
-    ⚠ **Lecture seule pour tout le monde, administrateur compris.** `write()` et
+    **Lecture seule pour tout le monde, administrateur compris.** `write()` et
     `unlink()` lèvent une `UserError` explicite, sans exception de groupe et
     sans échappatoire par `sudo()`. Un journal d'audit modifiable ne vaut rien :
     sa seule valeur est la garantie que personne n'a pu le retoucher après

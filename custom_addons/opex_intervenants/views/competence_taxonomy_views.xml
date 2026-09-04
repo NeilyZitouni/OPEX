@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ══════════ LA FILE D'ARBITRAGE - §8 ══════════ -->
+
+    <record id="view_competence_arbitrage_list" model="ir.ui.view">
+        <field name="name">opex.competence.arbitrage.list</field>
+        <field name="model">opex.competence.arbitrage</field>
+        <field name="arch" type="xml">
+            <list string="Compétences à arbitrer" create="false"
+                  decoration-warning="decision == 'pending'"
+                  decoration-muted="decision == 'discarded'">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="source_document" optional="show"/>
+                <field name="suggestion_id"/>
+                <field name="suggestion_confiance" widget="percentage_pie"
+                       optional="show"/>
+                <field name="decision"/>
+                <field name="competence_id" optional="show"/>
+                <field name="decided_by" optional="hide"/>
+                <field name="decided_on" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_competence_arbitrage_form" model="ir.ui.view">
+        <field name="name">opex.competence.arbitrage.form</field>
+        <field name="model">opex.competence.arbitrage</field>
+        <field name="arch" type="xml">
+            <form string="Arbitrage d'une compétence" create="false">
+                <header>
+                    <!--
+                        Les trois issues, et rien d'autre. Elles disparaissent
+                        une fois la décision prise : un arbitrage ne se rejoue
+                        pas, il se lit.
+                    -->
+                    <button name="action_link" type="object"
+                            string="Rattacher à la compétence proposée"
+                            class="btn-primary"
+                            invisible="decision != 'pending' or not suggestion_id"/>
+                    <button name="action_add_to_catalogue" type="object"
+                            string="Ajouter au catalogue"
+                            class="btn-secondary"
+                            invisible="decision != 'pending'"
+                            confirm="Cette compétence sera ajoutée au référentiel partagé du portail, et deviendra disponible pour tous les modules. Confirmer ?"/>
+                    <button name="action_discard" type="object"
+                            string="Écarter" class="btn-secondary"
+                            invisible="decision != 'pending'"/>
+                    <field name="decision" widget="statusbar"
+                           statusbar_visible="pending,linked,added"/>
+                </header>
+                <sheet>
+                    <div class="oe_title">
+                        <label for="name" string="Libellé lu dans le document"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="D'où il vient">
+                            <field name="partner_id" readonly="1"/>
+                            <field name="profile_id" readonly="1"/>
+                            <field name="source_document" readonly="1"/>
+                            <field name="niveau_lu" readonly="1"/>
+                            <field name="annees_lues" readonly="1"/>
+                        </group>
+                        <group string="Ce que l'IA a proposé">
+                            <field name="suggestion_id" readonly="1"/>
+                            <field name="suggestion_confiance" readonly="1"/>
+                            <field name="suggestion_motif" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <div class="alert alert-info" role="alert"
+                         invisible="decision != 'pending' or suggestion_id">
+                        Aucun rapprochement n'a été proposé. Soit
+                        l'assistance IA n'est pas configurée, soit elle n'a
+                        trouvé aucune correspondance dans le catalogue — ce
+                        qui est une réponse en soi.
+                    </div>
+
+                    <group string="Décision" invisible="decision == 'pending'">
+                        <field name="competence_id" readonly="1"/>
+                        <field name="decided_by" readonly="1"/>
+                        <field name="decided_on" readonly="1"/>
+                    </group>
+                    <group string="Note">
+                        <field name="decision_note" nolabel="1"
+                               placeholder="Pourquoi cette décision. Le prochain qui verra ce libellé le lira."/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!--
+        Les champs d'une vue search se déclarent tous avant les filtres, et le
+        groupe de regroupement s'écrit nu : il refuse `expand` et `string`.
+    -->
+    <record id="view_competence_arbitrage_search" model="ir.ui.view">
+        <field name="name">opex.competence.arbitrage.search</field>
+        <field name="model">opex.competence.arbitrage</field>
+        <field name="arch" type="xml">
+            <search string="Compétences à arbitrer">
+                <field name="name"/>
+                <field name="partner_id"/>
+                <field name="suggestion_id"/>
+
+                <filter name="pending" string="À arbitrer"
+                        domain="[('decision', '=', 'pending')]"/>
+                <filter name="proposees" string="Avec une proposition de l'IA"
+                        domain="[('suggestion_id', '!=', False)]"/>
+                <filter name="sans_proposition" string="Sans proposition"
+                        domain="[('suggestion_id', '=', False)]"/>
+                <separator/>
+                <filter name="added" string="Ajoutées au catalogue"
+                        domain="[('decision', '=', 'added')]"/>
+                <filter name="linked" string="Rattachées"
+                        domain="[('decision', '=', 'linked')]"/>
+
+                <group name="group_by">
+                    <filter name="group_decision" string="Décision"
+                            context="{'group_by': 'decision'}"/>
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_decided_by" string="Arbitré par"
+                            context="{'group_by': 'decided_by'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_competence_arbitrage" model="ir.actions.act_window">
+        <field name="name">Compétences à arbitrer</field>
+        <field name="res_model">opex.competence.arbitrage</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_pending': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Rien à arbitrer</p>
+            <p>
+                Un libellé qu'aucune correspondance n'a su rattacher au
+                référentiel atterrit ici. Le rattacher crée un synonyme : la
+                prochaine fois, il sera reconnu sans arbitrage et sans appel
+                à l'IA. La file se vide à mesure qu'on s'en sert.
+            </p>
+        </field>
+    </record>
+
+    <!-- ══════════ LA TABLE DES SYNONYMES ══════════ -->
+
+    <record id="view_competence_synonyme_list" model="ir.ui.view">
+        <field name="name">opex.competence.synonyme.list</field>
+        <field name="model">opex.competence.synonyme</field>
+        <field name="arch" type="xml">
+            <list string="Synonymes" editable="bottom">
+                <field name="name"/>
+                <field name="competence_id"/>
+                <field name="origine"/>
+                <field name="normalised" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_competence_synonyme_search" model="ir.ui.view">
+        <field name="name">opex.competence.synonyme.search</field>
+        <field name="model">opex.competence.synonyme</field>
+        <field name="arch" type="xml">
+            <search string="Synonymes">
+                <field name="name"/>
+                <field name="competence_id"/>
+
+                <filter name="arbitrage" string="Issus d'un arbitrage"
+                        domain="[('origine', '=', 'arbitrage')]"/>
+
+                <group name="group_by">
+                    <filter name="group_competence" string="Compétence"
+                            context="{'group_by': 'competence_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_competence_synonyme" model="ir.actions.act_window">
+        <field name="name">Synonymes de compétences</field>
+        <field name="res_model">opex.competence.synonyme</field>
+        <field name="view_mode">list</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun synonyme</p>
+            <p>
+                Un synonyme fait reconnaître un libellé à la première étape du
+                rapprochement, sans appel à l'IA. C'est ici que se règle
+                « ISO27001 » écrit sans espace, et c'est la réponse à la
+                dette D1 : une table explicite plutôt qu'une comparaison
+                approximative.
+            </p>
+        </field>
+    </record>
+
+    <menuitem id="menu_competence_arbitrage"
+              name="Compétences à arbitrer"
+              parent="menu_intervenants_config"
+              action="action_competence_arbitrage"
+              sequence="45"
+              groups="group_mission_manager"/>
+
+    <menuitem id="menu_competence_synonyme"
+              name="Synonymes de compétences"
+              parent="menu_intervenants_config"
+              action="action_competence_synonyme"
+              sequence="46"
+              groups="group_mission_manager"/>
+
+</odoo>

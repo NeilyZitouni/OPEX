@@ -14,7 +14,7 @@ CANONICAL_STAGES = [
 class SmartCrowdfundingCase(TransactionCase):
     """Socle commun : un dossier engagé dans le Smart Crowdfunding.
 
-    ⚠ Le projet porte **deux** instances : celle du parcours d'innovation,
+    Le projet porte **deux** instances : celle du parcours d'innovation,
     démarrée par `create()`, et celle du Smart Crowdfunding, démarrée ici. Le
     couplage `res_model`/`res_id` le permet ; le champ `workflow_instance_id`
     du mixin, lui, n'en désigne qu'une. On pilote donc l'instance Smart
@@ -138,7 +138,7 @@ class TestSmartCrowdfundingConfiguration(SmartCrowdfundingCase):
     # ------------------------------------------------------------
 
     def test_the_definition_is_published(self):
-        """⚠ Le piège de l'Extension 10, vérifié ici.
+        """Le piège de l'Extension 10, vérifié ici.
 
         Odoo n'exécute pas les `<function>` d'un bloc `noupdate="1"` lors d'une
         mise à jour. Publier depuis l'intérieur du bloc marcherait à
@@ -256,7 +256,7 @@ class TestSmartCrowdfundingConfiguration(SmartCrowdfundingCase):
     def test_the_maturation_loop_exists(self):
         """Accompagnement → Réévaluation → Matching, et le retour en arrière.
 
-        ⚠ Volontairement écrit en compréhension et non avec `mapped()` : sur
+        Volontairement écrit en compréhension et non avec `mapped()` : sur
         un Many2one, `mapped()` déduplique, et une boucle qui repasse par la
         même étape y devient invisible. Un test écrit avec `mapped()` passerait
         au vert sur un graphe où la boucle n'existe pas.
@@ -351,7 +351,7 @@ class TestSmartCrowdfundingConfiguration(SmartCrowdfundingCase):
         message à l'écran. Trouvé en exécutant le parcours ; invisible à la
         relecture.
 
-        ⚠ Le `search` est borné à cette définition : les critères du parcours
+        Le `search` est borné à cette définition : les critères du parcours
         d'innovation portent des codes voisins, et un `search` global en
         renverrait un mélange.
         """
@@ -385,7 +385,7 @@ class TestSmartCrowdfundingConfiguration(SmartCrowdfundingCase):
         self.assertEqual(len(instance.history_ids), before + 1)
         self.assertEqual(instance.current_stage_id.code, 'quality_gate')
 
-        # ⚠ `history_ids[0]` n'est pas la dernière ligne : l'ordre d'un
+        # `history_ids[0]` n'est pas la dernière ligne : l'ordre d'un
         # One2many est celui du comodèle, et plusieurs lignes créées dans la
         # même transaction partagent la même `date`. Le tri se fait donc sur
         # `id`, explicitement — sinon le test lit l'entrée d'ouverture du
@@ -425,7 +425,7 @@ class TestSmartCrowdfundingConfiguration(SmartCrowdfundingCase):
     def test_the_maturation_path_runs_and_comes_back(self):
         """La boucle du § 9 route B, parcourue pour de bon.
 
-        ⚠ Les étapes traversées sont collectées en compréhension. Avec
+        Les étapes traversées sont collectées en compréhension. Avec
         `mapped('to_stage_id.code')`, le second passage par `accompagnement`
         disparaîtrait du résultat et le test ne prouverait plus rien.
         """
@@ -523,7 +523,7 @@ class TestSmartCrowdfundingConfiguration(SmartCrowdfundingCase):
                             offences.append("%s:%s — « %s »" % (
                                 filename, node.lineno, operand.value))
 
-        # ⚠ Assertion positive d'abord : sans elle, un `engine_dir` erroné
+        # Assertion positive d'abord : sans elle, un `engine_dir` erroné
         # donnerait zéro fichier parcouru, zéro infraction, et un test vert qui
         # ne prouve rien.
         self.assertGreaterEqual(scanned, 5,
@@ -548,7 +548,7 @@ class TestDemoDayAcceptance(SmartCrowdfundingCase):
     champs, les mêmes valeurs. La différence est le moyen d'écriture — l'ORM
     ici, le formulaire là — pas la nature de l'opération.
 
-    ⚠ Aucun `import` de `opex_workflow` ici, aucun appel à une méthode que le
+    Aucun `import` de `opex_workflow` ici, aucun appel à une méthode que le
     moteur n'exposait pas déjà. Tout passe par `create()` et `write()` sur les
     modèles de configuration. C'est la définition littérale de « depuis le
     configurateur, sans modifier le code Python du moteur ».
@@ -591,7 +591,7 @@ class TestDemoDayAcceptance(SmartCrowdfundingCase):
 
         # Écran 3 — on détourne l'arc existant vers la nouvelle étape.
         #
-        # ⚠ Aucune écriture sur `action_ids` ici, et c'est une contrainte, pas
+        # Aucune écriture sur `action_ids` ici, et c'est une contrainte, pas
         # un choix : `action_ids` n'est exposé dans aucune vue du
         # configurateur. Une manipulation que ce test ferait sans effort et que
         # l'opérateur du protocole manuel ne pourrait pas reproduire
@@ -707,7 +707,7 @@ class TestDemoDayAcceptance(SmartCrowdfundingCase):
         self.assertIn("réservée", str(error.exception).lower())
 
     def test_the_whole_operation_touches_only_fields_the_ui_exposes(self):
-        """⚠ Le test qui garde le protocole manuel honnête.
+        """Le test qui garde le protocole manuel honnête.
 
         Ce qui suit énumère les champs que les cinq écrans modifient, et
         vérifie qu'ils sont tous présents dans une vue du configurateur. Si

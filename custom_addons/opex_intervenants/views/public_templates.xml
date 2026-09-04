@@ -1,0 +1,421 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        §7 — LA RUBRIQUE « OPPORTUNITÉS / MISSIONS OPEX »
+
+        Ces gabarits ne reçoivent **jamais** de recordset. `mission` est un
+        dictionnaire produit par `public_card()` / `public_detail()`, à clés
+        fermées. Ce qui n'y est pas n'existe pas pour la page — c'est ce qui
+        rend impossible la publication accidentelle du budget ou du client.
+
+        Corollaire : une clé masquée est **absente**, pas mise à `False`. Un
+        gabarit qui l'afficherait lèverait au premier rendu. Une erreur
+        bruyante vaut mieux qu'une fuite silencieuse.
+    -->
+
+    <record id="website_menu_missions" model="website.menu">
+        <field name="name">Missions OPEX</field>
+        <field name="url">/missions</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">52</field>
+    </record>
+
+    <template id="public_missions" name="Opportunités / Missions OPEX">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <div class="container my-5">
+
+                    <div class="row mb-4">
+                        <div class="col-lg-8">
+                            <h1 class="mb-2">Opportunités — Missions OPEX</h1>
+                            <p class="lead text-muted">
+                                Les appels à mission ouverts du cluster. Experts,
+                                consultants, formateurs et mentors peuvent y
+                                candidater en quelques champs.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div t-if="not missions" class="alert alert-light border">
+                        Aucun appel à mission n'est ouvert pour le moment.
+                        Revenez bientôt.
+                    </div>
+
+                    <div class="row g-4">
+                        <div t-foreach="missions" t-as="m" class="col-md-6 col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="text-muted small mb-1">
+                                        <t t-out="m['reference']"/> ·
+                                        <t t-out="m['type']"/>
+                                    </div>
+                                    <h5 class="card-title" t-out="m['titre']"/>
+
+                                    <div class="mb-2">
+                                        <span t-foreach="m['competences']" t-as="c"
+                                              class="badge text-bg-light me-1"
+                                              t-out="c"/>
+                                    </div>
+
+                                    <ul class="list-unstyled small text-muted mb-3">
+                                        <li t-if="m['domaine']">
+                                            <i class="fa fa-folder-o me-2"/>
+                                            <t t-out="m['domaine']"/>
+                                        </li>
+                                        <li t-if="m['localisation']">
+                                            <i class="fa fa-map-marker me-2"/>
+                                            <t t-out="m['localisation']"/>
+                                            <t t-if="m['mode']">
+                                                — <t t-out="m['mode']"/>
+                                            </t>
+                                        </li>
+                                        <li t-if="m['duree']">
+                                            <i class="fa fa-clock-o me-2"/>
+                                            <t t-out="m['duree']"/> jours
+                                        </li>
+                                        <li t-if="m['date_limite']">
+                                            <i class="fa fa-calendar me-2"/>
+                                            Candidatures jusqu'au
+                                            <t t-out="m['date_limite']"
+                                               t-options="{'widget': 'date'}"/>
+                                        </li>
+                                    </ul>
+
+                                    <div class="mt-auto d-flex justify-content-between align-items-center">
+                                        <span t-if="m['ouvert']"
+                                              class="badge text-bg-success">Candidatures ouvertes</span>
+                                        <span t-else=""
+                                              class="badge text-bg-secondary">Sourcing en cours</span>
+                                        <a class="btn btn-sm btn-primary"
+                                           t-attf-href="/missions/#{m['id']}">
+                                            Voir l'appel
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §12 — LA FICHE PUBLIQUE
+
+        Le §12 du document UX liste « Client » et « Budget indicatif » parmi ce
+        que la page doit présenter ; le §7 de la spécification dit qu'ils
+        « peuvent rester masqués jusqu'à une étape ultérieure ».
+
+        Les deux se réconcilient par `public_fields_only`, réglé **par appel**
+        depuis l'Extension 1 : les clés `client` et `budget` ne sont dans le
+        dictionnaire que si l'appel les publie. Ici on ne fait que les afficher
+        quand elles existent — et **dire** qu'elles sont réservées quand elles
+        n'y sont pas, plutôt que de laisser un blanc qui passerait pour un oubli.
+    -->
+    <template id="public_mission_detail" name="Appel à mission">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <div class="container my-5">
+
+                    <a href="/missions" class="text-muted small">
+                        &#8592; Toutes les opportunités
+                    </a>
+
+                    <div class="row mt-3">
+                        <div class="col-lg-8">
+                            <div class="text-muted small" t-out="mission['reference']"/>
+                            <h1 class="mb-2" t-out="mission['titre']"/>
+                            <p class="text-muted">
+                                <t t-out="mission['type']"/>
+                                <t t-if="mission['domaine']">
+                                    — <t t-out="mission['domaine']"/>
+                                </t>
+                            </p>
+
+                            <div t-if="motif" class="alert alert-warning" t-out="motif"/>
+
+                            <h5 class="mt-4">Le besoin</h5>
+                            <p style="white-space: pre-line;" t-out="mission['description']"/>
+
+                            <h5 class="mt-4">Objectifs</h5>
+                            <p style="white-space: pre-line;" t-out="mission['objectifs']"/>
+
+                            <t t-if="mission['resultats']">
+                                <h5 class="mt-4">Résultats attendus</h5>
+                                <p style="white-space: pre-line;" t-out="mission['resultats']"/>
+                            </t>
+
+                            <h5 class="mt-4">Profil recherché</h5>
+                            <div class="mb-2">
+                                <span t-foreach="mission['competences']" t-as="c"
+                                      class="badge text-bg-light me-1" t-out="c"/>
+                            </div>
+                            <ul class="text-muted">
+                                <li t-if="mission['niveau']">
+                                    Niveau : <t t-out="mission['niveau']"/>
+                                </li>
+                                <li t-if="mission['annees_min']">
+                                    Expérience minimale :
+                                    <t t-out="mission['annees_min']"/> ans
+                                </li>
+                                <li t-if="mission['certifications']">
+                                    Certifications :
+                                    <t t-out="mission['certifications']"/>
+                                </li>
+                                <li t-if="mission['langues']">
+                                    Langues : <t t-out="mission['langues']"/>
+                                </li>
+                            </ul>
+
+                            <t t-if="mission['documents']">
+                                <h5 class="mt-4">Documents</h5>
+                                <ul class="list-unstyled">
+                                    <li t-foreach="mission['documents']" t-as="d"
+                                        class="mb-1">
+                                        <a t-attf-href="/missions/#{mission['id']}/document/#{d['id']}">
+                                            <i class="fa fa-paperclip me-2"/>
+                                            <t t-out="d['nom']"/>
+                                        </a>
+                                        <span class="text-muted small">
+                                            — <t t-out="d['type']"/>
+                                        </span>
+                                    </li>
+                                </ul>
+                            </t>
+                        </div>
+
+                        <div class="col-lg-4">
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title">En bref</h6>
+                                    <dl class="row small mb-0">
+                                        <dt class="col-6">Mode</dt>
+                                        <dd class="col-6" t-out="mission['mode'] or '—'"/>
+                                        <dt class="col-6">Lieu</dt>
+                                        <dd class="col-6"
+                                            t-out="mission['localisation'] or mission['wilaya'] or '—'"/>
+                                        <dt class="col-6">Début souhaité</dt>
+                                        <dd class="col-6">
+                                            <t t-if="mission['date_debut']"
+                                               t-out="mission['date_debut']"
+                                               t-options="{'widget': 'date'}"/>
+                                            <t t-else="">—</t>
+                                        </dd>
+                                        <dt class="col-6">Durée</dt>
+                                        <dd class="col-6">
+                                            <t t-if="mission['duree']">
+                                                <t t-out="mission['duree']"/> jours
+                                            </t>
+                                            <t t-else="">—</t>
+                                        </dd>
+                                        <dt class="col-6">Date limite</dt>
+                                        <dd class="col-6">
+                                            <t t-if="mission['date_limite']"
+                                               t-out="mission['date_limite']"
+                                               t-options="{'widget': 'date'}"/>
+                                            <t t-else="">—</t>
+                                        </dd>
+
+                                        <!--
+                                            Client et budget : présents **si et
+                                            seulement si** l'appel les publie.
+                                            Les clés sont absentes du
+                                            dictionnaire sinon — pas vides.
+                                        -->
+                                        <t t-if="not mission['restreint']">
+                                            <dt class="col-6">Client</dt>
+                                            <dd class="col-6" t-out="mission['client']"/>
+                                            <dt class="col-6">Budget</dt>
+                                            <dd class="col-6">
+                                                <t t-out="mission['budget']"/>
+                                                <t t-out="mission['devise']"/>
+                                            </dd>
+                                        </t>
+                                    </dl>
+
+                                    <div t-if="mission['restreint']"
+                                         class="alert alert-light border small mt-3 mb-0">
+                                        Le client et le budget de cet appel ne
+                                        sont communiqués qu'aux candidats
+                                        retenus.
+                                    </div>
+
+                                    <div t-if="mission['nda_requis']"
+                                         class="alert alert-warning small mt-2 mb-0">
+                                        Un accord de confidentialité sera
+                                        demandé avant l'accès aux documents
+                                        détaillés.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!--
+                                 Le CTA du §7
+
+                                Un **POST**, pas un lien. La création d'une
+                                candidature n'est pas une lecture : un GET
+                                serait rejouable par un préchargement de
+                                navigateur ou un crawler.
+
+                                Le `t-if` interroge exactement la même
+                                fonction que la route —
+                                `opex_check_can_apply()`. Un bouton visible là
+                                où la route refuse, ou l'inverse, sont deux
+                                bugs symétriques ; le second est déjà arrivé
+                                sur le Module 1.
+                            -->
+                            <div class="card">
+                                <div class="card-body">
+                                    <t t-if="not mission['ouvert']">
+                                        <p class="text-muted mb-0">
+                                            Les candidatures ne sont pas ouvertes
+                                            sur cet appel.
+                                        </p>
+                                    </t>
+                                    <t t-elif="not connecte">
+                                        <p class="small text-muted">
+                                            Connectez-vous pour candidater.
+                                        </p>
+                                        <a class="btn btn-primary w-100"
+                                           t-attf-href="/web/login?redirect=/missions/#{mission['id']}">
+                                            Je suis intéressé
+                                        </a>
+                                    </t>
+                                    <t t-elif="peut_candidater">
+                                        <form method="post"
+                                              t-attf-action="/missions/#{mission['id']}/interesse">
+                                            <input type="hidden" name="csrf_token"
+                                                   t-att-value="request.csrf_token()"/>
+                                            <button type="submit"
+                                                    class="btn btn-primary w-100">
+                                                Je suis intéressé
+                                            </button>
+                                        </form>
+                                        <p class="small text-muted mt-2 mb-0">
+                                            Vous ne ressaisirez pas votre profil :
+                                            seules les informations propres à
+                                            cette mission vous seront demandées.
+                                        </p>
+                                    </t>
+                                    <t t-else="">
+                                        <a class="btn btn-outline-primary w-100"
+                                           t-attf-href="/missions/#{mission['id']}/interesse">
+                                            Je suis intéressé
+                                        </a>
+                                    </t>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §7 — LE CANDIDAT EXTERNE
+
+        « Un candidat externe crée un mini-profil puis fournit les informations
+        nécessaires à la candidature. S'il est qualifié, son profil peut
+        intégrer le référentiel experts OPEX. »
+    -->
+    <template id="public_mission_no_profile" name="Appel : profil requis">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <div class="container my-5" style="max-width: 720px;">
+                    <div class="text-muted small" t-out="mission['reference']"/>
+                    <h2 t-out="mission['titre']"/>
+
+                    <div class="alert alert-info mt-3" t-out="motif"/>
+
+                    <p>
+                        Le cluster instruira votre profil en même temps que votre
+                        candidature. Vous n'aurez à le renseigner
+                        <strong>qu'une seule fois</strong> : il servira à toutes
+                        vos candidatures suivantes.
+                    </p>
+
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-primary"
+                           t-attf-href="/missions/#{mission['id']}/mini-profil">
+                            Créer mon profil et candidater
+                        </a>
+                        <a class="btn btn-light"
+                           t-attf-href="/missions/#{mission['id']}">
+                            Revenir à l'appel
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="public_mini_profile" name="Mini-profil candidat externe">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <div class="container my-5" style="max-width: 720px;">
+                    <div class="text-muted small">
+                        Candidature à <t t-out="mission['reference']"/>
+                    </div>
+                    <h2>Créer mon profil</h2>
+                    <p class="text-muted">
+                        Quatre champs suffisent pour candidater. Vous compléterez
+                        votre expertise — compétences, expériences,
+                        certifications, disponibilités — depuis votre espace,
+                        quand vous voudrez.
+                    </p>
+
+                    <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                    <form method="post"
+                          t-attf-action="/missions/#{mission['id']}/mini-profil"
+                          class="mt-4">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="domaine_expertise">
+                                Domaine d'expertise <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control"
+                                   name="domaine_expertise" id="domaine_expertise"
+                                   required="required"
+                                   placeholder="Sécurité des systèmes d'information"/>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="fonction">Fonction</label>
+                            <input type="text" class="form-control" name="fonction"
+                                   id="fonction" placeholder="Consultant senior"/>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="specialites">Spécialités</label>
+                            <textarea class="form-control" name="specialites"
+                                      id="specialites" rows="2"/>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="description_expertise">
+                                En quelques lignes
+                            </label>
+                            <textarea class="form-control" name="description_expertise"
+                                      id="description_expertise" rows="4"/>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a class="btn btn-light"
+                               t-attf-href="/missions/#{mission['id']}">Annuler</a>
+                            <button type="submit" class="btn btn-primary">
+                                Créer mon profil et continuer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

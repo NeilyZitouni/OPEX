@@ -2,16 +2,14 @@
 <odoo>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Section 31 — Historique / traçabilité
-        ═══════════════════════════════════════════════════════════════
 
         Motif repris du Module 1 (`opex_membership.membership_history`) :
         `opex.innovation.project` n'hérite pas de `portal.mixin`, donc le
         chatter natif ne s'affiche pas au portail. Un bloc QWeb en lecture
         seule le remplace.
 
-        ⚠ Le gabarit itère sur des **dictionnaires** produits par
+        Le gabarit itère sur des **dictionnaires** produits par
         `project.history_entries()`. C'est le modèle qui décide ce que chaque
         public a le droit de lire, pas la page. Passer `instance.history_ids`
         donnerait accès à l'instance, à ses acteurs, et de fil en aiguille au
@@ -66,7 +64,7 @@
                     file de l'autre (26/08). Les deux parcours sont désormais
                     nommés sur l'accueil.
 
-                    ⚠ Aucun vocabulaire d'architecture ici — ni « moteur de
+                    Aucun vocabulaire d'architecture ici — ni « moteur de
                     workflow », ni « configuration » : ce qui distingue les deux
                     modules relève de la soutenance, pas de l'écran du porteur.
                 -->
@@ -75,7 +73,7 @@
                 <t t-set="text">Projet d'innovation du cluster, évalué par le Comité d'évaluation puis accompagné jusqu'à l'industrialisation.</t>
                 <t t-set="placeholder_count" t-value="'innovation_project_count'"/>
                 <!--
-                    ⚠ `config_card` : sans lui, `portal.portal_docs_entry`
+                    `config_card` : sans lui, `portal.portal_docs_entry`
                     ajoute `d-none` à la tuile et celle-ci n'apparaît **jamais**
                     tant que le compteur est nul.
 
@@ -93,7 +91,7 @@
         </xpath>
     </template>
 
-    <!-- ══════════ Fil des étapes, partagé par les six écrans ══════════ -->
+    <!-- Fil des étapes, partagé par les six écrans -->
 
     <template id="portal_project_steps" name="Étapes du dépôt">
         <ul class="nav nav-pills mb-4 flex-wrap">
@@ -110,7 +108,7 @@
         </ul>
     </template>
 
-    <!-- ══════════ Section 4 — Mes projets ══════════ -->
+    <!-- Section 4 — Mes projets -->
 
     <template id="portal_my_projects" name="Mes projets">
         <t t-call="portal.portal_layout">
@@ -138,7 +136,7 @@
                 </div>
 
                 <!--
-                    ═══════════ Section 35 — le tableau de bord du porteur ═══════════
+                     Section 35 — le tableau de bord du porteur
 
                     Le tableau d'origine listait « État : Évaluation en cours »
                     dans une colonne. C'était déjà le libellé utilisateur et
@@ -198,7 +196,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Écran 1 — Informations générales ══════════ -->
+    <!-- Écran 1 — Informations générales -->
 
     <template id="portal_project_step_general" name="Dépôt : informations générales">
         <t t-call="portal.portal_layout">
@@ -278,7 +276,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Écran 2 — Marché ══════════ -->
+    <!-- Écran 2 — Marché -->
 
     <template id="portal_project_step_marche" name="Dépôt : marché">
         <t t-call="portal.portal_layout">
@@ -346,7 +344,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Écran 3 — Équipe ══════════ -->
+    <!-- Écran 3 — Équipe -->
 
     <template id="portal_project_step_equipe" name="Dépôt : équipe">
         <t t-call="portal.portal_layout">
@@ -417,7 +415,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Écran 4 — Besoins ══════════ -->
+    <!-- Écran 4 — Besoins -->
 
     <template id="portal_project_step_besoins" name="Dépôt : besoins">
         <t t-call="portal.portal_layout">
@@ -514,7 +512,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Écran 5 — Pièces jointes ══════════ -->
+    <!-- Écran 5 — Pièces jointes -->
 
     <template id="portal_project_step_documents" name="Dépôt : pièces jointes">
         <t t-call="portal.portal_layout">
@@ -586,7 +584,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Écran 6 — Récapitulatif et soumission ══════════ -->
+    <!-- Écran 6 — Récapitulatif et soumission -->
 
     <template id="portal_project_step_recap" name="Dépôt : récapitulatif">
         <t t-call="portal.portal_layout">
@@ -643,7 +641,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Suivi ══════════ -->
+    <!-- Suivi -->
 
     <template id="portal_project_detail" name="Mon projet">
         <t t-call="portal.portal_layout">
@@ -696,7 +694,7 @@
                 </div>
 
                 <!--
-                    ═══════════ Section 25 — le suivi du financement ═══════════
+                     Section 25 — le suivi du financement
 
                     « Le porteur peut voir : Financement recherché 500 000 DA,
                     Montant obtenu 300 000 DA, Progression 60 %. »
@@ -725,7 +723,7 @@
                                         </td>
                                     </tr>
                                 </table>
-                                <!-- ⚠ `t-attf-` : voir la note du gabarit
+                                <!-- `t-attf-` : voir la note du gabarit
                                      `portal_opportunity_detail`. Un
                                      `t-att-style="'width: %s%%' % ..."` renvoie
                                      une 500 au rendu. -->
@@ -747,10 +745,10 @@
                                     <li t-foreach="project.financement_steps()" t-as="step"
                                         class="list-group-item d-flex justify-content-between px-0">
                                         <span t-esc="step['label']"/>
-                                        <span t-if="step['state'] == 'done'" class="text-success">✓</span>
+                                        <span t-if="step['state'] == 'done'" class="text-success"></span>
                                         <span t-elif="step['state'] == 'current'"
                                               class="badge text-bg-primary">en cours</span>
-                                        <span t-else="" class="text-muted">○</span>
+                                        <span t-else="" class="text-muted"></span>
                                     </li>
                                 </ul>
                             </div>
@@ -759,7 +757,7 @@
                 </div>
 
                 <!--
-                    ═══════════ Section 29 — l'évaluation finale ═══════════
+                     Section 29 — l'évaluation finale
 
                     Le bouton n'apparaît que si `can_evaluate_finally()` répond
                     oui. **La même fonction** garde la route : un `t-if` qui

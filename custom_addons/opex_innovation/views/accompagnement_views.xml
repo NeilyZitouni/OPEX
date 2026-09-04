@@ -2,9 +2,7 @@
 <odoo>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Accompagnement — section 21
-        ═══════════════════════════════════════════════════════════════
     -->
     <record id="view_accompagnement_form" model="ir.ui.view">
         <field name="name">opex.innovation.accompagnement.form</field>
@@ -104,9 +102,7 @@
     </record>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Livrable — sections 23 et 24
-        ═══════════════════════════════════════════════════════════════
     -->
     <record id="view_deliverable_form" model="ir.ui.view">
         <field name="name">opex.innovation.deliverable.form</field>
@@ -196,7 +192,7 @@
                 <field name="name"/>
                 <field name="project_id"/>
                 <!--
-                    ⚠ Le filtre porte sur les champs bruts, pas sur `en_retard`.
+                    Le filtre porte sur les champs bruts, pas sur `en_retard`.
 
                     `en_retard` est calculé et **non stocké** : il n'est donc pas
                     cherchable, et Odoo refuse la vue (« Unsearchable field
@@ -230,7 +226,7 @@
         <field name="view_mode">list,form</field>
     </record>
 
-    <!-- ══════════ Référentiel des phases ══════════ -->
+    <!-- Référentiel des phases -->
 
     <record id="view_roadmap_template_list" model="ir.ui.view">
         <field name="name">opex.innovation.roadmap.template.list</field>
@@ -260,7 +256,7 @@
         </field>
     </record>
 
-    <!-- ══════════ Menus ══════════ -->
+    <!-- Menus -->
 
     <menuitem id="menu_accompagnement"
               name="Accompagnements"

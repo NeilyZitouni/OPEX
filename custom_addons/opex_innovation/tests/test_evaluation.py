@@ -7,7 +7,7 @@ from odoo.tests.common import HttpCase, new_test_user, tagged
 
 @tagged('post_install', '-at_install')
 class TestEvaluation(HttpCase):
-    
+
 
     @classmethod
     def setUpClass(cls):
@@ -54,7 +54,7 @@ class TestEvaluation(HttpCase):
         qu'on le lit à l'écran demande donc de défaire les deux — sinon
         l'assertion échoue sur une question d'encodage et non de contenu.
 
-        ⚠ Cela vaut pour les assertions **positives**. Les assertions négatives
+        Cela vaut pour les assertions **positives**. Les assertions négatives
         d'un test de confidentialité doivent porter sur le HTML **brut** : une
         donnée présente sous forme échappée reste une donnée présente.
         """
@@ -203,7 +203,7 @@ class TestEvaluation(HttpCase):
             alice.sudo().score_innovation = 21  # maximum 20
 
     def test_project_score_is_the_average_of_submitted_opinions(self):
-        """⚠ C'est ce champ que lit `field('score') >= 70` du test final."""
+        """C'est ce champ que lit `field('score') >= 70` du test final."""
         project, alice, bob = self._with_two_evaluators()
         alice.sudo().write({'score_innovation': 20, 'score_pertinence': 20,
                             'score_faisabilite': 20, 'score_marche': 20,
@@ -237,7 +237,7 @@ class TestEvaluation(HttpCase):
         self.assertIn("plus être modifié", str(error.exception))
 
     # ------------------------------------------------------------
-    # ⚠ CONFIDENTIALITÉ — le test central
+    # CONFIDENTIALITÉ — le test central
     # ------------------------------------------------------------
 
     def test_an_evaluator_does_not_see_the_opinion_of_another(self):
@@ -274,7 +274,7 @@ class TestEvaluation(HttpCase):
         self.assertFalse(project.visible_evaluations(self.carol))
 
     def test_the_evaluator_page_never_renders_another_opinion(self):
-        """⚠ LE test de sécurité de l'extension.
+        """LE test de sécurité de l'extension.
 
         « Présent dans le HTML » suffirait à violer la confidentialité : un
         évaluateur curieux ouvre la source de la page. On vérifie donc le HTML
@@ -300,7 +300,7 @@ class TestEvaluation(HttpCase):
         self.assertIn("Smart Factory", self._readable(raw))
 
         # …et rien de Bob n'y figure, ni visible ni masqué.
-        # ⚠ Sur le HTML **brut** : une donnée échappée reste une donnée
+        # Sur le HTML **brut** : une donnée échappée reste une donnée
         # présente, et se lit dans la source de la page.
         self.assertNotIn("SECRET DE BOB", raw)
         self.assertNotIn("FAIBLESSE VUE PAR BOB", raw)

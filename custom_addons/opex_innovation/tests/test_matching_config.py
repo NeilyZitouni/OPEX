@@ -130,7 +130,7 @@ class TestMatchingConfiguration(HttpCase):
             self.assertIn(expected, codes)
 
     def test_the_business_module_writes_no_scoring(self):
-        """⚠ Le scoring reste dans le moteur.
+        """Le scoring reste dans le moteur.
 
         Ce module configure ; il ne recalcule pas. Un `_score_` défini ici
         signifierait qu'on a réécrit ce que l'Extension 7 fait déjà.
@@ -229,7 +229,7 @@ class TestMatchingConfiguration(HttpCase):
             self.assertIn("Score", candidate.detail)
 
     # ------------------------------------------------------------
-    # ⚠ L'IA recommande, elle ne décide pas
+    # L'IA recommande, elle ne décide pas
     # ------------------------------------------------------------
 
     def test_matching_moves_the_project_only_by_the_asked_transition(self):
@@ -298,7 +298,7 @@ class TestMatchingConfiguration(HttpCase):
             project.workflow_instance_id._has_access(self.expert_hs, 'limited'))
 
     def test_the_teaser_exposes_only_the_allowed_fields(self):
-        """⚠ Section 20 : « seulement les informations auxquelles il a droit ».
+        """Section 20 : « seulement les informations auxquelles il a droit ».
 
         Le gabarit reçoit un dictionnaire, pas le projet : un champ non listé
         ne peut pas être rendu par inadvertance.

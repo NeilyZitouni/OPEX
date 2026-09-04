@@ -17,7 +17,7 @@ class OpexCrowdfundingRelation(models.Model):
         match → teaser anonymisé → expression d'intérêt → autorisation du
         porteur → NDA si nécessaire → dossier détaillé
 
-    ⚠️ Le contrôle du niveau vit dans **une seule méthode**, `_portal_payload()`.
+    Le contrôle du niveau vit dans **une seule méthode**, `_portal_payload()`.
     Toutes les routes portail passent par elle et ne reçoivent que les données
     du niveau atteint : les informations réservées ne sont pas masquées à
     l'affichage, elles ne quittent jamais le serveur.
@@ -257,7 +257,7 @@ class OpexCrowdfundingRelation(models.Model):
     # méthodes n'expose un état au demandeur, et aucune ne lui en demande un.
 
     def action_decision_interesse(self):
-        """★ Intéressé → le dossier passe en décision de l'acteur financier."""
+        """Intéressé → le dossier passe en décision de l'acteur financier."""
         for relation in self:
             relation._ensure_dossier_ouvert()
             relation._enregistrer_decision('interesse')
@@ -315,7 +315,7 @@ class OpexCrowdfundingRelation(models.Model):
         return True
 
     def action_decision_non_interesse(self):
-        """✕ Non intéressé → cet acteur sort, le dossier reste.
+        """Non intéressé → cet acteur sort, le dossier reste.
 
         Un refus n'écarte pas le projet : d'autres acteurs sont peut-être en
         relation, et c'est au comité de décider de la suite.

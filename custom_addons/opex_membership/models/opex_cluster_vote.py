@@ -4,7 +4,7 @@ from odoo import fields, models
 class OpexClusterVote(models.Model):
     """Vote en assemblée générale — **stub, hors périmètre actuel**.
 
-    ⚠️ Ce modèle ne fait rien d'autre que porter une question et ses options.
+    Ce modèle ne fait rien d'autre que porter une question et ses options.
     Il n'y a **volontairement** :
 
     - aucun bulletin (personne n'enregistre de choix) ;

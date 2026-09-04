@@ -2,11 +2,9 @@
 <odoo>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Sections 23 et 24 — un livrable, ses versions, ses décisions
-        ═══════════════════════════════════════════════════════════════
 
-        ⚠ Les boutons d'action viennent de `instance.transition_options()`.
+        Les boutons d'action viennent de `instance.transition_options()`.
         Celui qui n'a pas le droit de franchir une transition ne la voit pas
         proposée — et s'il forge la requête, `_check_transition_allowed()` la
         refuse. Le gabarit n'est pas la barrière, il en est le reflet.
@@ -58,7 +56,7 @@
                             </div>
                         </div>
 
-                        <!-- ══════════ Le porteur dépose ══════════ -->
+                        <!-- Le porteur dépose -->
                         <div t-if="deliverable.workflow_stage_id.code in ('todo', 'correction_requested')
                                    and deliverable.partner_id == request.env.user.partner_id"
                              class="card mb-3">
@@ -94,7 +92,7 @@
                             </div>
                         </div>
 
-                        <!-- ══════════ L'expert décide — section 24 ══════════ -->
+                        <!-- L'expert décide — section 24 -->
                         <t t-set="decisions" t-value="[
                             o for o in options
                             if o['transition'].code in ('deliverable_validate',
@@ -128,7 +126,7 @@
                         </div>
                     </div>
 
-                    <!-- ══════════ L'historique — section 24 ══════════ -->
+                    <!-- L'historique — section 24 -->
                     <div class="col-lg-5">
                         <div class="card mb-3">
                             <div class="card-header">Versions précédentes</div>

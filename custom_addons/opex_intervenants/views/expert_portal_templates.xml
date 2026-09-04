@@ -1,0 +1,510 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+         La tuile « mon expertise »
+
+        `config_card` pour la même raison qu'à l'Extension 2 : un expert qui
+        n'a encore rien déclaré a précisément zéro compétence, et la tuile
+        disparaîtrait exactement pour celui qui doit la remplir.
+
+        Compteur **neuf** : `intervenants_expertise_count`. Il mesure le
+        capital, là où `intervenants_mission_count` mesure les demandes. Deux
+        tuiles partageant une clé laisseraient la seconde masquée —
+        `querySelector()` ne renvoie que le premier nœud.
+    -->
+    <template id="portal_my_home_expertise" name="Portail : mon expertise"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="70">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">OPEX Intervenants — mon expertise</t>
+                <t t-set="url" t-value="'/my/missions/expertise'"/>
+                <t t-set="text">Compétences, expériences, certifications et disponibilités. C'est ce capital que le cluster compare lorsqu'il cherche un intervenant.</t>
+                <t t-set="placeholder_count" t-value="'intervenants_expertise_count'"/>
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!--
+         Sans profil expert
+
+        Une page qui explique, plutôt qu'une redirection muette vers `/my`.
+        Le membre saurait qu'il n'a pas accès, sans savoir ce qui lui manque.
+    -->
+    <template id="portal_expertise_no_profile" name="Expertise — profil requis">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3>Mon expertise</h3>
+                <div class="alert alert-info mt-3">
+                    <p class="mb-2">
+                        Pour déclarer vos compétences et candidater aux appels à
+                        mission, vous devez d'abord disposer d'un
+                        <strong>profil Expert validé</strong>.
+                    </p>
+                    <p class="mb-0">
+                        La demande se fait depuis votre espace Innovation ; elle
+                        est instruite par le secrétariat du cluster.
+                    </p>
+                </div>
+                <a class="btn btn-primary" href="/my/innovation/profiles">
+                    Demander un profil Expert
+                </a>
+            </div>
+        </t>
+    </template>
+
+    <!--
+         Le capital, en une page
+
+        Quatre blocs, chacun avec sa liste et son formulaire d'ajout. Ce n'est
+        pas un parcours : un capital s'entretient, on y revient pour changer une
+        ligne. Un assistant en cinq étapes obligerait à tout retraverser pour
+        corriger une date.
+    -->
+    <template id="portal_expertise" name="Mon expertise">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-4">
+                    <div>
+                        <h3 class="mb-1">Mon expertise</h3>
+                        <p class="text-muted mb-0">
+                            C'est ce capital que le cluster compare lorsqu'il
+                            cherche un intervenant pour une mission.
+                        </p>
+                    </div>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" role="alert">
+                    <t t-out="error"/>
+                </div>
+
+                <!-- La synthèse -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100"><div class="card-body">
+                            <div class="display-6" t-out="summary['competences']"/>
+                            <div class="text-muted">Compétences</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100"><div class="card-body">
+                            <div class="display-6" t-out="summary['experiences']"/>
+                            <div class="text-muted">Expériences</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100"><div class="card-body">
+                            <div class="display-6">
+                                <t t-out="summary['certifications_valides']"/>
+                                <span class="fs-6 text-muted">
+                                    / <t t-out="summary['certifications']"/>
+                                </span>
+                            </div>
+                            <div class="text-muted">Certifications valides</div>
+                        </div></div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100"><div class="card-body">
+                            <!--
+                                On affiche « — » et non « 0 » tant qu'aucune
+                                évaluation n'existe. Une note de 0 sur 5
+                                laisserait croire à un expert mal noté, alors
+                                qu'il n'a simplement pas encore été évalué.
+                            -->
+                            <div class="display-6">
+                                <t t-if="summary['evaluations']">
+                                    <t t-out="summary['reputation']"/>
+                                    <span class="fs-6 text-muted">/ 5</span>
+                                </t>
+                                <span t-else="" class="text-muted">—</span>
+                            </div>
+                            <div class="text-muted">
+                                Réputation
+                                <t t-if="not summary['evaluations']">
+                                    <br/><span class="small">Aucune mission évaluée</span>
+                                </t>
+                            </div>
+                        </div></div>
+                    </div>
+                </div>
+
+                <!-- Bloc 1 — Compétences -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <strong>Compétences</strong>
+                        <span class="text-muted small ms-2">
+                            Le critère le plus lourd du matching. Déclarez le
+                            niveau réellement pratiqué.
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div t-if="profile.expert_skill_ids" class="table-responsive mb-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Compétence</th><th>Niveau</th>
+                                        <th class="text-end">Années</th><th/></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="profile.expert_skill_ids" t-as="s">
+                                        <td t-out="s.competence_id.name"/>
+                                        <td t-out="dict(niveaux).get(s.niveau, '')"/>
+                                        <td class="text-end" t-out="s.annees"/>
+                                        <td class="text-end">
+                                            <form method="post"
+                                                  action="/my/missions/expertise/skill">
+                                                <input type="hidden" name="csrf_token"
+                                                       t-att-value="request.csrf_token()"/>
+                                                <input type="hidden" name="action" value="remove"/>
+                                                <input type="hidden" name="line_id" t-att-value="s.id"/>
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-danger">Retirer</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p t-else="" class="text-muted">
+                            Aucune compétence déclarée. Sans elles, aucun appel
+                            à mission ne vous sera proposé.
+                        </p>
+
+                        <form method="post" action="/my/missions/expertise/skill"
+                              class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="action" value="add"/>
+                            <div class="col-md-5">
+                                <label class="form-label" for="competence_id">Compétence</label>
+                                <select class="form-select" name="competence_id" id="competence_id">
+                                    <option value="">— Choisir —</option>
+                                    <t t-foreach="competences" t-as="c">
+                                        <option t-att-value="c.id" t-out="c.name"/>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="niveau">Niveau</label>
+                                <select class="form-select" name="niveau" id="niveau">
+                                    <t t-foreach="niveaux" t-as="n">
+                                        <option t-att-value="n[0]"
+                                                t-att-selected="'selected' if n[0] == 'confirme' else None"
+                                                t-out="n[1]"/>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="annees">Années</label>
+                                <input type="number" min="0" class="form-control"
+                                       name="annees" id="annees" value="0"/>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-outline-primary w-100">
+                                    Ajouter
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bloc 2 — Expériences -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <strong>Expériences</strong>
+                        <span class="text-muted small ms-2">
+                            Les missions déjà réalisées. Le type et le domaine
+                            servent au critère « missions similaires ».
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div t-if="profile.expert_experience_ids" class="table-responsive mb-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Mission</th><th>Type</th><th>Domaine</th>
+                                        <th>Séniorité</th><th>Période</th><th/></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="profile.expert_experience_ids" t-as="e">
+                                        <td>
+                                            <div t-out="e.name"/>
+                                            <div t-if="e.organisation" class="small text-muted"
+                                                 t-out="e.organisation"/>
+                                        </td>
+                                        <td t-out="e.mission_type_id.name or '—'"/>
+                                        <td t-out="e.domaine_id.name or '—'"/>
+                                        <td t-out="dict(seniorites).get(e.seniorite, '—')"/>
+                                        <td class="text-nowrap small">
+                                            <t t-out="e.date_debut or '?'"/> →
+                                            <t t-out="e.date_fin or '?'"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <form method="post"
+                                                  action="/my/missions/expertise/experience">
+                                                <input type="hidden" name="csrf_token"
+                                                       t-att-value="request.csrf_token()"/>
+                                                <input type="hidden" name="action" value="remove"/>
+                                                <input type="hidden" name="line_id" t-att-value="e.id"/>
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-danger">Retirer</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p t-else="" class="text-muted">Aucune expérience déclarée.</p>
+
+                        <form method="post" action="/my/missions/expertise/experience"
+                              class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="action" value="add"/>
+                            <div class="col-md-4">
+                                <label class="form-label" for="exp_name">Intitulé</label>
+                                <input type="text" class="form-control" name="name"
+                                       id="exp_name" placeholder="Audit SI — groupe industriel"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="organisation">Organisation</label>
+                                <input type="text" class="form-control" name="organisation"
+                                       id="organisation"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="mission_type_id">Type</label>
+                                <select class="form-select" name="mission_type_id" id="mission_type_id">
+                                    <option value="">—</option>
+                                    <t t-foreach="mission_types" t-as="t">
+                                        <option t-att-value="t.id" t-out="t.name"/>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="exp_domaine_id">Domaine</label>
+                                <select class="form-select" name="domaine_id" id="exp_domaine_id">
+                                    <option value="">—</option>
+                                    <t t-foreach="domaines" t-as="d">
+                                        <option t-att-value="d.id" t-out="d.name"/>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="seniorite">Séniorité</label>
+                                <select class="form-select" name="seniorite" id="seniorite">
+                                    <option value="">—</option>
+                                    <t t-foreach="seniorites" t-as="s">
+                                        <option t-att-value="s[0]" t-out="s[1]"/>
+                                    </t>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="exp_debut">Début</label>
+                                <input type="date" class="form-control" name="date_debut"
+                                       id="exp_debut"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="exp_fin">Fin</label>
+                                <input type="date" class="form-control" name="date_fin"
+                                       id="exp_fin"/>
+                            </div>
+                            <div class="col-md-3">
+                                <button type="submit" class="btn btn-outline-primary w-100">
+                                    Ajouter
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bloc 3 — Certifications -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <strong>Certifications</strong>
+                        <span class="text-muted small ms-2">
+                            Une certification expirée cesse d'être comptée le
+                            jour de son échéance.
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div t-if="profile.expert_certification_ids" class="table-responsive mb-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Intitulé</th><th>Organisme</th>
+                                        <th>Obtenue</th><th>Valable jusqu'au</th>
+                                        <th>État</th><th/></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="profile.expert_certification_ids" t-as="c">
+                                        <td t-out="c.name"/>
+                                        <td t-out="c.organisme or '—'"/>
+                                        <td t-out="c.date_obtention or '—'"/>
+                                        <td t-out="c.date_expiration or 'Sans échéance'"/>
+                                        <td>
+                                            <span t-if="c.is_valid" class="badge text-bg-success">Valide</span>
+                                            <span t-else="" class="badge text-bg-secondary">Expirée</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <form method="post"
+                                                  action="/my/missions/expertise/certification">
+                                                <input type="hidden" name="csrf_token"
+                                                       t-att-value="request.csrf_token()"/>
+                                                <input type="hidden" name="action" value="remove"/>
+                                                <input type="hidden" name="line_id" t-att-value="c.id"/>
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-danger">Retirer</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p t-else="" class="text-muted">Aucune certification déclarée.</p>
+
+                        <form method="post" action="/my/missions/expertise/certification"
+                              class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="action" value="add"/>
+                            <div class="col-md-4">
+                                <label class="form-label" for="cert_name">Intitulé</label>
+                                <input type="text" class="form-control" name="name"
+                                       id="cert_name" placeholder="ISO 27001 Lead Auditor"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="organisme">Organisme</label>
+                                <input type="text" class="form-control" name="organisme"
+                                       id="organisme"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="date_obtention">Obtenue le</label>
+                                <input type="date" class="form-control" name="date_obtention"
+                                       id="date_obtention"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="date_expiration">Jusqu'au</label>
+                                <input type="date" class="form-control" name="date_expiration"
+                                       id="date_expiration"/>
+                            </div>
+                            <div class="col-md-1">
+                                <button type="submit" class="btn btn-outline-primary w-100">+</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bloc 4 — Disponibilités -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <strong>Disponibilités</strong>
+                        <span class="text-muted small ms-2">
+                            Une période et un taux : un expert à mi-temps n'est
+                            ni disponible ni indisponible.
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <div t-if="profile.expert_availability_ids" class="table-responsive mb-3">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Du</th><th>Au</th><th class="text-end">Taux</th>
+                                        <th>Précision</th><th>État</th><th/></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="profile.expert_availability_ids" t-as="a">
+                                        <td t-out="a.date_debut"/>
+                                        <td t-out="a.date_fin"/>
+                                        <td class="text-end"><t t-out="a.taux"/> %</td>
+                                        <td t-out="a.note or '—'"/>
+                                        <td>
+                                            <span t-if="a.is_current" class="badge text-bg-success">En cours</span>
+                                            <span t-else="" class="badge text-bg-light">Hors période</span>
+                                        </td>
+                                        <td class="text-end">
+                                            <form method="post"
+                                                  action="/my/missions/expertise/availability">
+                                                <input type="hidden" name="csrf_token"
+                                                       t-att-value="request.csrf_token()"/>
+                                                <input type="hidden" name="action" value="remove"/>
+                                                <input type="hidden" name="line_id" t-att-value="a.id"/>
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-danger">Retirer</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p t-else="" class="text-muted">
+                            Aucune période déclarée. Sans disponibilité en cours,
+                            le matching vous considère indisponible.
+                        </p>
+
+                        <form method="post" action="/my/missions/expertise/availability"
+                              class="row g-2 align-items-end">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="action" value="add"/>
+                            <div class="col-md-3">
+                                <label class="form-label" for="dispo_debut">À partir du</label>
+                                <input type="date" class="form-control" name="date_debut"
+                                       id="dispo_debut"/>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="dispo_fin">Jusqu'au</label>
+                                <input type="date" class="form-control" name="date_fin"
+                                       id="dispo_fin"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="taux">Taux (%)</label>
+                                <input type="number" min="0" max="100" class="form-control"
+                                       name="taux" id="taux" value="100"/>
+                            </div>
+                            <div class="col-md-2">
+                                <label class="form-label" for="note">Précision</label>
+                                <input type="text" class="form-control" name="note" id="note"/>
+                            </div>
+                            <div class="col-md-2">
+                                <button type="submit" class="btn btn-outline-primary w-100">
+                                    Ajouter
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Bloc 5 — Évaluations, en lecture seule -->
+                <div class="card">
+                    <div class="card-header"><strong>Mes évaluations</strong></div>
+                    <div class="card-body">
+                        <div t-if="profile.expert_rating_ids" class="table-responsive">
+                            <table class="table table-sm align-middle mb-0">
+                                <thead>
+                                    <tr><th>Date</th><th>Mission</th><th>Origine</th>
+                                        <th class="text-end">Note</th><th>Commentaire</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="profile.expert_rating_ids" t-as="r">
+                                        <td t-out="r.date" t-options="{'widget': 'date'}"/>
+                                        <td t-out="r.mission_id.name or '—'"/>
+                                        <td t-out="dict(r._fields['source'].selection).get(r.source, '')"/>
+                                        <td class="text-end"><t t-out="r.note"/> / 5</td>
+                                        <td class="small" t-out="r.commentaire or ''"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p t-else="" class="text-muted mb-0">
+                            Vous n'avez pas encore été évalué. Les évaluations
+                            sont portées à la clôture d'une mission, par le
+                            client et par le cluster ; elles alimentent votre
+                            réputation et ne sont pas modifiables.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+</odoo>

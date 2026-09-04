@@ -16,7 +16,7 @@ class ProjectFinancement(models.Model):
     # Section 25 — Suivi du financement
     # ------------------------------------------------------------
 
-    # ⚠ **Pas un nouveau champ de stockage.**
+    # **Pas un nouveau champ de stockage.**
     #
     # Le cahier des charges nomme ce champ `financement_recherche`. Or le
     # montant recherché existe déjà depuis la section 9 sous le nom
@@ -91,7 +91,7 @@ class ProjectFinancement(models.Model):
     def financement_steps(self):
         """Où en est le financement, sans champ d'état supplémentaire.
 
-        ⚠ Rien n'est stocké ici. Chaque étape est **déduite** de données qui
+        Rien n'est stocké ici. Chaque étape est **déduite** de données qui
         existent déjà : le besoin déclaré, les candidats investisseurs proposés
         par le moteur, leurs réponses, le montant obtenu.
 

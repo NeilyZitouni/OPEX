@@ -159,7 +159,7 @@ class TestRoadmap(Extension16Case):
         self.assertIn('certification', accompagnement.phase_ids.mapped('code'))
 
     def test_the_roadmap_is_a_copy_not_a_reference(self):
-        """⚠ Modifier le référentiel ne doit pas réécrire une roadmap en cours.
+        """Modifier le référentiel ne doit pas réécrire une roadmap en cours.
 
         Sans cela, le porteur verrait ses phases changer de nom sous ses yeux.
         Le référentiel décide de ce qu'on propose au démarrage, pas de ce qui a
@@ -193,7 +193,7 @@ class TestDeliverableWorkflow(Extension16Case):
     """Sections 23 et 24 — le cycle de vie, porté par le moteur."""
 
     def test_the_deliverable_has_no_state_field(self):
-        """⚠ La règle, sur le modèle où elle était le plus tentante.
+        """La règle, sur le modèle où elle était le plus tentante.
 
         Un `state` à quatre valeurs aurait fait l'affaire et aurait été plus
         court à écrire. C'est précisément le cas que le périmètre demande de
@@ -306,7 +306,7 @@ class TestDeliverableHistory(Extension16Case):
         self.assertIn("pas chiffré", archive.motif_correction)
 
     def test_the_archive_keeps_the_old_file_not_the_new_one(self):
-        """⚠ L'ordre compte : on fige **avant** d'écrire.
+        """L'ordre compte : on fige **avant** d'écrire.
 
         Après, le champ `file` porte déjà le nouveau contenu et la version
         archivée serait un double de la version courante. L'historique
@@ -329,7 +329,7 @@ class TestDeliverableHistory(Extension16Case):
                 {'motif_correction': "Autre chose."})
 
     def test_two_refusals_keep_two_distinct_motives(self):
-        """⚠ Le motif est stocké **sur la version refusée**, pas sur le
+        """Le motif est stocké **sur la version refusée**, pas sur le
         livrable — sinon le second refus écraserait le premier, c'est-à-dire
         justement ce que l'historique doit montrer.
 
@@ -370,7 +370,7 @@ class TestSeamsClosed(Extension16Case):
     """Les trois coutures que les Extensions 17, 18 et 19 avaient laissées."""
 
     def test_the_three_orphan_notifications_are_now_attached(self):
-        """⑩ ⑪ ⑫ étaient configurées et rattachées à rien depuis l'Extension 18.
+        """10. 11. 12. étaient configurées et rattachées à rien depuis l'Extension 18.
 
         `notification_inventory()` les signalait comme orphelines. Il ne doit
         plus en rester **aucune**.

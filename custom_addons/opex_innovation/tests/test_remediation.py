@@ -123,7 +123,7 @@ class TestRemediation(HttpCase):
         })
 
     # ------------------------------------------------------------
-    # ⚠ Une remédiation sans point ne part pas
+    # Une remédiation sans point ne part pas
     # ------------------------------------------------------------
 
     def test_a_remediation_without_a_point_is_refused(self):
@@ -232,7 +232,7 @@ class TestRemediation(HttpCase):
         self.assertEqual(visited.count('evaluation'), 2)
 
     # ------------------------------------------------------------
-    # ⚠ Historique des versions conservé
+    # Historique des versions conservé
     # ------------------------------------------------------------
 
     def test_resubmission_archives_the_previous_version(self):
@@ -254,7 +254,7 @@ class TestRemediation(HttpCase):
         self.assertIn("Corrections apportées.", snapshot.reponse_porteur)
 
     def test_the_archive_keeps_the_dossier_as_it_was(self):
-        """⚠ Le point de la section 18 : l'ancienne version reste consultable.
+        """Le point de la section 18 : l'ancienne version reste consultable.
 
         L'archive est une **copie figée**, pas un lien : elle ne suit pas les
         modifications ultérieures du projet. C'est tout son intérêt.

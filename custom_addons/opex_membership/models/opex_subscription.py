@@ -183,14 +183,14 @@ class OpexSubscription(models.Model):
         self.ensure_one()
         today = fields.Date.context_today(self)
         if self.state == 'paid':
-            return {'icon': '✓', 'label': _("Payée"), 'css': 'text-bg-success'}
+            return {'icon': '', 'label': _("Payée"), 'css': 'text-bg-success'}
         if self.state == 'cancelled':
             return {'icon': '—', 'label': _("Annulée"), 'css': 'text-bg-secondary'}
         if self.state == 'late':
-            return {'icon': '⚠', 'label': _("En retard"), 'css': 'text-bg-danger'}
+            return {'icon': '', 'label': _("En retard"), 'css': 'text-bg-danger'}
         if self.date_echeance and self.date_echeance > today:
-            return {'icon': '⏳', 'label': _("À venir"), 'css': 'text-bg-info'}
-        return {'icon': '○', 'label': _("À renouveler"), 'css': 'text-bg-warning'}
+            return {'icon': '', 'label': _("À venir"), 'css': 'text-bg-info'}
+        return {'icon': '', 'label': _("À renouveler"), 'css': 'text-bg-warning'}
 
     def _portal_year(self):
         """Année de rattachement de la cotisation, pour l'historique annuel."""

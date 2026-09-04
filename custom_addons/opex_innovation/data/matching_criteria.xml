@@ -3,15 +3,13 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             SMART MATCHING — configuration, pas de code
-            ═══════════════════════════════════════════════════════════════
 
             Les sept critères de la section 19 : secteur, compétences
             recherchées, localisation, niveau de maturité, besoins
             d'accompagnement, besoin de financement, technologies.
 
-            ⚠ Pas une ligne de scoring n'est écrite ici ni ailleurs dans ce
+            Pas une ligne de scoring n'est écrite ici ni ailleurs dans ce
             module. Le moteur de l'Extension 7 fait le calcul ; ces
             enregistrements lui disent quoi comparer et avec quel poids.
 
@@ -20,7 +18,7 @@
             une liste ordonnée, que le responsable arbitre.
         -->
 
-        <!-- ══════════ Critères ══════════ -->
+        <!-- Critères -->
 
         <record id="matching_secteur" model="opex.matching.criteria">
             <field name="definition_id" ref="wf_innovation_project"/>
@@ -111,7 +109,7 @@
             <field name="match_mode">intersect</field>
         </record>
 
-        <!-- ══════════ Trois actions, trois catégories ══════════
+        <!-- Trois actions, trois catégories
 
             Le moteur cherche **un** type de candidat par exécution. Les trois
             catégories de la section 19 s'obtiennent donc par trois actions

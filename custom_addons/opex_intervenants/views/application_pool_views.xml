@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        §10 — LE KANBAN DU POOL
+
+        « Le responsable dispose d'un Kanban : Nouveaux → Qualifiés →
+        Short-list → Retenus. »
+
+        Groupé sur `pool_column`, une **projection** de l'étape du workflow,
+        et non sur `workflow_stage_id` directement. La définition compte dix
+        étapes ; un Kanban à dix colonnes n'est pas un outil de décision. La
+        carte affiche l'étape réelle — rien n'est masqué, et le champ n'est
+        jamais écrit à la main.
+
+        **`records_draggable="0"`, et c'est le point.**
+
+        Un Kanban Odoo laisse par défaut glisser une carte d'une colonne à
+        l'autre, ce qui écrirait `pool_column` — donc court-circuiterait le
+        moteur : ni contrôle de rôle, ni condition, ni ligne d'historique. Les
+        transitions se franchissent par le bouton « Action », qui passe par
+        `_check_transition_allowed()`.
+
+        C'est le seul endroit du module où l'ergonomie native aurait cassé la
+        règle qui gouverne tout le reste.
+    -->
+    <record id="view_mission_application_kanban" model="ir.ui.view">
+        <field name="name">opex.mission.application.kanban</field>
+        <field name="model">opex.mission.application</field>
+        <field name="arch" type="xml">
+            <kanban default_group_by="pool_column"
+                    records_draggable="0"
+                    group_create="false" group_delete="false"
+                    quick_create="false"
+                    class="o_kanban_small_column">
+                <field name="pool_column"/>
+                <field name="alert_count"/>
+                <field name="has_blocking_alert"/>
+                <field name="score"/>
+                <field name="source"/>
+                <templates>
+                    <t t-name="card">
+                        <div class="oe_kanban_global_click">
+                            <div class="d-flex justify-content-between">
+                                <strong class="o_kanban_record_title">
+                                    <field name="partner_id"/>
+                                </strong>
+                                <span class="badge text-bg-primary"
+                                      t-if="record.score.raw_value">
+                                    <field name="score"/> %
+                                </span>
+                            </div>
+
+                            <div class="text-muted small mt-1">
+                                <field name="mission_id"/>
+                            </div>
+
+                            <div class="mt-2">
+                                <!-- L'origine, et rien d'autre, distingue les
+                                     deux canaux du §8. -->
+                                <span class="badge text-bg-light">
+                                    <field name="source"/>
+                                </span>
+                                <!-- L'étape réelle du workflow : la colonne
+                                     regroupe, elle ne remplace pas. -->
+                                <span class="badge text-bg-light ms-1">
+                                    <field name="workflow_stage_label"/>
+                                </span>
+                            </div>
+
+                            <div class="mt-2 small text-muted">
+                                <span t-if="record.disponibilite.raw_value">
+                                    <field name="disponibilite"/>
+                                </span>
+                                <span t-if="record.tarif_propose.raw_value">
+                                    · <field name="tarif_propose"/>
+                                </span>
+                                <span t-if="record.delai_propose_jours.raw_value">
+                                    · <field name="delai_propose_jours"/> j
+                                </span>
+                            </div>
+
+                            <!--
+                                Les alertes d'éligibilité du §10, sur la carte.
+                                Un responsable doit voir ce qui cloche avant
+                                d'ouvrir le dossier — sinon il ouvre les dix.
+                            -->
+                            <div class="mt-2" t-if="record.alert_count.raw_value">
+                                <!-- `title` sur le `<i>` : sans lui, Odoo 19
+                                     émet un avertissement d'accessibilité au
+                                     chargement — une icône sans texte ne se
+                                     lit pas au lecteur d'écran. -->
+                                <span t-if="record.has_blocking_alert.raw_value"
+                                      class="badge text-bg-danger">
+                                    <i class="fa fa-exclamation-triangle me-1"
+                                       title="Alerte bloquante" role="img"
+                                       aria-label="Alerte bloquante"/>
+                                    <field name="alert_count"/> alerte(s)
+                                </span>
+                                <span t-else="" class="badge text-bg-warning">
+                                    <field name="alert_count"/> point(s) de vigilance
+                                </span>
+                            </div>
+                        </div>
+                    </t>
+                </templates>
+            </kanban>
+        </field>
+    </record>
+
+    <!--
+        L'action du pool : le Kanban d'abord, la liste ensuite. C'est l'écran de
+        travail du §10, distinct de la liste générale des candidatures posée à
+        l'Extension 1.
+    -->
+    <record id="action_mission_application_pool" model="ir.actions.act_window">
+        <field name="name">Pool de candidatures</field>
+        <field name="res_model">opex.mission.application</field>
+        <field name="view_mode">kanban,list,form</field>
+        <field name="search_view_id" ref="view_mission_application_search"/>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Le pool est vide</p>
+            <p>Toutes les candidatures convergent ici, quelle que soit leur
+               origine : matching, portail, invitation ou ajout manuel. Le champ
+               « Origine » les distingue — et rien d'autre.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_mission_application_pool"
+              name="Pool de candidatures"
+              parent="menu_intervenants_root"
+              action="action_mission_application_pool"
+              sequence="25"/>
+
+    <!--
+         Le pool depuis l'appel
+
+        Le bouton mène au Kanban **filtré sur cet appel** : c'est ainsi qu'on
+        s'en sert. Le menu global sert à la vue d'ensemble.
+    -->
+    <record id="view_mission_request_form_pool" model="ir.ui.view">
+        <field name="name">opex.mission.request.form.pool</field>
+        <field name="model">opex.mission.request</field>
+        <field name="inherit_id" ref="view_mission_request_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//page[@name='candidatures']" position="attributes">
+                <attribute name="string">Pool de candidatures</attribute>
+            </xpath>
+            <xpath expr="//page[@name='candidatures']" position="inside">
+                <button name="action_view_application_pool" type="object"
+                        string="Ouvrir le pool (Kanban)"
+                        class="btn-primary mt-3"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Les alertes, aussi dans la liste : c'est ce qui rend la comparaison
+         possible sans ouvrir chaque dossier. -->
+    <record id="view_mission_application_list_pool" model="ir.ui.view">
+        <field name="name">opex.mission.application.list.pool</field>
+        <field name="model">opex.mission.application</field>
+        <field name="inherit_id" ref="view_mission_application_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='score']" position="after">
+                <field name="alert_count" string="Alertes" optional="show"/>
+                <field name="has_blocking_alert" column_invisible="1"/>
+            </xpath>
+            <xpath expr="//list" position="attributes">
+                <attribute name="decoration-danger">has_blocking_alert</attribute>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>

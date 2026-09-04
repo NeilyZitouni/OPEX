@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            TYPES DE MISSION — les six de l'introduction du Module 3
+
+            Semés en données, jamais figés dans un `Selection` : le cluster en
+            ajoutera sans migration, et `multi_intervenants` doit se régler par
+            type.
+
+            `multi_intervenants` porte l'exception explicite de la règle 4 du
+            §39. Formation et Coaching sont cochés : une session de formation
+            mobilise couramment plusieurs formateurs, un dispositif de coaching
+            plusieurs coachs. Audit, Conseil, Expertise et Mentoring ne le sont
+            pas — un seul intervenant retenu, et la transition « Attribuer la
+            mission » le vérifie.
+
+            `noupdate="1"` : ces réglages sont du paramétrage. Le cluster qui
+            décide qu'un audit peut mobiliser deux auditeurs ne doit pas voir
+            son choix écrasé au prochain `-u`.
+        -->
+
+        <record id="mission_type_audit" model="opex.mission.type">
+            <field name="name">Audit</field>
+            <field name="code">audit</field>
+            <field name="sequence">10</field>
+            <field name="description">Évaluation indépendante d'une organisation, d'un processus ou d'un système, aboutissant à un rapport et des recommandations.</field>
+        </record>
+
+        <record id="mission_type_conseil" model="opex.mission.type">
+            <field name="name">Conseil</field>
+            <field name="code">conseil</field>
+            <field name="sequence">20</field>
+            <field name="description">Accompagnement à la décision : diagnostic, préconisations, plan d'action.</field>
+        </record>
+
+        <record id="mission_type_expertise" model="opex.mission.type">
+            <field name="name">Expertise</field>
+            <field name="code">expertise</field>
+            <field name="sequence">30</field>
+            <field name="description">Intervention technique pointue sur un sujet délimité.</field>
+        </record>
+
+        <record id="mission_type_formation" model="opex.mission.type">
+            <field name="name">Formation</field>
+            <field name="code">formation</field>
+            <field name="sequence">40</field>
+            <field name="description">Transfert de compétences : sessions, supports, évaluation des acquis.</field>
+            <!-- Une formation mobilise couramment plusieurs formateurs :
+                 l'exception de la règle 4 s'applique. -->
+            <field name="multi_intervenants" eval="True"/>
+        </record>
+
+        <record id="mission_type_coaching" model="opex.mission.type">
+            <field name="name">Coaching</field>
+            <field name="code">coaching</field>
+            <field name="sequence">50</field>
+            <field name="description">Accompagnement individuel ou collectif dans la durée.</field>
+            <field name="multi_intervenants" eval="True"/>
+        </record>
+
+        <record id="mission_type_mentoring" model="opex.mission.type">
+            <field name="name">Mentoring</field>
+            <field name="code">mentoring</field>
+            <field name="sequence">60</field>
+            <field name="description">Relation de transmission entre un mentor expérimenté et un porteur.</field>
+        </record>
+
+        <!--
+            DOMAINES D'EXPERTISE
+
+            Les documents ne donnent pas de liste fermée : le §4 demande un
+            « domaine d'expertise », le §6 de la spécification cite « Lean, ISO,
+            finance, cybersécurité, marketing, data, formation… » — un « … » qui
+            dit assez que la liste est ouverte.
+
+            Ce qui suit est un amorçage, pas un référentiel arrêté. Il est
+            aligné sur les secteurs du Module 2 partout où c'est possible, pour
+            que les deux domaines du portail se parlent.
+        -->
+
+        <record id="mission_domain_qualite" model="opex.mission.domain">
+            <field name="name">Qualité et excellence opérationnelle</field>
+            <field name="code">qualite</field>
+            <field name="sequence">10</field>
+            <field name="description">Lean, ISO, amélioration continue, certification.</field>
+        </record>
+
+        <record id="mission_domain_cybersecurite" model="opex.mission.domain">
+            <field name="name">Cybersécurité</field>
+            <field name="code">cybersecurite</field>
+            <field name="sequence">20</field>
+            <field name="description">Sécurité des systèmes d'information, audit de sécurité, conformité.</field>
+        </record>
+
+        <record id="mission_domain_numerique" model="opex.mission.domain">
+            <field name="name">Transformation numérique</field>
+            <field name="code">numerique</field>
+            <field name="sequence">30</field>
+            <field name="description">Systèmes d'information, données, automatisation.</field>
+        </record>
+
+        <record id="mission_domain_finance" model="opex.mission.domain">
+            <field name="name">Finance et gestion</field>
+            <field name="code">finance</field>
+            <field name="sequence">40</field>
+            <field name="description">Contrôle de gestion, financement, évaluation économique.</field>
+        </record>
+
+        <record id="mission_domain_marketing" model="opex.mission.domain">
+            <field name="name">Marketing et développement commercial</field>
+            <field name="code">marketing</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="mission_domain_industrie" model="opex.mission.domain">
+            <field name="name">Industrie et production</field>
+            <field name="code">industrie</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="mission_domain_rh" model="opex.mission.domain">
+            <field name="name">Ressources humaines et formation</field>
+            <field name="code">rh</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="mission_domain_energie" model="opex.mission.domain">
+            <field name="name">Énergie et environnement</field>
+            <field name="code">energie</field>
+            <field name="sequence">80</field>
+        </record>
+
+    </data>
+</odoo>

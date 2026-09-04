@@ -9,7 +9,7 @@ class ProjectClosure(models.Model):
     d'accompagnement, experts impliqués, financement obtenu, livrables
     réalisés, résultat final. »
 
-    ⚠ **Toutes ces valeurs sont figées à la génération.** C'est un bilan, pas
+    **Toutes ces valeurs sont figées à la génération.** C'est un bilan, pas
     une vue. Un bilan calculé à l'affichage changerait après coup — le jour où
     un expert est retiré du dossier, où un document est supprimé, où le montant
     est corrigé — et un bilan qui change n'est pas un bilan.
@@ -149,7 +149,7 @@ class ProjectClosure(models.Model):
     def _livrables_realises(self, project):
         """« Livrables réalisés » — enfin ce que la section 28 demandait.
 
-        ⚠ Couture refermée. Jusqu'à l'Extension 16, ce chiffre comptait les
+        Couture refermée. Jusqu'à l'Extension 16, ce chiffre comptait les
         `opex.innovation.document` du projet, faute de modèle de livrable. Un
         document déposé n'est pas un livrable validé par un expert : le bilan
         annonçait donc systématiquement plus que la réalité, et il était figé
@@ -168,7 +168,7 @@ class ProjectClosure(models.Model):
     def _read_history(self, instance):
         """Les trois faits datés, lus dans le journal d'audit du moteur.
 
-        ⚠ L'historique est parcouru **en compréhension**, jamais avec
+        L'historique est parcouru **en compréhension**, jamais avec
         `mapped()`. Un projet qui repasse par l'accompagnement après une
         réévaluation y entre deux fois : `mapped('to_stage_id.code')`
         dédoublonnerait, le second séjour disparaîtrait du résultat, et la

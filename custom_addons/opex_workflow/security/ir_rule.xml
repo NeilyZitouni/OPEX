@@ -10,7 +10,7 @@
         applicatif s'oublie sur une route ; une `ir.rule` porte sur toutes les
         requêtes, y compris celles qu'on n'a pas écrites.
 
-        ⚠ Toutes les règles traversent `active_actor_ids` et non `actor_ids`.
+        Toutes les règles traversent `active_actor_ids` et non `actor_ids`.
         La différence n'est pas cosmétique : `actor_ids` inclut les lignes
         révoquées (`access_level = 'none'`), et un domaine à deux conditions sur
         un One2many produit deux sous-requêtes indépendantes — les conditions
@@ -19,7 +19,7 @@
         l'a. Le filtre porté par le champ garantit qu'on parle d'une seule et
         même ligne.
 
-        ⚠ Ces règles ne se voient pas en administrateur : `base.group_system`
+        Ces règles ne se voient pas en administrateur : `base.group_system`
         contourne les `ir.rule`. Elles se testent avec un vrai compte portail —
         c'est le piège qui a coûté du temps sur le module précédent.
     -->

@@ -9,7 +9,7 @@ class InnovationMilestone(models.Model):
     Le workflow d'un projet compte **quinze** étapes. La carte de la section 35
     en montre **sept**. Ce modèle porte la correspondance entre les deux.
 
-    ⚠ C'est une **donnée**, pas une table en dur dans un gabarit. Trois raisons,
+    C'est une **donnée**, pas une table en dur dans un gabarit. Trois raisons,
     dans l'ordre d'importance :
 
     1. Ajouter une étape technique — le Demo Day du critère d'acceptation, par
@@ -93,7 +93,7 @@ class ProjectMilestones(models.Model):
         - un jalon dont une étape figure dans l'historique est franchi lui
           aussi, ce qui rattrape les retours en arrière.
 
-        ⚠ Un dossier clos ou refusé n'a plus de jalon « en cours ». Sans cette
+        Un dossier clos ou refusé n'a plus de jalon « en cours ». Sans cette
         dernière règle, un projet refusé afficherait « Décision » comme étape
         en cours pour toujours.
         """
@@ -108,7 +108,7 @@ class ProjectMilestones(models.Model):
         if not milestones:
             return []
 
-        # ⚠ Les étapes visitées se lisent en compréhension sur l'historique.
+        # Les étapes visitées se lisent en compréhension sur l'historique.
         # Ici l'ensemble suffit — on ne compte pas les passages, on demande
         # seulement s'il y en a eu un.
         visited = {
@@ -119,7 +119,7 @@ class ProjectMilestones(models.Model):
         current = milestones.filtered(
             lambda m: current_stage in m.stage_ids)[:1]
 
-        # ⚠ L'étape courante peut n'appartenir à **aucun** jalon : c'est le cas
+        # L'étape courante peut n'appartenir à **aucun** jalon : c'est le cas
         # des allers-retours internes (`complement_requested`, `remediation`,
         # `resubmitted`), volontairement absents de la carte.
         #
@@ -162,7 +162,7 @@ class ProjectMilestones(models.Model):
         que le moteur sait produire — `next_action_label()` dit à l'utilisateur
         ce qu'on attend de lui plutôt que dans quel état est la machine.
 
-        ⚠ `user` est résolu immédiatement : `_()` devine la langue en
+        `user` est résolu immédiatement : `_()` devine la langue en
         inspectant les variables locales de l'appelant et fait `int()` sur un
         nom `user`. Un `user=None` laissé tel quel fait planter la traduction.
         """
@@ -173,7 +173,7 @@ class ProjectMilestones(models.Model):
             return ""
 
         if instance.state == 'running':
-            # ⚠ Ce qu'on attend de l'utilisateur passe **avant** l'état du
+            # Ce qu'on attend de l'utilisateur passe **avant** l'état du
             # dossier. Section 16 : « ne pas demander à l'utilisateur de
             # piloter le workflow, le workflow doit guider l'utilisateur. »
             #

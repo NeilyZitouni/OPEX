@@ -21,7 +21,7 @@ class Industrialisation(models.Model):
     Production pilote et Déploiement se fait au configurateur, comme le Demo
     Day, sans toucher à ce fichier.
 
-    ⚠ Enregistrement **distinct du projet**, et non des champs de plus sur
+    Enregistrement **distinct du projet**, et non des champs de plus sur
     lui. Le projet suit déjà son propre workflow ; deux instances sur le même
     enregistrement lui donneraient deux étapes courantes et un seul champ
     `workflow_stage_id` pour les porter.
@@ -83,7 +83,7 @@ class Industrialisation(models.Model):
         string="Progression du financement",
     )
 
-    # ✅ **Couture refermée par l'Extension 16.**
+    # **Couture refermée par l'Extension 16.**
     #
     # La section 27 liste « livrables » parmi ce que le cluster suit. Jusqu'ici,
     # faute du modèle `opex.innovation.deliverable`, ce champ exposait les
@@ -93,7 +93,7 @@ class Industrialisation(models.Model):
     # Il pointe désormais vers les vrais livrables de l'accompagnement. Comme
     # annoncé, rien d'autre de ce modèle n'a bougé.
     #
-    # ⚠ Un `related='project_id.accompagnement_id.deliverable_ids'` aurait été
+    # Un `related='project_id.accompagnement_id.deliverable_ids'` aurait été
     # plus court, et Odoo l'a refusé en avertissant : `accompagnement_id` est
     # lui-même calculé et non stocké, donc non cherchable, et le moteur de
     # recalcul ne sait plus quels enregistrements réviser quand un livrable

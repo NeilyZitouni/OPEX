@@ -20,7 +20,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     d'enregistrement (`ir.rule`) et la surcharge de `create()` restent le
     filet : elles protègent la base même si un écran oublie un contrôle.
 
-    ⚠ **Tout ce qui est défini ici est préfixé, sans exception** : routes sous
+    **Tout ce qui est défini ici est préfixé, sans exception** : routes sous
     `/my/crowdfunding/…`, méthodes en `portal_crowdfunding_*`, helpers en
     `_crowdfunding_*`, constantes en `_CROWDFUNDING_*`.
 
@@ -61,7 +61,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     def _prepare_home_portal_values(self, counters):
         """Compte les tuiles **ici**, jamais dans le gabarit.
 
-        ⚠ Ces trois comptes se faisaient en QWeb, dans
+        Ces trois comptes se faisaient en QWeb, dans
         `portal_my_home_crowdfunding`. Un `search_count()` posé dans un gabarit
         s'exécute sous l'identité du visiteur : celui sur
         `opex.crowdfunding.project` n'avait aucun garde, et tout utilisateur
@@ -78,7 +78,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
         portail et les `ir.rule` les bornent déjà au contact connecté. Un
         `sudo()` dans un gabarit contourne les deux et ne laisse aucune trace.
 
-        ⚠ **Chaque compteur est conditionné à `counters`, sans exception.** Ce
+        **Chaque compteur est conditionné à `counters`, sans exception.** Ce
         n'est pas une convention de style : la route `/my/counters` renvoie ce
         dictionnaire **tel quel** au navigateur, et
         `portal_home_counters.js` fait, pour *chaque clé reçue*,
@@ -339,7 +339,7 @@ class CrowdfundingCustomerPortal(CustomerPortal):
     #: dépôt : ce qui n'est pas listé ici est ignoré, même si un champ traîne
     #: dans le gabarit ou dans un POST forgé.
     #
-    #: ⚠ Un quatrième type de besoin ajoute une entrée ici et une dans
+    #: Un quatrième type de besoin ajoute une entrée ici et une dans
     #: `_CROWDFUNDING_DOSSIER_DOCUMENTS`. Le décompte complet des cinq fichiers à toucher
     #: est dans `_champs_dossier_requis()`, côté modèle.
     _CROWDFUNDING_DOSSIER_FIELDS = {

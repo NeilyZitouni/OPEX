@@ -4,7 +4,7 @@
     <!--
         Rendu générique d'un formulaire dynamique.
 
-        ⚠ Le gabarit n'itère que sur `fields`, une liste **calculée côté
+        Le gabarit n'itère que sur `fields`, une liste **calculée côté
         serveur** par `form.render_values()`. Un champ dont la condition
         d'affichage est fausse n'y figure pas : il n'est donc pas rendu du
         tout, et non rendu puis masqué. C'est la différence entre une

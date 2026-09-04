@@ -8,7 +8,7 @@ from .staff_portal import InnovationStaffPortal
 
 
 class InnovationPortalCounters(CustomerPortal):
-    """⚠ Les compteurs qui **rendent les tuiles visibles**.
+    """Les compteurs qui **rendent les tuiles visibles**.
 
     Piège déjà payé sur le Module 1, et retrouvé intact ici sur les quatre
     tuiles du Module 2 : `portal.portal_docs_entry` ajoute `d-none` à toute
@@ -69,7 +69,7 @@ class InnovationPortalCounters(CustomerPortal):
             # propositions retenues où le contact intervient **comme expert ou
             # mentor**, pas toutes ses opportunités.
             #
-            # ⚠ Pas de `has_access()` ici, contrairement aux compteurs du
+            # Pas de `has_access()` ici, contrairement aux compteurs du
             # crowdfunding : `opex.matching.candidate` n'a aucune ligne ACL
             # pour `base.group_portal` (seulement `base.group_user` et les
             # groupes du moteur). La garde renverrait donc `False` pour **tout**
@@ -126,7 +126,7 @@ class InnovationHolderDashboard(InnovationProjectPortal):
     def _project_card(self, project):
         """La carte « MON PROJET », préparée par le contrôleur.
 
-        ⚠ Le projet **est** passé au gabarit ici, contrairement aux vignettes
+        Le projet **est** passé au gabarit ici, contrairement aux vignettes
         de l'espace investisseur — et c'est légitime : c'est son propre
         dossier, il en est le porteur. La liste fermée protège d'un tiers, pas
         de soi-même.
@@ -175,7 +175,7 @@ class InnovationExpertDashboard(CustomerPortal):
             ('candidate_type', 'in', ('expert', 'mentor')),
             ('state', '=', 'accepted'),
         ], order='score desc')
-        # ⚠ Le filtre de visibilité est le même partout : `instance.actor`,
+        # Le filtre de visibilité est le même partout : `instance.actor`,
         # tranché par la seule fonction du moteur qui en décide. Une route qui
         # referait sa propre requête finirait par oublier une condition.
         proposals = proposals.filtered(
@@ -185,9 +185,9 @@ class InnovationExpertDashboard(CustomerPortal):
         Evaluation = request.env['opex.innovation.evaluation'].sudo()
         evaluations = Evaluation.search([('evaluator_id', '=', partner.id)])
 
-        # ✅ « Mes livrables » — couture refermée par l'Extension 16.
+        # « Mes livrables » — couture refermée par l'Extension 16.
         #
-        # ⚠ Le filtre passe par `instance.actor`, comme partout : être expert du
+        # Le filtre passe par `instance.actor`, comme partout : être expert du
         # cluster ne donne accès à aucun livrable ; c'est la désignation sur
         # CE livrable-là qui ouvre la porte. `_has_access()` est la seule
         # fonction qui en décide.
@@ -242,7 +242,7 @@ class InnovationStaffDashboard(InnovationStaffPortal):
     def _by_stage(self, projects):
         """Projets par étape, dans l'ordre du workflow.
 
-        ⚠ `mapped()` sert ici à obtenir la **liste des étapes distinctes** —
+        `mapped()` sert ici à obtenir la **liste des étapes distinctes** —
         c'est exactement ce qu'il fait, et c'est ce qu'on veut. Le comptage,
         lui, se fait à part : `len(projects.mapped('workflow_stage_id'))`
         aurait donné le nombre d'étapes occupées, pas le nombre de projets.

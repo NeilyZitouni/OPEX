@@ -1,0 +1,304 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LES SEPT CRITÈRES DU §11 — configuration, pas de code
+
+            Compétences 30 · Expérience 20 · Secteur 15 · Disponibilité 10 ·
+            Budget 10 · Réputation OPEX 10 · Localisation-langue 5.
+
+            Pas une ligne de scoring n'est écrite nulle part dans ce module.
+            Ces enregistrements disent au moteur **quoi** comparer et **avec
+            quel poids** ; `_score_candidate()` fait le calcul et rédige
+            l'explication, exactement comme pour `opex_innovation`.
+
+            `weight` porte le pourcentage tel quel : le moteur normalise sur la
+            somme des poids applicables, donc 30/20/15/10/10/10/5 = 100 se lit
+            directement. Un critère désactivé ou éliminatoire sort de la somme,
+            et les autres se re-normalisent d'eux-mêmes — c'est ce qui rend les
+            profils par type possibles sans recalculer les pourcentages à la
+            main.
+
+            `family` identifie ce que le critère mesure. C'est par elle qu'un
+            profil de type de mission remplace le critère par défaut ; le
+            `code`, lui, doit rester unique par définition (contrainte du
+            moteur), d'où les suffixes.
+
+            `noupdate="1"` : les pondérations sont du **paramétrage**. Le
+            cluster qui décide de peser la réputation à 20 % ne doit pas voir
+            son choix écrasé au prochain `-u`.
+        -->
+
+        <!-- 1. Compétences — 30 % -->
+        <record id="matching_competences" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Compétences recherchées</field>
+            <field name="code">mis_competences</field>
+            <field name="family">competences</field>
+            <field name="criteria_type">competence</field>
+            <field name="sequence">10</field>
+            <field name="weight">30.0</field>
+            <field name="source_expression">field('skill_ids')</field>
+            <field name="target_field">expert_skill_competence_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <!-- 2. Expérience — 20 %
+
+            Le §6 parle de « nombre d'années, missions similaires, séniorité ».
+            On compare la **séniorité** : c'est la seule des trois qui se lise
+            sur les deux bords avec le même vocabulaire — l'appel demande un
+            `niveau_experience`, le profil expose la plus haute séniorité
+            atteinte, et les deux `Selection` portent les mêmes valeurs.
+
+            « Missions similaires » est mesuré par le critère 7. ci-dessous, sur
+            le type de mission ; le nombre d'années est un mauvais critère
+            isolé — dix ans de formation ne préparent pas à un audit.
+        -->
+        <record id="matching_experience" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Niveau d'expérience</field>
+            <field name="code">mis_experience</field>
+            <field name="family">experience</field>
+            <field name="criteria_type">autre</field>
+            <field name="sequence">20</field>
+            <field name="weight">20.0</field>
+            <field name="source_expression">field('niveau_experience')</field>
+            <field name="target_field">expert_seniorite</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <!-- 3. Secteur — 15 % -->
+        <record id="matching_secteur" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Expérience du domaine</field>
+            <field name="code">mis_secteur</field>
+            <field name="family">secteur</field>
+            <field name="criteria_type">secteur</field>
+            <field name="sequence">30</field>
+            <field name="weight">15.0</field>
+            <field name="source_expression">field('domaine_id')</field>
+            <field name="target_field">expert_experience_domaine_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <!-- 4. Disponibilité — 10 %
+
+            Le champ cible est **calculé, non stocké** : « disponible » dépend
+            du jour où l'on regarde, et une période échue ne déclenche aucun
+            recalcul. Stocké, ce critère proposerait des experts indisponibles.
+        -->
+        <record id="matching_disponibilite" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Disponibilité</field>
+            <field name="code">mis_disponibilite</field>
+            <field name="family">disponibilite</field>
+            <field name="criteria_type">disponibilite</field>
+            <field name="sequence">40</field>
+            <field name="weight">10.0</field>
+            <field name="source_expression">True</field>
+            <field name="target_field">expert_disponible</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <!-- 5. Budget — 10 %
+
+            Le point que l'arbitrage du 30/08 a rendu explicite : la mission
+            porte un **budget total**, l'expert un **tarif journalier**. Les
+            comparer directement n'a aucun sens.
+
+            L'expression divise donc le budget par la durée estimée. Le `or 1`
+            n'est pas de la coquetterie : une durée non renseignée vaut 0, et la
+            division ferait échouer le critère — neutralisé et signalé dans
+            l'explication, mais pour une raison qui n'a rien à voir avec le
+            candidat.
+
+            `lte` se lit « candidat ≤ dossier » (`_compare`,
+            `matching.py:151`) : le TJM de l'expert tient dans le budget
+            journalier de la mission.
+        -->
+        <record id="matching_budget" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Budget</field>
+            <field name="code">mis_budget</field>
+            <field name="family">budget</field>
+            <field name="criteria_type">montant</field>
+            <field name="sequence">50</field>
+            <field name="weight">10.0</field>
+            <field name="source_expression">field('budget_estimatif') / (field('duree_estimee_jours') or 1)</field>
+            <field name="target_field">expert_tjm</field>
+            <field name="match_mode">lte</field>
+        </record>
+
+        <!-- 6. Réputation OPEX — 10 %
+
+            `gte` : la réputation du candidat doit atteindre le seuil attendu.
+            Le seuil est une constante de l'expression et non un champ de
+            l'appel — le §11 ne demande pas au client de fixer une note
+            minimale, et lui poser la question n'aurait pas de sens.
+
+            Vaut 0 pour tout expert jamais évalué, tant que l'Extension 10
+            n'a pas alimenté `opex.expert.rating`. Ce critère ne rapporte donc
+            rien à personne aujourd'hui — et c'est honnête : on ne récompense
+            pas une réputation qui n'existe pas.
+        -->
+        <record id="matching_reputation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Réputation OPEX</field>
+            <field name="code">mis_reputation</field>
+            <field name="family">reputation</field>
+            <field name="criteria_type">autre</field>
+            <field name="sequence">60</field>
+            <field name="weight">10.0</field>
+            <field name="source_expression">3.5</field>
+            <field name="target_field">expert_reputation</field>
+            <field name="match_mode">gte</field>
+        </record>
+
+        <!-- 7. Localisation et langue — 5 %
+
+            Deux champs texte de part et d'autre. `_as_set()` normalise en
+            minuscules, donc « Français » croise « français » — mais pas
+            « FR ». Écart assumé du MVP, arbitré le 30/08 : un référentiel des
+            deux côtés serait plus robuste.
+        -->
+        <record id="matching_localisation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="name">Localisation et langue</field>
+            <field name="code">mis_localisation</field>
+            <field name="family">localisation</field>
+            <field name="criteria_type">localisation</field>
+            <field name="sequence">70</field>
+            <field name="weight">5.0</field>
+            <field name="source_expression">field('wilaya')</field>
+            <field name="target_field">wilaya</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <!--
+            UN PROFIL PAR TYPE DE MISSION — la démonstration du §11
+
+            « Les pondérations sont configurables par type de mission ou par
+            appel. » Voici la preuve, sur le type **Formation**.
+
+            Le raisonnement métier tient en une phrase : pour une formation,
+            savoir transmettre compte plus que connaître le secteur du client.
+            Les compétences montent à 40, le secteur descend à 5, la
+            disponibilité monte à 15 — un formateur indisponible aux dates de
+            la session ne sert à rien.
+
+            Seules les familles qu'on veut changer sont redéclarées. Les
+            autres — expérience, budget, réputation, localisation — sont
+            héritées du profil par défaut : le résolveur remplace **par
+            famille**, il ne remplace pas le profil entier. Sans cela, chaque
+            nouveau type obligerait à recopier les sept critères.
+        -->
+
+        <record id="matching_competences_formation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="mission_type_id" ref="mission_type_formation"/>
+            <field name="name">Compétences recherchées (formation)</field>
+            <field name="code">mis_competences_formation</field>
+            <field name="family">competences</field>
+            <field name="criteria_type">competence</field>
+            <field name="sequence">10</field>
+            <field name="weight">40.0</field>
+            <field name="source_expression">field('skill_ids')</field>
+            <field name="target_field">expert_skill_competence_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <record id="matching_secteur_formation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="mission_type_id" ref="mission_type_formation"/>
+            <field name="name">Expérience du domaine (formation)</field>
+            <field name="code">mis_secteur_formation</field>
+            <field name="family">secteur</field>
+            <field name="criteria_type">secteur</field>
+            <field name="sequence">30</field>
+            <field name="weight">5.0</field>
+            <field name="source_expression">field('domaine_id')</field>
+            <field name="target_field">expert_experience_domaine_ids</field>
+            <field name="match_mode">intersect</field>
+        </record>
+
+        <record id="matching_disponibilite_formation" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="mission_type_id" ref="mission_type_formation"/>
+            <field name="name">Disponibilité (formation)</field>
+            <field name="code">mis_disponibilite_formation</field>
+            <field name="family">disponibilite</field>
+            <field name="criteria_type">disponibilite</field>
+            <field name="sequence">40</field>
+            <field name="weight">15.0</field>
+            <field name="source_expression">True</field>
+            <field name="target_field">expert_disponible</field>
+            <field name="match_mode">equal</field>
+        </record>
+
+        <!--
+            UN CRITÈRE ÉLIMINATOIRE — le §21 en un enregistrement
+
+            « Les critères éliminatoires sont distingués du scoring pondéré. »
+
+            Celui-ci l'est par une case à cocher, `is_eliminatoire`. Il n'entre
+            **pas** dans la somme des poids : un candidat qui ne le remplit pas
+            n'est pas noté zéro sur cette ligne, il est **écarté** — absent de
+            la liste des propositions, avec son motif dans le compte rendu du
+            matching.
+
+            Il est posé sur **Audit** parce que le §6 le dit : les
+            certifications sont « obligatoires ou préférentielles **selon la
+            mission** ». Un audit certifiant sans auditeur certifié n'a pas de
+            valeur ; une formation, si.
+
+            `weight` vaut 0 : il ne sert à rien, mais le champ est requis par
+            le moteur. Le laisser à sa valeur par défaut ferait croire à une
+            pondération qui n'a pas lieu d'être.
+        -->
+        <record id="matching_certification_audit" model="opex.matching.criteria">
+            <field name="definition_id" ref="wf_mission_request"/>
+            <field name="mission_type_id" ref="mission_type_audit"/>
+            <field name="name">Certification exigée</field>
+            <field name="code">mis_certification_audit</field>
+            <field name="family">certification</field>
+            <field name="criteria_type">autre</field>
+            <field name="sequence">5</field>
+            <field name="weight">0.0</field>
+            <field name="is_eliminatoire" eval="True"/>
+            <!--
+                DETTE D1 REFERMEE. Ce critere comparait :
+
+                    source_expression : field('certifications_souhaitees')
+                    target_field      : expert_certification_names
+                    match_mode        : contains
+
+                Deux textes libres, compares par inclusion de chaines dans les
+                deux sens. Trois defaillances mesurees, sur un critere qui
+                decide QUI ENTRE DANS LE VIVIER :
+
+                  - « ISO 27001 » satisfaisait « ISO 27001 Lead Auditor » ;
+                  - « ISO27001 » sans espace ne croisait plus rien, et un
+                    candidat qualifie disparaissait pour une faute de frappe ;
+                  - exiger « ISO 27001, ISO 9001 » produisait UN SEUL jeton,
+                    donc n'exigeait au plus qu'une des deux.
+
+                Desormais deux Many2many vers `opex.certification`, le
+                referentiel du Module 1. Deux ensembles issus de la meme table
+                se croisent par construction, jamais par coincidence
+                d'orthographe.
+
+                `is_conjonctif` porte le troisieme point : chaque
+                certification exigee doit etre detenue. Le mode `intersect` du
+                moteur teste un recoupement, ce qui est juste pour un critere
+                pondere et faux pour un eliminatoire.
+            -->
+            <field name="source_expression">field('certification_ids')</field>
+            <field name="target_field">expert_certification_ref_ids</field>
+            <field name="match_mode">intersect</field>
+            <field name="is_conjonctif" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

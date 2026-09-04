@@ -3,16 +3,14 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LES PHASES DE ROADMAP — section 22
-            ═══════════════════════════════════════════════════════════════
 
-                Phase 1 — Validation      : ✓ Étude du besoin
-                Phase 2 — Produit         : ✓ Prototype, → MVP
-                Phase 3 — Marché          : ○ Premiers clients
-                Phase 4 — Industrialisation : ○ Industrialisation
+                Phase 1 — Validation      : Étude du besoin
+                Phase 2 — Produit         : Prototype, → MVP
+                Phase 3 — Marché          : Premiers clients
+                Phase 4 — Industrialisation : Industrialisation
 
-            ⚠ **Un référentiel, pas une liste en dur.** Le périmètre le demande
+            **Un référentiel, pas une liste en dur.** Le périmètre le demande
             explicitement, et pour une raison qui se vérifie : un cluster qui
             travaille avec des projets deeptech voudra une phase
             « Certification » ou « Propriété intellectuelle ». Il l'ajoute ici,

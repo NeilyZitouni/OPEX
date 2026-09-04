@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_ai_call_log_system,ai.call.log.system,model_opex_ai_call_log,base.group_system,1,1,1,1
+access_ai_call_log_user,ai.call.log.user,model_opex_ai_call_log,base.group_user,1,0,0,0
+access_ai_prompt_system,ai.prompt.system,model_opex_ai_prompt,base.group_system,1,1,1,1
+access_ai_prompt_user,ai.prompt.user,model_opex_ai_prompt,base.group_user,1,0,0,0

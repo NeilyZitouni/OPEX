@@ -70,7 +70,7 @@ class TestProjectPortal(HttpCase):
     # ------------------------------------------------------------
 
     def test_my_projects_shows_the_section_35_card(self):
-        """⚠ Réécrit à l'Extension 19.
+        """Réécrit à l'Extension 19.
 
         Cette page listait les projets dans un tableau à cinq colonnes
         (« Projet, Catégorie, État, Dernière mise à jour, Action »). La

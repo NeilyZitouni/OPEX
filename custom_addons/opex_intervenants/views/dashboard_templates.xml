@@ -1,0 +1,319 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LA FILE PRIORISÉE DU §43, PARTAGÉE
+
+        Un seul gabarit pour les trois espaces qui en affichent une. Le
+        périmètre est décidé par le modèle, jamais ici : ce gabarit ne sait pas
+        s'il rend la file du responsable ou celle d'un intervenant, et c'est
+        exactement ce qui garantit qu'il ne peut pas montrer à l'un ce qui
+        appartient à l'autre.
+
+        Il ne reçoit que des dictionnaires à clés fermées. Aucun enregistrement
+        n'entre ici : un gabarit qui recevrait la mission pourrait en afficher
+        n'importe quel champ, y compris ceux que le §14 réserve.
+    -->
+    <template id="portal_priority_board" name="Priorisation des actions">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="card h-100 border-danger">
+                    <div class="card-header bg-danger-subtle fw-bold">
+                        Urgent
+                        <span class="badge text-bg-danger float-end"
+                              t-out="len(priorites['urgent'])"/>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li t-if="not priorites['urgent']"
+                            class="list-group-item text-muted">Rien d'urgent.</li>
+                        <li t-foreach="priorites['urgent']" t-as="item"
+                            class="list-group-item">
+                            <a t-att-href="item['url']" t-out="item['libelle']"/>
+                            <div class="small text-muted">
+                                <t t-out="item['reference']"/>
+                                <t t-if="item['titre']"> — <t t-out="item['titre']"/></t>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-warning">
+                    <div class="card-header bg-warning-subtle fw-bold">
+                        À traiter
+                        <span class="badge text-bg-warning float-end"
+                              t-out="len(priorites['a_traiter'])"/>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li t-if="not priorites['a_traiter']"
+                            class="list-group-item text-muted">Rien en attente.</li>
+                        <li t-foreach="priorites['a_traiter']" t-as="item"
+                            class="list-group-item">
+                            <a t-att-href="item['url']" t-out="item['libelle']"/>
+                            <div class="small text-muted">
+                                <t t-out="item['reference']"/>
+                                <t t-if="item['titre']"> — <t t-out="item['titre']"/></t>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card h-100 border-success">
+                    <div class="card-header bg-success-subtle fw-bold">
+                        Terminé
+                        <span class="badge text-bg-success float-end"
+                              t-out="len(priorites['termine'])"/>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li t-if="not priorites['termine']"
+                            class="list-group-item text-muted">Rien de clos.</li>
+                        <li t-foreach="priorites['termine']" t-as="item"
+                            class="list-group-item">
+                            <a t-att-href="item['url']" t-out="item['libelle']"/>
+                            <div class="small text-muted">
+                                <t t-out="item['reference']"/>
+                                <t t-if="item['titre']"> — <t t-out="item['titre']"/></t>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!--
+        L'ESPACE INTERVENANT - §41
+    -->
+    <template id="portal_espace_intervenant" name="Mon espace intervenant">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 class="mb-4">Mon espace intervenant</h3>
+
+                <!-- Les cinq indicateurs du §41, dans l'ordre du document. -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="space['indicateurs']['appels_pertinents']"/>
+                                <div class="small text-muted">Appels pertinents</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="space['indicateurs']['candidatures_en_cours']"/>
+                                <div class="small text-muted">Candidatures en cours</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="space['indicateurs']['missions_en_cours']"/>
+                                <div class="small text-muted">Missions en cours</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="space['indicateurs']['missions_terminees']"/>
+                                <div class="small text-muted">Missions terminées</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="space['indicateurs']['note_moyenne']"/>
+                                <div class="small text-muted">Note moyenne</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Les actions rapides du §41. -->
+                <div class="mb-4 d-flex flex-wrap gap-2">
+                    <a class="btn btn-primary" href="/missions">Voir les appels</a>
+                    <a class="btn btn-outline-secondary" href="/my/candidatures">Mes candidatures</a>
+                    <a class="btn btn-outline-secondary" href="/my/missions">Mes missions</a>
+                    <a class="btn btn-outline-secondary" href="/my/expertise">Mon expertise</a>
+                </div>
+
+                <div t-if="space['opportunites']" class="mb-4">
+                    <h5>Appels ouverts auxquels vous n'avez pas encore répondu</h5>
+                    <div class="list-group">
+                        <a t-foreach="space['opportunites']" t-as="mission"
+                           class="list-group-item list-group-item-action"
+                           t-att-href="'/missions/%s' % mission.id">
+                            <t t-out="mission.title"/>
+                            <span class="small text-muted d-block"
+                                  t-out="mission.mission_type_id.name"/>
+                        </a>
+                    </div>
+                </div>
+
+                <h5 class="mb-3">Ce qui vous attend</h5>
+                <t t-call="opex_intervenants.portal_priority_board">
+                    <t t-set="priorites" t-value="space['priorites']"/>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        LA SMART WORK QUEUE DU RESPONSABLE - §42, §43, §18
+    -->
+    <template id="staff_work_queue" name="Staff : Smart Work Queue">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0">Smart Work Queue</h3>
+                    <a class="btn btn-outline-secondary" href="/staff/missions">
+                        Tous les appels
+                    </a>
+                </div>
+
+                <!-- Les sept indicateurs du §42, dans l'ordre du document. -->
+                <div class="row g-3 mb-4">
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['demandes_a_traiter']"/>
+                                <div class="small text-muted">Demandes à traiter</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['appels_actifs']"/>
+                                <div class="small text-muted">Appels actifs</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['candidatures']"/>
+                                <div class="small text-muted">Candidatures</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['missions_en_cours']"/>
+                                <div class="small text-muted">Missions en cours</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-4">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['livrables_a_valider']"/>
+                                <div class="small text-muted">Livrables à valider</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-4">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['contrats_en_attente']"/>
+                                <div class="small text-muted">Contrats en attente</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-4">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="queue['indicateurs']['missions_a_cloturer']"/>
+                                <div class="small text-muted">Missions à clôturer</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h5 class="mb-3">Priorisation des actions</h5>
+                <t t-call="opex_intervenants.portal_priority_board">
+                    <t t-set="priorites" t-value="queue['priorites']"/>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        LA TUILE D'ACCUEIL DE L'ESPACE INTERVENANT
+
+        `config_card` pour la même raison qu'aux Extensions 2, 3 et 5 :
+        `portal.portal_docs_entry` masque toute entrée dont le compteur vaut
+        zéro, et l'intervenant qui n'a encore aucune mission est précisément
+        celui qui a besoin de trouver l'écran.
+
+        `placeholder_count` est unique dans toute la base. Relevé fait sur les
+        quatre modules : `portal_home_counters.js` résout chaque compteur par
+        `querySelector()`, qui ne renvoie que le premier nœud, et deux tuiles
+        partageant une clé laisseraient la seconde masquée.
+    -->
+    <template id="portal_my_home_espace" name="Portail : mon espace intervenant"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="64">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="inside">
+            <t t-call="portal.portal_docs_entry">
+                <t t-set="title">OPEX Intervenants — mon espace</t>
+                <t t-set="url" t-value="'/my/intervenant'"/>
+                <t t-set="text">Vos appels pertinents, vos candidatures, vos missions en cours et votre réputation, sur un seul écran.</t>
+                <t t-set="placeholder_count" t-value="'intervenants_espace_count'"/>
+                <t t-set="config_card" t-value="True"/>
+            </t>
+        </xpath>
+    </template>
+
+    <!--
+        LA FILE DU CLIENT, GREFFÉE SUR SON TABLEAU DE BORD
+
+        Le client a son écran depuis l'Extension 2. On y ajoute la file du §43
+        plutôt que d'ouvrir une seconde route : deux écrans pour le même acteur
+        auraient fini par ne plus dire la même chose.
+    -->
+    <template id="portal_my_missions_priorities"
+              inherit_id="opex_intervenants.portal_my_missions"
+              name="Client : priorisation des actions">
+        <xpath expr="//div[hasclass('container')]" position="inside">
+            <div t-if="priorites" class="mt-4">
+                <h5 class="mb-3">Ce qui vous attend</h5>
+                <t t-call="opex_intervenants.portal_priority_board"/>
+            </div>
+        </xpath>
+    </template>
+
+    <!--
+        LE LIEN VERS LA FILE DEPUIS LA LISTE DES APPELS
+    -->
+    <template id="staff_missions_queue_link"
+              inherit_id="opex_intervenants.staff_missions"
+              name="Staff : lien vers la Smart Work Queue">
+        <xpath expr="//h3" position="after">
+            <a class="btn btn-primary mb-3" href="/staff/queue">
+                Smart Work Queue
+            </a>
+        </xpath>
+    </template>
+
+</odoo>

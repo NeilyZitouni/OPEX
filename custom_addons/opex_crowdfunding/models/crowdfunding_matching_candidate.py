@@ -31,7 +31,7 @@ SECTEURS_TECHNOLOGIQUES = ('numerique', 'energie', 'sante')
 class OpexCrowdfundingMatchingCandidate(models.Model):
     """Un acteur financier proposé pour un projet (section 10).
 
-    ⚠️ « Le matching est une **recommandation**. » Rien dans ce modèle ne
+    « Le matching est une **recommandation**. » Rien dans ce modèle ne
     déclenche de transition : le score classe des candidats, le comité décide.
     Aucune méthode ici ne touche à `project_id.state`.
 
@@ -103,15 +103,12 @@ class OpexCrowdfundingMatchingCandidate(models.Model):
     def _evaluate(self):
         """Calcule le score et rédige son explication, ligne par ligne.
 
-        ═══════════════════════════════════════════════════════════════════
         COÛT D'UN ONZIÈME CRITÈRE — pour le document de comparaison
-        ═══════════════════════════════════════════════════════════════════
         Une méthode `_critere_*` (~12 lignes), une ligne dans le tableau
         ci-dessous, et surtout : **rééquilibrer les dix poids existants** pour
         que le total reste sur 100. Puis mise à jour du module et
         redéploiement. Changer un seul poids — passer le secteur de 15 à 20 —
         demande exactement la même chose : c'est du code.
-        ═══════════════════════════════════════════════════════════════════
         """
         for candidate in self:
             # Les dix critères de la section 10, avec leurs poids. Total : 100.

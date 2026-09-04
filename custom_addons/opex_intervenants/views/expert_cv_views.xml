@@ -1,0 +1,476 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- ══════════ LE DEPOT D'UN CV - §6 ══════════ -->
+
+    <record id="view_expert_cv_wizard_form" model="ir.ui.view">
+        <field name="name">opex.expert.cv.wizard.form</field>
+        <field name="model">opex.expert.cv.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Déposer un CV">
+                <field name="ai_available" invisible="1"/>
+
+                <div class="alert alert-warning" role="alert"
+                     invisible="ai_available">
+                    L'assistance IA n'est pas disponible. Le CV peut être
+                    déposé : il restera en file jusqu'à ce qu'elle le soit.
+                    La saisie manuelle des compétences reste ouverte.
+                </div>
+
+                <group>
+                    <field name="profile_id" readonly="1"/>
+                    <field name="document" filename="filename"/>
+                    <field name="filename" invisible="1"/>
+                </group>
+
+                <div class="text-muted">
+                    Le dépôt ne lance pas l'analyse : elle prend dix à trente
+                    secondes et se fait en arrière-plan. Vous verrez son état
+                    sur la fiche du CV.
+                </div>
+
+                <footer>
+                    <button name="action_deposit" type="object"
+                            string="Déposer et mettre en file"
+                            class="btn-primary"/>
+                    <button string="Annuler" class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_expert_cv_wizard" model="ir.actions.act_window">
+        <field name="name">Déposer un CV</field>
+        <field name="res_model">opex.expert.cv.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+        <field name="context">{'default_profile_id': active_id}</field>
+    </record>
+
+    <!-- ══════════ LE CV ET SON ANALYSE - §17 ══════════ -->
+
+    <record id="view_expert_cv_source_form" model="ir.ui.view">
+        <field name="name">opex.expert.cv.source.form</field>
+        <field name="model">opex.expert.cv.source</field>
+        <field name="arch" type="xml">
+            <form string="CV déposé" create="false">
+                <header>
+                    <button name="action_reanalyse" type="object"
+                            string="Relancer l'analyse" class="btn-secondary"
+                            invisible="analyse in ('pending', 'running')"/>
+                    <field name="analyse" widget="statusbar"
+                           statusbar_visible="pending,running,done"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_proposals" type="object"
+                                class="oe_stat_button" icon="fa-lightbulb-o"
+                                invisible="proposal_count == 0">
+                            <field name="proposal_count" widget="statinfo"
+                                   string="Propositions"/>
+                        </button>
+                    </div>
+
+                    <div class="alert alert-info" role="alert"
+                         invisible="analyse != 'pending'">
+                        Analyse en attente. Le traitement se fait en
+                        arrière-plan, par lots, toutes les dix minutes.
+                    </div>
+                    <div class="alert alert-danger" role="alert"
+                         invisible="analyse != 'failed'">
+                        <strong>L'analyse n'a pas abouti.</strong>
+                        <field name="error_message" readonly="1" nolabel="1"/>
+                    </div>
+
+                    <div class="oe_title">
+                        <h1><field name="display_name" readonly="1"/></h1>
+                    </div>
+
+                    <group>
+                        <group string="Le document">
+                            <field name="profile_id" readonly="1"/>
+                            <field name="partner_id" readonly="1"/>
+                            <field name="document" filename="filename"
+                                   readonly="1"/>
+                            <field name="filename" invisible="1"/>
+                            <field name="mimetype" readonly="1"/>
+                            <field name="version" readonly="1"/>
+                        </group>
+                        <group string="La trace du §17">
+                            <field name="date_depot" readonly="1"/>
+                            <field name="date_analyse" readonly="1"/>
+                            <field name="attempts" readonly="1"/>
+                            <field name="confirmed_count" readonly="1"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Propositions" name="propositions">
+                            <div class="alert alert-info" role="alert">
+                                Rien de ce qui suit n'est une donnée du
+                                profil. Chaque ligne est une proposition, avec
+                                sa confiance et le passage du CV d'où elle
+                                vient. Elle ne devient une donnée qu'une fois
+                                confirmée.
+                            </div>
+                            <field name="proposal_ids" readonly="1">
+                                <list decoration-muted="not is_confirmed">
+                                    <field name="destination"/>
+                                    <field name="valeur"/>
+                                    <field name="confidence"
+                                           widget="percentage"/>
+                                    <field name="source_quote"/>
+                                    <field name="confiance"/>
+                                    <field name="promotion"/>
+                                    <field name="is_confirmed" column_invisible="1"/>
+                                    <field name="destination" column_invisible="1"/>
+                                    <button name="action_confirm" type="object"
+                                            string="Confirmer" icon="fa-check"
+                                            invisible="is_confirmed"/>
+                                    <!-- Deux gestes distincts, et c'est
+                                         voulu : confirmer dit « je l'ai bien
+                                         ecrit », promouvoir dit « et cela
+                                         doit compter dans le vivier ».
+                                         Reserve aux competences : les huit
+                                         autres destinations n'ont pas de
+                                         modele qui les attende. -->
+                                    <button name="action_promote" type="object"
+                                            string="Promouvoir" icon="fa-arrow-right"
+                                            invisible="not is_confirmed
+                                                       or destination != 'competence'
+                                                       or promotion != 'non_promue'"/>
+                                </list>
+                            </field>
+                        </page>
+                        <page string="JSON brut" name="raw">
+                            <div class="text-muted mb-2">
+                                Tel que le fournisseur l'a rendu, avant toute
+                                validation. C'est ce qui permet de comprendre
+                                une extraction ratée sans relancer l'appel.
+                            </div>
+                            <field name="raw_json" nolabel="1" readonly="1"
+                                   widget="ace" options="{'mode': 'json'}"/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_expert_cv_source_list" model="ir.ui.view">
+        <field name="name">opex.expert.cv.source.list</field>
+        <field name="model">opex.expert.cv.source</field>
+        <field name="arch" type="xml">
+            <list string="CV déposés" create="false"
+                  decoration-danger="analyse == 'failed'"
+                  decoration-muted="analyse == 'pending'">
+                <field name="partner_id"/>
+                <field name="filename"/>
+                <field name="version"/>
+                <field name="date_depot"/>
+                <field name="analyse"/>
+                <field name="date_analyse"/>
+                <field name="proposal_count"/>
+                <field name="confirmed_count"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_expert_cv_source_search" model="ir.ui.view">
+        <field name="name">opex.expert.cv.source.search</field>
+        <field name="model">opex.expert.cv.source</field>
+        <field name="arch" type="xml">
+            <search string="CV déposés">
+                <field name="partner_id"/>
+                <field name="filename"/>
+
+                <filter name="pending" string="En file"
+                        domain="[('analyse', 'in', ['pending', 'running'])]"/>
+                <filter name="failed" string="Analyse impossible"
+                        domain="[('analyse', '=', 'failed')]"/>
+                <filter name="done" string="Analysés"
+                        domain="[('analyse', '=', 'done')]"/>
+
+                <group name="group_by">
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_analyse" string="Analyse"
+                            context="{'group_by': 'analyse'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_expert_cv_source" model="ir.actions.act_window">
+        <field name="name">CV déposés</field>
+        <field name="res_model">opex.expert.cv.source</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun CV déposé</p>
+            <p>
+                Un CV se dépose depuis la fiche d'un profil expert. L'analyse
+                se fait en arrière-plan : le dépôt rend la main tout de suite.
+            </p>
+        </field>
+    </record>
+
+    <!-- ══════════ LES PROPOSITIONS - §24 ══════════ -->
+
+    <record id="view_expert_cv_proposal_list" model="ir.ui.view">
+        <field name="name">opex.expert.cv.proposal.list</field>
+        <field name="model">opex.expert.cv.proposal</field>
+        <field name="arch" type="xml">
+            <list string="Propositions" create="false"
+                  decoration-muted="is_confirmed">
+                <field name="partner_id"/>
+                <field name="source_id"/>
+                <field name="destination"/>
+                <field name="valeur"/>
+                <field name="confidence" widget="percentage"/>
+                <field name="source_quote" optional="show"/>
+                <field name="confiance"/>
+                <field name="promotion"/>
+                <field name="skill_id" optional="hide"/>
+                <field name="arbitrage_id" optional="hide"/>
+                <field name="is_confirmed" column_invisible="1"/>
+                <field name="confirmed_by" optional="hide"/>
+                <button name="action_confirm" type="object"
+                        string="Confirmer" icon="fa-check"
+                        invisible="is_confirmed"/>
+                <button name="action_promote" type="object"
+                        string="Promouvoir" icon="fa-arrow-right"
+                        invisible="not is_confirmed
+                                   or destination != 'competence'
+                                   or promotion != 'non_promue'"/>
+                <button name="action_view_skill" type="object"
+                        string="Voir la compétence" icon="fa-external-link"
+                        invisible="promotion != 'promue'"/>
+                <button name="action_view_arbitrage" type="object"
+                        string="Voir l'arbitrage" icon="fa-gavel"
+                        invisible="promotion != 'arbitrage'"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_expert_cv_proposal_search" model="ir.ui.view">
+        <field name="name">opex.expert.cv.proposal.search</field>
+        <field name="model">opex.expert.cv.proposal</field>
+        <field name="arch" type="xml">
+            <search string="Propositions">
+                <field name="valeur"/>
+                <field name="partner_id"/>
+
+                <filter name="a_confirmer" string="À confirmer"
+                        domain="[('is_confirmed', '=', False)]"/>
+                <filter name="peu_sures" string="Confiance sous 50 %"
+                        domain="[('confidence', '&lt;', 0.5)]"/>
+                <filter name="sans_citation" string="Sans passage cité"
+                        domain="[('source_quote', 'in', [False, ''])]"/>
+                <separator/>
+                <!-- La file de travail du gestionnaire : ce qui est confirme
+                     et attend d'entrer au vivier. -->
+                <filter name="a_promouvoir" string="À promouvoir"
+                        domain="[('is_confirmed', '=', True),
+                                 ('destination', '=', 'competence'),
+                                 ('promotion', '=', 'non_promue')]"/>
+                <filter name="promues" string="Promues"
+                        domain="[('promotion', '=', 'promue')]"/>
+                <filter name="en_arbitrage" string="En attente d'arbitrage"
+                        domain="[('promotion', '=', 'arbitrage')]"/>
+
+                <group name="group_by">
+                    <filter name="group_promotion" string="Promotion"
+                            context="{'group_by': 'promotion'}"/>
+                    <filter name="group_destination" string="Destination"
+                            context="{'group_by': 'destination'}"/>
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_expert_cv_proposal" model="ir.actions.act_window">
+        <field name="name">Propositions issues des CV</field>
+        <field name="res_model">opex.expert.cv.proposal</field>
+        <field name="view_mode">list</field>
+        <field name="context">{'search_default_a_confirmer': 1}</field>
+    </record>
+
+    <!-- ══════════ GREFFES ET MENUS ══════════ -->
+
+    <record id="view_expert_profile_form_cv" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.form.cv</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <field name="inherit_id" ref="opex_innovation.view_expert_profile_form"/>
+        <!--
+            La restriction de groupe vit dans l'arbre, sur le bouton, et non
+            sur l'enregistrement de vue : Odoo refuse une vue héritée qui
+            porterait ses propres groupes. C'est cohérent - une vue héritée
+            n'est pas un écran, c'est une greffe.
+        -->
+        <field name="arch" type="xml">
+            <xpath expr="//sheet" position="before">
+                <header>
+                    <button name="%(action_expert_cv_wizard)d" type="action"
+                            string="Déposer un CV" class="btn-secondary"
+                            groups="opex_intervenants.group_mission_manager"/>
+                </header>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_expert_profile_form_axes" model="ir.ui.view">
+        <field name="name">opex.innovation.expert.profile.form.axes</field>
+        <field name="model">opex.innovation.expert.profile</field>
+        <field name="inherit_id" ref="opex_intervenants.view_expert_profile_form_capital"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='expert_skill_ids']/list/field[@name='annees']"
+                   position="after">
+                <field name="source"/>
+                <field name="confiance"/>
+                <field name="is_confirmed" optional="hide"/>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_expert_skill_list" model="ir.ui.view">
+        <field name="name">opex.expert.skill.list</field>
+        <field name="model">opex.expert.skill</field>
+        <field name="arch" type="xml">
+            <list string="Compétences qualifiées"
+                  decoration-warning="not is_confirmed">
+                <field name="partner_id"/>
+                <field name="competence_id"/>
+                <field name="niveau"/>
+                <field name="annees"/>
+                <field name="derniere_pratique" optional="show"/>
+                <field name="fraicheur" optional="hide"/>
+                <field name="source"/>
+                <field name="preuve_count" string="Preuves"/>
+                <field name="confiance"/>
+                <field name="is_confirmed" column_invisible="1"/>
+                <button name="action_confirm" type="object"
+                        string="Confirmer" icon="fa-check"
+                        invisible="is_confirmed"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_expert_skill_form" model="ir.ui.view">
+        <field name="name">opex.expert.skill.form</field>
+        <field name="model">opex.expert.skill</field>
+        <field name="arch" type="xml">
+            <form string="Compétence qualifiée">
+                <sheet>
+                    <div class="oe_title">
+                        <h1><field name="competence_id" readonly="1"/></h1>
+                        <h3><field name="partner_id" readonly="1"/></h3>
+                    </div>
+                    <group>
+                        <group string="Niveau métier — §9">
+                            <field name="niveau"/>
+                            <field name="annees"/>
+                            <field name="derniere_pratique"/>
+                            <field name="fraicheur" readonly="1"/>
+                        </group>
+                        <group string="Ce que vaut l'information — §9">
+                            <!-- Deux axes distincts, et c'est le point du §9.
+                                 Un niveau 4 auto-declare et un niveau 4
+                                 confirme par trois experiences ne valent pas
+                                 la meme chose. -->
+                            <field name="source"/>
+                            <field name="confiance"/>
+                            <field name="is_confirmed" readonly="1"/>
+                            <field name="preuve_count" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="Preuves — §8" name="preuves">
+                            <group>
+                                <field name="profile_id" invisible="1"/>
+                                <field name="preuve_experience_ids"
+                                       widget="many2many_tags"/>
+                                <field name="preuve_certification_ids"
+                                       widget="many2many_tags"/>
+                            </group>
+                            <separator string="Passage du CV"/>
+                            <!-- La preuve d'une competence promue depuis un
+                                 CV. Sans elle, `source = cv` dirait d'ou
+                                 vient l'information sans permettre de la
+                                 verifier. -->
+                            <field name="preuve_cv_id" readonly="1"/>
+                            <field name="preuve_citation" readonly="1"
+                                   nolabel="1"
+                                   placeholder="Aucune citation : cette ligne n'a pas été promue depuis un CV."/>
+                        </page>
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_expert_skill_search" model="ir.ui.view">
+        <field name="name">opex.expert.skill.search</field>
+        <field name="model">opex.expert.skill</field>
+        <field name="arch" type="xml">
+            <search string="Compétences qualifiées">
+                <field name="partner_id"/>
+                <field name="competence_id"/>
+
+                <filter name="a_confirmer" string="À confirmer"
+                        domain="[('is_confirmed', '=', False)]"/>
+                <filter name="issues_cv" string="Issues d'un CV"
+                        domain="[('source', '=', 'cv')]"/>
+                <filter name="verifiees" string="Vérifiées par OPEX"
+                        domain="[('confiance', '=', 'opex')]"/>
+                <separator/>
+                <filter name="avec_citation" string="Avec passage du CV"
+                        domain="[('preuve_citation', '!=', False)]"/>
+                <filter name="sans_preuve" string="Sans aucune preuve"
+                        domain="[('preuve_citation', '=', False),
+                                 ('preuve_experience_ids', '=', False),
+                                 ('preuve_certification_ids', '=', False)]"/>
+
+                <group name="group_by">
+                    <filter name="group_partner" string="Intervenant"
+                            context="{'group_by': 'partner_id'}"/>
+                    <filter name="group_confiance" string="Confiance"
+                            context="{'group_by': 'confiance'}"/>
+                    <filter name="group_source" string="Source"
+                            context="{'group_by': 'source'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_expert_skill" model="ir.actions.act_window">
+        <field name="name">Compétences qualifiées</field>
+        <field name="res_model">opex.expert.skill</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_a_confirmer': 1}</field>
+    </record>
+
+    <menuitem id="menu_expert_cv_source"
+              name="CV déposés"
+              parent="menu_intervenants_config"
+              action="action_expert_cv_source"
+              sequence="35"
+              groups="group_mission_manager"/>
+
+    <menuitem id="menu_expert_cv_proposal"
+              name="Propositions issues des CV"
+              parent="menu_intervenants_config"
+              action="action_expert_cv_proposal"
+              sequence="36"
+              groups="group_mission_manager"/>
+
+    <menuitem id="menu_expert_skill"
+              name="Compétences à confirmer"
+              parent="menu_intervenants_config"
+              action="action_expert_skill"
+              sequence="40"
+              groups="group_mission_manager"/>
+
+</odoo>

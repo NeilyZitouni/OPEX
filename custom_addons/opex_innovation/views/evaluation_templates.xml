@@ -48,7 +48,7 @@
                     </thead>
                     <tbody>
                         <!--
-                            ⚠ On itère sur les avis **de l'évaluateur**, pas sur
+                            On itère sur les avis **de l'évaluateur**, pas sur
                             les projets : parcourir un projet donnerait accès à
                             ses `evaluation_ids`, donc aux avis des autres.
                         -->
@@ -88,9 +88,7 @@
                 </div>
 
                 <!--
-                    ═══════════════════════════════════════════════════════
-                    ⚠ AUCUN AVIS D'UN AUTRE ÉVALUATEUR N'EST RENDU ICI.
-                    ═══════════════════════════════════════════════════════
+                    AUCUN AVIS D'UN AUTRE ÉVALUATEUR N'EST RENDU ICI.
 
                     Ni affiché, ni masqué en CSS, ni caché dans un attribut :
                     absent du HTML. Le contexte de rendu ne contient que

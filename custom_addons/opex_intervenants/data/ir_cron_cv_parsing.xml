@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LA FILE D'ANALYSE DES CV - §6
+
+            Un parsing prend dix a trente secondes. Une route portail qui
+            attend cela est inutilisable : le navigateur tourne, l'utilisateur
+            recharge, et le second appel repart pour trente secondes - facture
+            comme le premier.
+
+            Le depot cree l'enregistrement et rend la main ; ce cron traite la
+            file. L'expert voit un etat, pas une roue qui tourne.
+
+            CINQ PAR PASSAGE, ET C'EST DELIBERE
+
+            Un cron qui traiterait toute la file d'un coup tiendrait la
+            transaction ouverte pendant des minutes, et un appel qui echoue a
+            la fin annulerait les precedents. Cinq passages de cinq valent
+            mieux qu'un passage de vingt-cinq.
+
+            TOUTES LES DIX MINUTES
+
+            Assez souvent pour qu'un expert qui depose son CV le voie analyse
+            avant de quitter son espace ; assez rare pour qu'un quota par
+            minute ne soit jamais frole. Le retry du service, lui, joue a
+            l'interieur d'un appel.
+
+            `noupdate="1"` : le cron porte un etat d'execution - sa derniere
+            date de passage, son activation. Un `-u` qui le reinitialiserait
+            ferait rejouer la file ou desactiverait un cron qu'un
+            administrateur avait coupe.
+        -->
+        <record id="cron_parse_cv" model="ir.cron">
+            <field name="name">OPEX Intervenants : analyser les CV deposes</field>
+            <field name="model_id" ref="model_opex_expert_cv_source"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_parse_pending()</field>
+            <field name="interval_number">10</field>
+            <field name="interval_type">minutes</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+         LE CONSTAT DE SERVICE FAIT — §27, §28
+          -->
+
+    <record id="view_service_acceptance_form" model="ir.ui.view">
+        <field name="name">opex.service.acceptance.form</field>
+        <field name="model">opex.service.acceptance</field>
+        <field name="arch" type="xml">
+            <form string="Constat de service fait">
+                <header>
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-primary"
+                            invisible="workflow_state != 'running'"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <!-- REBRANCHEMENT `sale` : les deux boutons sont
+                             conserves. `sale_disponible` les eteint tant que
+                             le module Ventes est absent ; ils reviennent
+                             d'eux-memes le jour ou il est installe, sans
+                             toucher a cette vue. -->
+                        <field name="sale_disponible" invisible="1"/>
+                        <field name="sale_order_ref" invisible="1"/>
+                        <button name="action_view_sale_order" type="object"
+                                class="oe_stat_button" icon="fa-shopping-cart"
+                                invisible="not sale_disponible or not sale_order_ref">
+                            <span class="o_stat_text">Commande</span>
+                        </button>
+                        <button name="action_view_invoices" type="object"
+                                class="oe_stat_button" icon="fa-file-text-o"
+                                invisible="not sale_disponible or not sale_order_ref">
+                            <span class="o_stat_text">Factures</span>
+                        </button>
+                    </div>
+
+                    <div class="alert alert-danger" role="alert"
+                         invisible="deliverable_unvalidated_count == 0">
+                        <strong><field name="deliverable_unvalidated_count"
+                                       class="oe_inline" readonly="1"/></strong>
+                        livrable(s) obligatoire(s) ne sont pas validés. La
+                        règle 6 du §39 interdit de valider le service fait tant
+                        que c'est le cas.
+                    </div>
+
+                    <div class="oe_title">
+                        <label for="name"/>
+                        <h1><field name="name" readonly="1"/></h1>
+                        <h5 class="text-muted">
+                            <field name="workflow_stage_label" readonly="1"/>
+                        </h5>
+                    </div>
+
+                    <group>
+                        <group string="Mission">
+                            <field name="mission_id" readonly="1"/>
+                            <field name="client_id" readonly="1"/>
+                            <field name="assignment_ids" widget="many2many_tags"
+                                   readonly="1"/>
+                        </group>
+                        <group string="À facturer — §29">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="montant_a_facturer"/>
+                            <!-- REBRANCHEMENT `sale` : c'etait sale_order_id. -->
+                            <field name="sale_order_name" readonly="1"
+                                   invisible="not sale_disponible"/>
+                            <div class="text-muted" colspan="2"
+                                 invisible="sale_disponible">
+                                Le module Ventes n'est pas installé : la
+                                clôture de la mission n'émet aucune commande
+                                de vente. Le montant ci-dessus reste la
+                                référence à facturer hors du portail.
+                            </div>
+                        </group>
+                    </group>
+
+                    <notebook>
+                        <page string="Validation finale — §28" name="checklist">
+                            <group string="Le cluster confirme que">
+                                <field name="objectifs_atteints"/>
+                                <field name="livrables_complets"/>
+                                <field name="corrections_effectuees"/>
+                                <field name="conforme_contrat"/>
+                            </group>
+                            <group string="Observations">
+                                <field name="observations" nolabel="1"
+                                       placeholder="Ce que le contrôle a relevé, au-delà des quatre points ci-dessus."/>
+                            </group>
+                        </page>
+
+                        <page string="Qui a validé, et quand" name="validations">
+                            <group>
+                                <group string="Cluster">
+                                    <field name="date_validation_cluster"/>
+                                    <field name="validateur_cluster_id"/>
+                                    <field name="commentaire_cluster"/>
+                                </group>
+                                <group string="Client — §27">
+                                    <field name="date_validation_client"/>
+                                    <field name="validateur_client_id"/>
+                                    <field name="commentaire_client"/>
+                                </group>
+                            </group>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_service_acceptance_list" model="ir.ui.view">
+        <field name="name">opex.service.acceptance.list</field>
+        <field name="model">opex.service.acceptance</field>
+        <field name="arch" type="xml">
+            <list string="Constats de service fait">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="client_id"/>
+                <field name="montant_a_facturer" sum="Total à facturer"/>
+                <field name="currency_id" column_invisible="1"/>
+                <field name="date_validation_client"/>
+                <field name="workflow_stage_label" string="Étape"/>
+                <!-- REBRANCHEMENT `sale` : c'etait sale_order_id. -->
+                <field name="sale_order_name" optional="hide"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_service_acceptance_search" model="ir.ui.view">
+        <field name="name">opex.service.acceptance.search</field>
+        <field name="model">opex.service.acceptance</field>
+        <field name="arch" type="xml">
+            <search string="Constats de service fait">
+                <field name="name"/>
+                <field name="mission_id"/>
+                <field name="client_id"/>
+
+                <filter name="a_verifier" string="À vérifier (cluster)"
+                        domain="[('workflow_stage_id.code', '=', 'draft')]"/>
+                <filter name="attente_client" string="En attente du client"
+                        domain="[('workflow_stage_id.code', '=', 'cluster_validated')]"/>
+                <filter name="conteste" string="Contesté"
+                        domain="[('workflow_stage_id.code', '=', 'disputed')]"/>
+                <filter name="service_fait" string="Service fait"
+                        domain="[('workflow_stage_id.code', '=', 'accepted')]"/>
+
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                    <filter name="group_client" string="Client"
+                            context="{'group_by': 'client_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_service_acceptance" model="ir.actions.act_window">
+        <field name="name">Service fait et facturation</field>
+        <field name="res_model">opex.service.acceptance</field>
+        <field name="view_mode">list,form</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Aucun constat de service fait</p>
+            <p>
+                Un constat s'ouvre automatiquement quand une mission remet ses
+                livrables.
+            </p>
+        </field>
+    </record>
+
+    <record id="view_mission_request_form_invoicing" model="ir.ui.view">
+        <field name="name">opex.mission.request.form.invoicing</field>
+        <field name="model">opex.mission.request</field>
+        <field name="inherit_id" ref="view_mission_request_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_acceptance" type="object"
+                        class="oe_stat_button" icon="fa-check-circle"
+                        invisible="not acceptance_id">
+                    <div class="o_stat_info">
+                        <span class="o_stat_text">Service fait</span>
+                    </div>
+                </button>
+            </xpath>
+
+            <xpath expr="//notebook" position="inside">
+                <page string="Service fait et facturation" name="facturation"
+                      invisible="not acceptance_id">
+
+                    <div class="oe_button_box">
+                        <button name="action_open_acceptance_workflow"
+                                type="object" class="btn-primary"
+                                string="Action sur le constat de service fait"/>
+                    </div>
+
+                    <group>
+                        <group string="Constat — §28">
+                            <field name="acceptance_id" readonly="1"/>
+                            <field name="acceptance_stage_label" readonly="1"/>
+                            <field name="service_fait_valide" readonly="1"/>
+                        </group>
+                        <group string="Facturation — §29">
+                            <field name="currency_id" invisible="1"/>
+                            <field name="facturation_disponible" invisible="1"/>
+                            <!-- `facturation_label` reste visible en toute
+                                 circonstance : sans le module il dit
+                                 « Facturation indisponible », ce qui est une
+                                 information. Les montants, eux, sont masques
+                                 - un « 0,00 » se lit comme un impaye. -->
+                            <field name="facturation_label" readonly="1"/>
+                            <!-- REBRANCHEMENT `sale` : c'etait sale_order_id. -->
+                            <field name="sale_order_name" readonly="1"
+                                   invisible="not facturation_disponible"/>
+                            <field name="montant_facture" readonly="1"
+                                   invisible="not facturation_disponible"/>
+                        </group>
+                    </group>
+
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <menuitem id="menu_service_acceptance"
+              name="Service fait et facturation"
+              parent="menu_intervenants_root"
+              action="action_service_acceptance"
+              sequence="85"
+              groups="group_mission_manager,opex_membership.group_secretariat"/>
+
+</odoo>

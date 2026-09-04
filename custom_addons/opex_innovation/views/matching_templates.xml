@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ══════════ Section 19 — L'écran du responsable OPEX ══════════ -->
+    <!-- Section 19 — L'écran du responsable OPEX -->
 
     <template id="staff_matching" name="Staff : matching">
         <t t-call="portal.portal_layout">
@@ -81,7 +81,7 @@
         </t>
     </template>
 
-    <!-- ══════════ Section 20 — Ce que le candidat voit ══════════ -->
+    <!-- Section 20 — Ce que le candidat voit -->
 
     <template id="portal_my_home_opportunities" name="Portail : mes opportunités"
               customize_show="True" inherit_id="portal.portal_my_home"
@@ -95,7 +95,7 @@
                 <t t-set="url" t-value="'/my/innovation/opportunities'"/>
                 <t t-set="text">Projets d'innovation proposés à votre expertise ou à votre investissement.</t>
                 <!--
-                    ⚠ Sans `placeholder_count`, `portal.portal_docs_entry`
+                    Sans `placeholder_count`, `portal.portal_docs_entry`
                     rendait cette tuile avec `d-none` : présente dans le HTML,
                     invisible à l'écran, et aucun test ne s'en apercevait.
 
@@ -117,7 +117,7 @@
                 <h3>OPEX Innovation — mes opportunités</h3>
 
                 <!--
-                    ⚠ Le gabarit itère sur des **dictionnaires** construits par
+                    Le gabarit itère sur des **dictionnaires** construits par
                     `_matching_teaser()`, jamais sur les projets.
 
                     Passer le recordset du projet donnerait accès à tous ses
@@ -152,7 +152,7 @@
                                     l'acteur financier. Section 32 : « informations
                                     financières autorisées ».
 
-                                    ⚠ Le `t-if` ne masque rien : ces clés
+                                    Le `t-if` ne masque rien : ces clés
                                     n'existent tout simplement pas dans le
                                     dictionnaire d'un expert. `_matching_teaser()`
                                     ne les y met que pour un investisseur ou un

@@ -8,7 +8,7 @@
                 <t t-set="instance" t-value="projet.workflow_instance_id"/>
             </t>
 
-        ⚠ Aucun code technique n'est rendu ici. Les libellés viennent de
+        Aucun code technique n'est rendu ici. Les libellés viennent de
         `stage.user_label`, et l'étape suivante est formulée comme une action
         attendue, pas comme un état de machine. Le workflow système peut être
         complexe ; ce que l'utilisateur lit ne doit pas l'être.
@@ -19,9 +19,9 @@
                 <ul class="list-unstyled mb-3">
                     <t t-foreach="instance.progress_steps()" t-as="step">
                         <li t-att-class="'mb-1 fw-bold' if step['state'] == 'current' else ('mb-1' if step['state'] == 'done' else 'mb-1 text-muted')">
-                            <span t-if="step['state'] == 'done'" class="text-success me-2">✓</span>
-                            <span t-elif="step['state'] == 'current'" class="text-primary me-2">●</span>
-                            <span t-else="" class="me-2">○</span>
+                            <span t-if="step['state'] == 'done'" class="text-success me-2"></span>
+                            <span t-elif="step['state'] == 'current'" class="text-primary me-2"></span>
+                            <span t-else="" class="me-2"></span>
                             <span t-esc="step['label']"/>
                         </li>
                     </t>

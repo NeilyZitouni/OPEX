@@ -1,0 +1,318 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LA SÉQUENCE DES PIÈCES CONTRACTUELLES
+        -->
+        <record id="seq_mission_contract" model="ir.sequence">
+            <field name="name">Pièce contractuelle OPEX</field>
+            <field name="code">opex.mission.contract</field>
+            <field name="prefix">CTR-%(year)s-</field>
+            <field name="padding">4</field>
+            <field name="number_increment">1</field>
+            <field name="implementation">standard</field>
+            <field name="company_id" eval="False"/>
+        </record>
+
+        <!--
+            LES CONDITIONS DU CYCLE DE VALIDATION — §19
+
+            Elles lisent des **faits** sur la mission — le contrat existe, il
+            est signé des deux côtés — jamais un avancement. L'avancement,
+            c'est l'étape courante de cette instance-ci.
+        -->
+
+        <record id="rule_contract_document_ready" model="opex.workflow.rule">
+            <field name="name">Contrat rédigé</field>
+            <field name="code">contract_document_ready</field>
+            <field name="expression">bool(field('contract_ready'))</field>
+            <field name="message">Le contrat n'est pas complet : il lui manque ses dates ou son montant. Complétez la pièce contractuelle avant de l'envoyer à la signature.</field>
+        </record>
+
+        <record id="rule_contract_signed" model="opex.workflow.rule">
+            <field name="name">Signatures recueillies</field>
+            <field name="code">contract_signed</field>
+            <field name="expression">bool(field('contract_fully_signed'))</field>
+            <field name="message">Le contrat n'est pas signé des deux côtés. Enregistrez la signature du client et celle de l'intervenant sur la pièce contractuelle.</field>
+        </record>
+
+        <!--
+            LES ACTIONS
+        -->
+
+        <record id="action_ctr_notify_validated" model="opex.workflow.action">
+            <field name="name">Informer que le contrat est validé</field>
+            <field name="code">contract_notify_validated</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_client')])]"/>
+            <field name="body" type="html"><p>Le contrat de votre mission est validé. La mission peut démarrer à la date prévue.</p></field>
+        </record>
+
+        <record id="action_ctr_notify_revision" model="opex.workflow.action">
+            <field name="name">Signaler la révision demandée</field>
+            <field name="code">contract_notify_revision</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Une révision du contrat est demandée. Le motif figure dans l'historique de la contractualisation.</p></field>
+        </record>
+
+        <record id="action_ctr_task_prepare" model="opex.workflow.action">
+            <field name="name">Préparer la nouvelle version du contrat</field>
+            <field name="code">contract_task_prepare</field>
+            <field name="action_type">create_task</field>
+            <field name="target_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="deadline_days">5</field>
+        </record>
+
+        <!--
+            LA DÉFINITION — SUR `opex.mission.request`, ET C'EST IMPOSÉ
+
+            La règle 5 du §39 a été écrite à l'Extension 1 :
+
+                subworkflow_done('mission_contract')
+
+            `_subworkflow_done()` cherche une instance par `res_model` /
+            `res_id` (`workflow_instance.py:305`), c'est-à-dire **sur le même
+            enregistrement métier**. Posée sur `opex.mission.contract`, cette
+            définition ne serait jamais vue par l'instance de la mission : la
+            condition renverrait `False` pour toujours, silencieusement — le
+            helper est tolérant par construction.
+
+            Le contrat *document* est donc `opex.mission.contract`, avec ses
+            versions ; le contrat *processus* est ce sous-workflow, qui tourne
+            sur la mission à côté de son workflow principal. C'est exactement
+            ce que `start_subworkflow()` est fait pour porter
+            (`workflow_instance.py:847`).
+
+            **`validated` est la SEULE étape `is_end`**, et c'est le point de
+            conception de tout ce fichier.
+
+            `do_transition()` pose `state = 'done'` en atteignant n'importe
+            quelle étape finale (`workflow_instance.py:769`), et
+            `_subworkflow_done()` teste exactement `state = 'done'`. Marquer
+            « Révision demandée » comme finale ferait donc qu'un contrat
+            **refusé** satisfait la règle 5 : la mission démarrerait parce que
+            sa contractualisation a échoué.
+
+            Le refus boucle donc vers la préparation d'une nouvelle version.
+            `_check_graph()` l'accepte — il exige au moins une étape finale et
+            aucun cul-de-sac (`workflow_definition.py:268-280`), pas que
+            chaque issue en soit une. Un test garde ce point précis, parce
+            qu'une seule case cochée par mégarde retournerait la règle contre
+            ce qu'elle protège.
+        -->
+
+        <record id="wf_mission_contract" model="opex.workflow.definition">
+            <field name="name">Contractualisation d'une mission</field>
+            <field name="code">mission_contract</field>
+            <field name="model_id" ref="model_opex_mission_request"/>
+            <field name="description">Cycle de validation du contrat, §19 du Module 3. Sous-workflow lancé sur la mission par « Lancer la contractualisation », et attendu par « Démarrer la mission » via la règle 5 du §39.</field>
+        </record>
+
+        <!-- Étapes -->
+
+        <record id="cstage_preparation" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_preparation</field>
+            <field name="name">Contrat en préparation</field>
+            <field name="user_label">Contrat en préparation</field>
+            <field name="sequence">10</field>
+            <field name="is_start" eval="True"/>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+            <field name="description">Le contrat et l'ordre de mission ont été générés à la sélection (§18). Le secrétariat les complète.</field>
+        </record>
+
+        <record id="cstage_review" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_review</field>
+            <field name="name">Contrat en relecture</field>
+            <field name="user_label">Contrat en relecture</field>
+            <field name="sequence">20</field>
+            <field name="sla_days">3</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="cstage_to_sign" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_to_sign</field>
+            <field name="name">Contrat à signer</field>
+            <field name="user_label">Contrat à signer</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">7</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_client'), ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="cstage_signed" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_signed</field>
+            <field name="name">Contrat signé</field>
+            <field name="user_label">Contrat signé</field>
+            <field name="sequence">40</field>
+            <field name="sla_days">3</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+        </record>
+
+        <!--
+            La seule étape finale de la définition. Voir la note ci-dessus :
+            en marquer une seconde ferait passer la règle 5 sur un contrat
+            refusé.
+        -->
+        <record id="cstage_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_validated</field>
+            <field name="name">Contrat validé</field>
+            <field name="user_label">Contrat validé — la mission peut démarrer</field>
+            <field name="sequence">50</field>
+            <field name="is_end" eval="True"/>
+        </record>
+
+        <!--
+            « Révision demandée » n'est **pas** une étape finale, et ce n'est
+            pas un oubli : elle repart vers la préparation. Le §19 exige que
+            chaque version soit traçable — une révision produit une nouvelle
+            version de la pièce, pas une réécriture de l'ancienne.
+        -->
+        <record id="cstage_revision" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_revision</field>
+            <field name="name">Révision demandée</field>
+            <field name="user_label">Révision du contrat demandée</field>
+            <field name="sequence">60</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
+        </record>
+
+        <!-- Transitions -->
+
+        <record id="ctr_submit_review" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_submit_review</field>
+            <field name="name">Soumettre le contrat à relecture</field>
+            <field name="source_stage_id" ref="cstage_preparation"/>
+            <field name="target_stage_id" ref="cstage_review"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="ctr_send_to_sign" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_send_to_sign</field>
+            <field name="name">Envoyer à la signature</field>
+            <field name="source_stage_id" ref="cstage_review"/>
+            <field name="target_stage_id" ref="cstage_to_sign"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_contract_document_ready')])]"/>
+        </record>
+
+        <record id="ctr_request_revision" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_request_revision</field>
+            <field name="name">Demander une révision</field>
+            <field name="source_stage_id" ref="cstage_review"/>
+            <field name="target_stage_id" ref="cstage_revision"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ctr_notify_revision'), ref('action_ctr_task_prepare')])]"/>
+        </record>
+
+        <record id="ctr_sign" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_sign</field>
+            <field name="name">Signatures recueillies</field>
+            <field name="source_stage_id" ref="cstage_to_sign"/>
+            <field name="target_stage_id" ref="cstage_signed"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('opex_workflow.role_secretariat')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_contract_signed')])]"/>
+        </record>
+
+        <record id="ctr_sign_refused" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_sign_refused</field>
+            <field name="name">Signature refusée</field>
+            <field name="source_stage_id" ref="cstage_to_sign"/>
+            <field name="target_stage_id" ref="cstage_revision"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager'), ref('role_client'), ref('role_intervenant')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ctr_notify_revision'), ref('action_ctr_task_prepare')])]"/>
+        </record>
+
+        <record id="ctr_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_validate</field>
+            <field name="name">Valider le contrat</field>
+            <field name="source_stage_id" ref="cstage_signed"/>
+            <field name="target_stage_id" ref="cstage_validated"/>
+            <field name="sequence">60</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_decideur'), ref('role_mission_manager')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ctr_notify_validated')])]"/>
+        </record>
+
+        <record id="ctr_reject_signed" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_reject_signed</field>
+            <field name="name">Refuser le contrat signé</field>
+            <field name="source_stage_id" ref="cstage_signed"/>
+            <field name="target_stage_id" ref="cstage_revision"/>
+            <field name="sequence">70</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_decideur')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_ctr_notify_revision'), ref('action_ctr_task_prepare')])]"/>
+        </record>
+
+        <record id="ctr_revise" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_contract"/>
+            <field name="code">contract_revise</field>
+            <field name="name">Nouvelle version préparée</field>
+            <field name="source_stage_id" ref="cstage_revision"/>
+            <field name="target_stage_id" ref="cstage_preparation"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat'), ref('role_mission_manager')])]"/>
+        </record>
+
+    </data>
+
+    <!--
+        HORS DU BLOC `noupdate` — sans quoi rien de ceci ne s'exécute
+
+        `convert.py`, `_tag_function` : « if self.noupdate and self.mode !=
+        'init': return ». Un `<function>` placé dans le bloc marcherait à
+        l'installation et serait silencieusement sauté à chaque `-u` — donc le
+        jour de la démonstration. Règle 8 du CLAUDE.md du moteur.
+    -->
+    <!--
+        La casse volontaire jouée ici a laissé un enseignement qui vaut
+        d'être écrit : `is_end` posé sur « Révision demandée » **passe
+        `_check_graph()` sans un mot**. Deux étapes finales sont un graphe
+        parfaitement valide ; le moteur n'a aucune raison d'en douter.
+
+        Rien, du côté du configurateur, ne signale donc qu'une case cochée
+        vient de retourner la règle 5 contre ce qu'elle protège. Ce sont les
+        deux tests de `test_contracting.py` qui le disent, et c'est pour cela
+        qu'ils existent tous les deux : l'un lit la configuration, l'autre
+        constate qu'un refus a clos le processus — « done != running ».
+
+        Il rétablit `is_end` sur la seule étape qui doit le porter, à chaque
+        mise à jour : si quelqu'un le décochait ou en cochait un second depuis
+        l'interface, la ligne suivante le corrigerait. La configuration semée
+        est la référence, l'écran n'en est que la vue.
+    -->
+    <function model="opex.workflow.stage" name="write">
+        <value eval="[ref('cstage_revision')]"/>
+        <value eval="{'is_end': False}"/>
+    </function>
+    <function model="opex.workflow.stage" name="write">
+        <value eval="[ref('cstage_validated')]"/>
+        <value eval="{'is_end': True}"/>
+    </function>
+
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_mission_contract')]]"/>
+</odoo>

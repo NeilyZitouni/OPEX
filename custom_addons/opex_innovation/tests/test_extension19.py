@@ -68,7 +68,7 @@ class TestMilestones(Extension19Case):
     def test_the_seven_milestones_of_section_35_are_configured(self):
         definition = self.env['opex.workflow.definition']._get_for_code(
             'innovation_project')
-        # ⚠ Borné à cette définition : le Smart Crowdfunding et
+        # Borné à cette définition : le Smart Crowdfunding et
         # l'industrialisation tournent dans la même base.
         milestones = self.Milestone.search(
             [('definition_id', '=', definition.id)], order='sequence')
@@ -99,13 +99,13 @@ class TestMilestones(Extension19Case):
     def test_the_card_of_section_35_word_for_word(self):
         """L'exemple du document, reproduit exactement.
 
-            ✓ Déposé
-            ✓ Contrôle terminé
-            ● Évaluation en cours
-            ○ Décision
-            ○ Accompagnement
-            ○ Financement
-            ○ Industrialisation
+            Déposé
+            Contrôle terminé
+            Évaluation en cours
+            Décision
+            Accompagnement
+            Financement
+            Industrialisation
         """
         project = self._project()
         for code, actor in (('submit', 'porteur'),
@@ -147,7 +147,7 @@ class TestMilestones(Extension19Case):
         self.assertEqual(states['controle'], 'done')
 
     def test_a_rejected_project_has_no_current_milestone(self):
-        """⚠ Sans la règle « dossier clos », un projet refusé afficherait
+        """Sans la règle « dossier clos », un projet refusé afficherait
         « Décision » comme étape en cours pour toujours."""
         project = self._project()
         for code, actor in (('submit', 'porteur'),
@@ -221,7 +221,7 @@ class TestMilestones(Extension19Case):
 
 @tagged('post_install', '-at_install')
 class TestPortalTilesAreActuallyVisible(HttpCase):
-    """⚠ Le piège du Module 1, retrouvé intact sur les quatre tuiles.
+    """Le piège du Module 1, retrouvé intact sur les quatre tuiles.
 
     `portal.portal_docs_entry` ajoute `d-none` à toute entrée qui ne fournit ni
     `placeholder_count` non nul, ni `config_card`. La tuile est donc **présente
@@ -471,7 +471,7 @@ class TestStaffDashboard(HttpCase):
         self.assertIn("submitted", flat)
 
     def test_two_projects_at_the_same_stage_count_as_two(self):
-        """⚠ `mapped()` sur un Many2one dédoublonne : deux projets à la même
+        """`mapped()` sur un Many2one dédoublonne : deux projets à la même
         étape n'en feraient qu'un. Le comptage se fait à part."""
         self._submitted_project("Alpha")
         self._submitted_project("Beta")

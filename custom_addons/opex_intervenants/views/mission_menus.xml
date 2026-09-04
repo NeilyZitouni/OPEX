@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        Le menu du §5, dans l'ordre du document. Les entrées « Missions »,
+        « Contrats », « Livrables », « Facturation » et « Évaluations » y
+        figurent aussi ; elles arriveront avec les objets qu'elles listent
+        (Extensions 7 à 10). Poser des menus vides maintenant donnerait un
+        module qui promet des écrans qu'il n'a pas.
+
+        « Appels à mission » et « Candidatures » suffisent à l'Extension 1 : ce
+        sont les deux modèles, et les deux workflows.
+    -->
+
+    <!-- Pas de `web_icon` : `opex_innovation` n'en pose pas non plus, et un
+         `web_icon` pointant vers un fichier absent affiche un carré vide dans
+         le lanceur d'applications. -->
+    <menuitem id="menu_intervenants_root"
+              name="OPEX Intervenants"
+              sequence="30"
+              groups="group_mission_manager,group_mission_committee,opex_membership.group_secretariat"/>
+
+    <menuitem id="menu_mission_requests"
+              name="Appels à mission"
+              parent="menu_intervenants_root"
+              action="action_mission_request"
+              sequence="10"/>
+
+    <menuitem id="menu_mission_applications"
+              name="Candidatures"
+              parent="menu_intervenants_root"
+              action="action_mission_application"
+              sequence="20"/>
+
+    <!--
+        La configuration est réservée au responsable : `multi_intervenants` sur
+        un type de mission lève la règle 4 du §39, ce n'est pas un réglage
+        d'affichage.
+    -->
+    <menuitem id="menu_intervenants_config"
+              name="Configuration"
+              parent="menu_intervenants_root"
+              sequence="90"
+              groups="group_mission_manager"/>
+
+    <menuitem id="menu_mission_types"
+              name="Types de mission"
+              parent="menu_intervenants_config"
+              action="action_mission_type"
+              sequence="10"/>
+
+    <menuitem id="menu_mission_domains"
+              name="Domaines d'expertise"
+              parent="menu_intervenants_config"
+              action="action_mission_domain"
+              sequence="20"/>
+
+</odoo>

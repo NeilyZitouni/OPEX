@@ -3,16 +3,14 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LE PREMIER WORKFLOW CONFIGURÉ DU PROJET
-            ═══════════════════════════════════════════════════════════════
 
             Schéma 2 du PDF Module 2, traduit en données. Pas une ligne de
             Python ne décrit ce processus : ni les étapes, ni les transitions,
             ni les conditions, ni les droits. Le module métier connaît un seul
             mot du workflow — son code, `profile_request`.
 
-            ⚠ Une seule définition pour **deux modèles**.
+            Une seule définition pour **deux modèles**.
 
             Le moteur pilote par `res_model` / `res_id` ; il n'exige pas que les
             objets se ressemblent. `model_id` désigne le profil Expert, et la
@@ -21,7 +19,7 @@
             mêmes étapes, mêmes libellés, mêmes règles, réécrites nulle part
             ailleurs qu'ici.
 
-            ⚠ Écart de comptage signalé.
+            Écart de comptage signalé.
 
             La consigne annonce « cinq étapes, quatre transitions ». Le schéma 2
             en demande davantage : la boucle Complément → Resoumission → En
@@ -32,7 +30,7 @@
             d'attente.
         -->
 
-        <!-- ══════════ Règles ══════════ -->
+        <!-- Règles -->
 
         <record id="rule_profile_has_cv" model="opex.workflow.rule">
             <field name="name">CV fourni</field>
@@ -48,7 +46,7 @@
             <field name="message">Précisez votre domaine d'expertise ou votre type d'investisseur avant de soumettre.</field>
         </record>
 
-        <!-- ══════════ Actions ══════════ -->
+        <!-- Actions -->
 
         <record id="action_profile_notify_control" model="opex.workflow.action">
             <field name="name">Prévenir le Secrétariat</field>
@@ -104,7 +102,7 @@
             <field name="value_expression">True</field>
         </record>
 
-        <!-- ══════════ Définition — profil Expert ══════════ -->
+        <!-- Définition — profil Expert -->
 
         <record id="wf_expert_profile" model="opex.workflow.definition">
             <field name="name">Demande de profil Expert</field>
@@ -246,7 +244,7 @@
         </record>
 
 
-        <!-- ══════════ Définition — profil Investisseur ══════════ -->
+        <!-- Définition — profil Investisseur -->
 
         <record id="wf_investor_profile" model="opex.workflow.definition">
             <field name="name">Demande de profil Investisseur</field>
@@ -385,7 +383,7 @@
     </data>
 
     <!--
-        ⚠ Publication hors du bloc `noupdate="1"`, et c'est indispensable.
+        Publication hors du bloc `noupdate="1"`, et c'est indispensable.
 
         Odoo **n'exécute pas** les `<function>` d'un bloc `noupdate` lors d'une
         mise à jour de module : seulement à la première installation. Placée
@@ -399,7 +397,7 @@
         fait échouer la mise à jour au lieu de se découvrir en démonstration.
     -->
     <!--
-        ⚠ Le `initiator_role_id` posé dans les `<record>` ci-dessus ne suffit
+        Le `initiator_role_id` posé dans les `<record>` ci-dessus ne suffit
         pas, et c'est la même facette du piège `noupdate` que partout ailleurs.
 
         Les deux définitions ont été créées dans un bloc `noupdate="1"` : leur

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        LE RAPPROCHEMENT TAXONOMIQUE - §8, seconde étape
+
+        La première étape ne coûte rien : correspondance exacte sur la forme
+        normalisée, contre le référentiel puis contre la table de synonymes.
+        Ce prompt n'est appelé que pour ce qu'elle n'a pas su rattacher.
+
+        Il ne demande pas au modèle de créer une compétence. Il lui demande
+        de **choisir dans une liste**, ou de dire qu'il ne trouve pas. C'est
+        toute la différence entre proposer et écrire : le §8 interdit les tags
+        libres, et un modèle à qui on laisse inventer un libellé en invente un.
+
+        Deux variables, `{libelle}` et `{catalogue}`. Les accolades du JSON
+        d'exemple ne sont pas touchées - la substitution ne reconnaît que les
+        `{noms_en_minuscules}`.
+    -->
+
+    <record id="prompt_competence_matching" model="opex.ai.prompt">
+        <field name="code">competence_matching</field>
+        <field name="name">Rapprochement d'une compétence</field>
+        <field name="version">1</field>
+        <field name="expected_keys">code, confiance, motif</field>
+        <field name="description">Seconde étape du rapprochement du §8, appelée seulement quand la correspondance exacte a échoué. Le modèle choisit dans le catalogue fourni ou rend un code vide ; il ne crée jamais rien.
+
+La confiance qu'il rend n'est pas un ornement : c'est elle qui permet au gestionnaire de trier sa file d'arbitrage. Une proposition à 40 % se regarde autrement qu'une proposition à 95 %, et les deux valent mieux qu'une proposition sans confiance.
+
+Le prompt demande explicitement de préférer le code vide au rapprochement approximatif. C'est la consigne qui compte le plus : un rapprochement faux entre silencieusement dans le référentiel et fausse le matching, alors qu'un code vide envoie le libellé en arbitrage, où quelqu'un le voit.</field>
+        <field name="body">Tu rapproches une competence lue dans un CV du catalogue de competences d'un cluster d'entreprises.
+
+Competence lue : "{libelle}"
+
+Catalogue disponible (code, nom, domaine) :
+{catalogue}
+
+Rends UNIQUEMENT un objet JSON, sans texte autour et sans bloc de code, de la forme exacte :
+
+{"code": "", "confiance": 0, "motif": ""}
+
+Regles imperatives :
+
+1. "code" vaut EXACTEMENT l'un des codes du catalogue ci-dessus, ou la chaine vide si aucune entree ne correspond. N'invente jamais un code absent de la liste.
+2. Prefere la chaine vide a un rapprochement approximatif. Un rapprochement faux entre dans le referentiel et y reste ; un code vide fait simplement examiner le libelle par un humain.
+3. "confiance" est un entier de 0 a 100. Il dit a quel point tu es sur du rapprochement, pas a quel point la competence est importante.
+4. Deux competences voisines ne sont pas la meme : "audit interne" et "audit des systemes d'information" sont distinctes. Ne rapproche que ce qui designe la meme chose.
+5. "motif" tient en une phrase et explique le choix, y compris quand le code est vide.</field>
+    </record>
+
+    <record id="prompt_certification_matching" model="opex.ai.prompt">
+        <field name="code">certification_matching</field>
+        <field name="name">Rapprochement d'une certification</field>
+        <field name="version">1</field>
+        <field name="expected_keys">code, confiance, motif</field>
+        <field name="description">Seconde étape du rapprochement des certifications, appelée seulement quand la correspondance exacte et les synonymes ont échoué.
+
+Ce prompt est plus exigeant que celui des compétences, et pour une raison précise : la certification décide de l'ÉLIMINATION. Un rapprochement approximatif ne coûte pas quelques points de score, il fait entrer dans le vivier quelqu'un qui n'aurait pas dû y être.
+
+D'où l'instruction de refuser explicitement les proches-mais-différents : « ISO 27001 » et « ISO 27001 Lead Auditor » sont deux qualifications distinctes, et les confondre est exactement la dette D1.</field>
+        <field name="body">Tu rapproches un intitulé de certification lu dans un CV du référentiel officiel d'un cluster d'expertise.
+
+INTITULÉ LU :
+{libelle}
+
+RÉFÉRENTIEL (le seul choix autorisé) :
+{catalogue}
+
+RÈGLES, dans cet ordre de priorité :
+
+1. Tu ne peux répondre QU'AVEC UN CODE DU RÉFÉRENTIEL ci-dessus, ou une chaîne vide. Tu n'inventes jamais de code.
+
+2. UNE CERTIFICATION PROCHE N'EST PAS LA MÊME CERTIFICATION. C'est la règle qui prime sur toutes les autres.
+   - « ISO 27001 » atteste la connaissance d'une norme ; « ISO 27001 Lead Auditor » atteste la qualification à conduire un audit de certification. Ce sont DEUX qualifications différentes.
+   - « Lead Auditor » et « Lead Implementer » sont différents.
+   - Deux normes de numéros différents (9001, 14001, 27001, 45001) sont différentes, même si l'intitulé se ressemble.
+   Dans le doute entre deux entrées proches, rends une chaîne vide. Un libellé non rapproché part en arbitrage humain, ce qui est le bon résultat ; un mauvais rapprochement fait entrer un candidat non qualifié, et personne ne le verra.
+
+3. Une variante d'ÉCRITURE de la MÊME certification se rapproche : casse, espaces, accents, forme anglaise ou française, millésime de la norme, sigle de l'organisme.
+
+4. Ta confiance est un nombre de 0 à 100. Sois sévère : au-dessous de 80, le gestionnaire regardera de près, et c'est bien.
+
+Réponds UNIQUEMENT par un objet JSON, sans texte autour :
+
+{"code": "LA27001", "confiance": 92, "motif": "Meme certification, forme abregee"}
+
+Si aucune entrée du référentiel ne correspond avec certitude :
+
+{"code": "", "confiance": 0, "motif": "Aucune correspondance sure au referentiel"}</field>
+    </record>
+
+</odoo>

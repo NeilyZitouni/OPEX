@@ -12,9 +12,7 @@ EVALUATOR_ROLE = 'opex_innovation.role_evaluateur'
 class InnovationProject(models.Model):
     """Un projet d'innovation déposé par un membre du cluster.
 
-    ═══════════════════════════════════════════════════════════════════════
-    ⚠ CE MODÈLE N'A PAS DE CHAMP `state`.
-    ═══════════════════════════════════════════════════════════════════════
+    CE MODÈLE N'A PAS DE CHAMP `state`.
 
     Son avancement, c'est `workflow_stage_id` — related sur
     `workflow_instance_id.current_stage_id`, piloté par une définition décrite
@@ -26,7 +24,7 @@ class InnovationProject(models.Model):
     ferait de ce module un workflow codé de plus, et annulerait la démonstration
     entière du travail. Un test l'interdit explicitement.
 
-    ⚠ **N'hérite pas de `project.project`**, malgré le Product Backlog.
+    **N'hérite pas de `project.project`**, malgré le Product Backlog.
     `project.project` apporte son propre `stage_id`, ses tâches et ses vues
     Kanban, en collision frontale avec nos étapes — c'est exactement la
     collision de nommage qui échoue au runtime plutôt qu'au chargement. Le lien
@@ -278,7 +276,7 @@ class InnovationProject(models.Model):
     def propose_to_candidate(self, candidate):
         """Ouvre au candidat retenu l'accès à ce qui le concerne.
 
-        ⚠ `access_level = 'limited'`, jamais `full`. « Il voit Projet, Secteur,
+        `access_level = 'limited'`, jamais `full`. « Il voit Projet, Secteur,
         Résumé, Besoin, Rôle proposé, Durée estimée — **mais seulement les
         informations auxquelles il a droit**. »
 
@@ -312,7 +310,7 @@ class InnovationProject(models.Model):
     def _matching_teaser(self, candidate):
         """Ce que le candidat voit — **une liste fermée**, pas le dossier.
 
-        ⚠ Un dictionnaire et non le recordset du projet. Passer le projet au
+        Un dictionnaire et non le recordset du projet. Passer le projet au
         gabarit lui donnerait accès à tous ses champs : budget, évaluations,
         historique, coordonnées du porteur. La liste ci-dessous est exactement
         celle de la section 20, et rien d'autre ne peut être rendu par
@@ -434,7 +432,7 @@ class InnovationProject(models.Model):
     def designate_evaluator(self, partner):
         """Fait de ce contact un évaluateur **de ce projet-là**.
 
-        ⚠ Deux choses en une, et elles sont indissociables :
+        Deux choses en une, et elles sont indissociables :
 
         1. une ligne `opex.innovation.evaluation` — l'avis à rendre ;
         2. une ligne `opex.workflow.instance.actor` portant le rôle
@@ -469,7 +467,7 @@ class InnovationProject(models.Model):
             # `limited` et non `full` : l'évaluateur accède au périmètre de sa
             # mission, pas au dossier entier (section 32).
             self.workflow_instance_id.add_actor(role, user, 'limited')
-            # ⚠ **Après** la ligne d'acteur, jamais avant : les destinataires
+            # **Après** la ligne d'acteur, jamais avant : les destinataires
             # d'une action `notify` sont résolus par rôle sur les acteurs de
             # l'instance. Notifier d'abord ne toucherait personne.
             #
@@ -497,7 +495,7 @@ class InnovationProject(models.Model):
         return True
 
     # ------------------------------------------------------------
-    # ⚠ Confidentialité des avis — schéma 7
+    # Confidentialité des avis — schéma 7
     # ------------------------------------------------------------
 
     def _is_committee(self, user):
@@ -523,7 +521,7 @@ class InnovationProject(models.Model):
         comité et par les tests. Un second filtre écrit ailleurs finirait par
         diverger — et ici, diverger signifie divulguer.
 
-        ⚠ Cette fonction est **plus stricte que l'`ir.rule`** posée sur le
+        Cette fonction est **plus stricte que l'`ir.rule`** posée sur le
         modèle, et c'est délibéré. La règle de base autorise la lecture de tout
         avis déjà rendu ; la formulation de la section 15 exige en plus que
         l'évaluateur ait finalisé le sien. La règle est le plancher de la base,

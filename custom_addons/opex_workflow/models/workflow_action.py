@@ -16,7 +16,7 @@ class WorkflowAction(models.Model):
     un éditeur de texte. Le configurateur doit rester utilisable par quelqu'un
     qui ne lit pas de Python.
 
-    ⚠ **Le dispatch se fait par `getattr`, jamais par une chaîne de if/elif.**
+    **Le dispatch se fait par `getattr`, jamais par une chaîne de if/elif.**
     Ajouter un type d'action doit être l'ajout d'une méthode `_execute_<type>`
     et d'une valeur dans la `Selection` — rien d'autre. Une chaîne de
     conditions ferait de chaque nouveau type une modification du cœur du
@@ -197,7 +197,7 @@ class WorkflowAction(models.Model):
     def _execute_notify(self, instance, transition=None):
         """Poste un message sur l'objet métier.
 
-        ⚠ Le sous-type est **`mail.mt_note` par défaut**. Un message interne
+        Le sous-type est **`mail.mt_note` par défaut**. Un message interne
         posté en `mt_comment` sur un enregistrement que le porteur suit lui
         part par email — bug déjà rencontré et corrigé sur le module précédent.
         """
@@ -324,7 +324,7 @@ class WorkflowAction(models.Model):
     def _execute_run_matching(self, instance, transition=None):
         """Lance le Smart Matching et **s'arrête là**.
 
-        ⚠ L'action produit des propositions, jamais une décision. Elle n'écrit
+        L'action produit des propositions, jamais une décision. Elle n'écrit
         rien sur l'objet métier et ne déclenche aucune transition : c'est le
         responsable qui, ensuite, retient ou écarte, puis fait avancer le
         dossier s'il le juge bon. Une action qui enchaînerait automatiquement

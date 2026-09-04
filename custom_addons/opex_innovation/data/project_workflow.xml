@@ -3,9 +3,7 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             LE WORKFLOW PROJET — 15 étapes, décrites en données
-            ═══════════════════════════════════════════════════════════════
 
             Schéma 10 du PDF Module 2 (machine à états), plus les précisions des
             sections 13 à 18. Pas une ligne de Python ne décrit ce processus.
@@ -29,7 +27,7 @@
                elle qui prouve qu'on gère un graphe et non une file.
         -->
 
-        <!-- ══════════ Règles ══════════ -->
+        <!-- Règles -->
 
         <record id="rule_project_ready_to_submit" model="opex.workflow.rule">
             <field name="name">Dossier complet</field>
@@ -71,7 +69,7 @@
             <field name="message">Le pitch deck n'a pas encore été déposé.</field>
         </record>
 
-        <!-- ══════════ Actions ══════════ -->
+        <!-- Actions -->
 
         <record id="action_project_notify_secretariat" model="opex.workflow.action">
             <field name="name">Prévenir le secrétariat</field>
@@ -108,7 +106,7 @@
             <field name="matching_limit">5</field>
         </record>
 
-        <!-- ══════════ Définition ══════════ -->
+        <!-- Définition -->
 
         <record id="wf_innovation_project" model="opex.workflow.definition">
             <field name="name">Projet d'innovation</field>
@@ -117,7 +115,7 @@
             <field name="description">Parcours complet du projet d'innovation : dépôt, contrôle administratif, qualification, évaluation, décision du comité, matching, accompagnement, financement, industrialisation, clôture. Schéma 10 du PDF Module 2.</field>
         </record>
 
-        <!-- ══════════ Les 15 étapes ══════════ -->
+        <!-- Les 15 étapes -->
 
         <record id="pstage_draft" model="opex.workflow.stage">
             <field name="definition_id" ref="wf_innovation_project"/>
@@ -257,7 +255,7 @@
             <field name="sequence">150</field>
         </record>
 
-        <!-- ══════════ Transitions ══════════ -->
+        <!-- Transitions -->
 
         <record id="ptr_submit" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_innovation_project"/>
@@ -281,7 +279,7 @@
             <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_secretariat')])]"/>
         </record>
 
-        <!-- ① Le contrôle administratif a DEUX sorties. -->
+        <!-- 1. Le contrôle administratif a DEUX sorties. -->
         <record id="ptr_qualify" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_innovation_project"/>
             <field name="code">qualify</field>
@@ -344,7 +342,7 @@
             <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
         </record>
 
-        <!-- ② La décision du comité a TROIS sorties. -->
+        <!-- 2. La décision du comité a TROIS sorties. -->
         <record id="ptr_accept" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_innovation_project"/>
             <field name="code">accept</field>
@@ -420,7 +418,7 @@
         <!-- Le retour du complément demandé par le comité rejoint le contrôle
              existant : `ptr_resubmit_after_complement` le porte déjà. -->
 
-        <!-- ③ La boucle remédiation → resoumission → évaluation. -->
+        <!-- 3. La boucle remédiation → resoumission → évaluation. -->
         <record id="ptr_resubmit_after_remediation" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_innovation_project"/>
             <field name="code">resubmit_after_remediation</field>
@@ -442,7 +440,7 @@
             <field name="allowed_role_ids" eval="[Command.set([ref('opex_workflow.role_comite')])]"/>
         </record>
 
-        <!-- ══════════ La suite du parcours ══════════ -->
+        <!-- La suite du parcours -->
 
         <record id="ptr_start_matching" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_innovation_project"/>
@@ -502,7 +500,7 @@
     </data>
 
     <!--
-        ⚠ Rattachements de rôles **hors du bloc `noupdate`**, et pour la même
+        Rattachements de rôles **hors du bloc `noupdate`**, et pour la même
         raison que la publication : `noupdate="1"` empêche non seulement la
         recréation, mais aussi la **mise à jour** d'un enregistrement existant.
 
@@ -514,7 +512,7 @@
         qu'aucune erreur ne le signale.
     -->
     <!--
-        ⚠ Rattachements par `<function>` et non par `<record>`, et c'est la
+        Rattachements par `<function>` et non par `<record>`, et c'est la
         troisième facette du même piège.
 
         `noupdate` n'est pas une propriété du bloc XML : c'est une colonne de
@@ -538,7 +536,7 @@
               eval="[[ref('opex_workflow.role_ceo')], {'group_id': ref('group_innovation_manager')}]"/>
 
     <!--
-        ⚠ Publication hors du bloc `noupdate="1"`, et c'est indispensable.
+        Publication hors du bloc `noupdate="1"`, et c'est indispensable.
 
         Odoo **n'exécute pas** les `<function>` d'un bloc `noupdate` lors d'une
         mise à jour de module : seulement à la première installation. Placée

@@ -3,7 +3,7 @@ from odoo.exceptions import UserError
 
 #: Code du rôle porté par un évaluateur **sur un projet donné**.
 #:
-#: ⚠ Expert ≠ évaluateur. Le rôle « Expert » du portail est un profil du
+#: Expert ≠ évaluateur. Le rôle « Expert » du portail est un profil du
 #: vivier ; on devient évaluateur uniquement quand on est **désigné pour ce
 #: projet-là**, c'est-à-dire quand une ligne `instance.actor` porte ce rôle sur
 #: cette instance. C'est exactement l'usage des droits dynamiques.

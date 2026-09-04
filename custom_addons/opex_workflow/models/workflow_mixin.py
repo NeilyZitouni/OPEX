@@ -9,7 +9,7 @@ class WorkflowMixin(models.AbstractModel):
 
         _inherit = ['mail.thread', 'opex.workflow.mixin']
 
-    ⚠ **Tous les champs sont préfixés `workflow_`, sans exception.** Un modèle
+    **Tous les champs sont préfixés `workflow_`, sans exception.** Un modèle
     hôte a presque toujours déjà un `state`, souvent un `stage_id` (c'est le cas
     de `project.project`), parfois un `sequence`. Une collision de nom sur un
     mixin ne se voit pas au chargement : elle écrase silencieusement le champ de

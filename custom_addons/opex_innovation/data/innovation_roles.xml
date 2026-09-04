@@ -16,7 +16,7 @@
             profil : c'est déjà lui qui instruit les dossiers d'adhésion, et le
             PDF place ce contrôle au même endroit.
 
-            ⚠ Ce bloc n'est **pas** en `noupdate` : il modifie un enregistrement
+            Ce bloc n'est **pas** en `noupdate` : il modifie un enregistrement
             semé par le moteur, et `noupdate="1"` ferait ignorer la
             modification lors de toute mise à jour du module.
 
@@ -33,7 +33,7 @@
 
 
         <!--
-            ⚠ Rôle créé par le métier, absent du référentiel du moteur.
+            Rôle créé par le métier, absent du référentiel du moteur.
 
             Expert ≠ évaluateur. « Expert » est un profil du vivier, semé par
             `opex_workflow` ; « évaluateur » est une fonction qu'on exerce sur

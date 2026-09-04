@@ -7,7 +7,7 @@ class RoadmapTemplate(models.Model):
 
     Section 22 : Validation, Produit, Marché, Industrialisation.
 
-    ⚠ **Configurables, et c'est explicitement demandé.** Le même raisonnement
+    **Configurables, et c'est explicitement demandé.** Le même raisonnement
     que pour les points de remédiation de l'Extension 14 : un cluster qui veut
     une cinquième phase — « Certification », « Export » — l'ajoute au
     référentiel, sans développement. Les quatre phases du document sont un
@@ -41,7 +41,7 @@ class RoadmapTemplate(models.Model):
 class RoadmapPhase(models.Model):
     """Une phase de la roadmap d'un accompagnement — section 22.
 
-    ⚠ **Cette phase porte un champ `state`, et le livrable non.** Ce n'est pas
+    **Cette phase porte un champ `state`, et le livrable non.** Ce n'est pas
     une incohérence, c'est la ligne de partage.
 
     Une phase est une case à trois positions : à faire, en cours, faite. Elle
@@ -256,7 +256,7 @@ class Accompagnement(models.Model):
     def _seed_roadmap(self):
         """Recopie le référentiel de phases dans cet accompagnement.
 
-        ⚠ Une **copie**, pas une référence. Modifier le référentiel plus tard ne
+        Une **copie**, pas une référence. Modifier le référentiel plus tard ne
         doit pas réécrire la roadmap d'un accompagnement déjà en cours : le
         porteur verrait ses phases changer de nom sous ses yeux. Le référentiel
         décide de ce qu'on propose au démarrage, pas de ce qui a été convenu.

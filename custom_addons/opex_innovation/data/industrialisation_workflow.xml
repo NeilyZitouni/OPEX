@@ -3,9 +3,7 @@
     <data noupdate="1">
 
         <!--
-            ═══════════════════════════════════════════════════════════════
             INDUSTRIALISATION — section 27
-            ═══════════════════════════════════════════════════════════════
 
             « Le cluster peut suivre : état d'industrialisation, partenaires,
             livrables, financement, échéances, résultats. »
@@ -72,7 +70,7 @@
             <field name="body" type="html"><p>L'industrialisation de votre projet a été abandonnée. Le motif figure dans l'historique du dossier.</p></field>
         </record>
 
-        <!-- ══════════ La définition ══════════ -->
+        <!-- La définition -->
 
         <record id="wf_industrialisation" model="opex.workflow.definition">
             <field name="name">Industrialisation</field>
@@ -81,7 +79,7 @@
             <field name="description">Suivi de la mise en production d'un projet abouti. Section 27 du cahier des charges Module 2.</field>
         </record>
 
-        <!-- ══════════ Étapes ══════════ -->
+        <!-- Étapes -->
 
         <record id="indus_preparation" model="opex.workflow.stage">
             <field name="definition_id" ref="wf_industrialisation"/>
@@ -150,7 +148,7 @@
             <field name="sequence">70</field>
         </record>
 
-        <!-- ══════════ Transitions ══════════ -->
+        <!-- Transitions -->
 
         <record id="indus_tr_chercher_partenaires" model="opex.workflow.transition">
             <field name="definition_id" ref="wf_industrialisation"/>

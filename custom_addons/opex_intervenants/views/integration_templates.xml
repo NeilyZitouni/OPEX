@@ -1,0 +1,308 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LES FILTRES DU CATALOGUE - §48
+
+        Greffés sur `public_missions` (Extension 5) plutôt que dans une page
+        neuve : le catalogue est déjà référencé par le menu du site, par la
+        fiche publique et par l'espace intervenant. Une seconde page filtrée
+        aurait fait deux catalogues à tenir d'accord.
+
+        Formulaire en GET : les critères restent dans l'URL, donc partageables
+        et gardés par le bouton Précédent. Un POST aurait perdu les deux.
+    -->
+    <template id="public_missions_filters"
+              inherit_id="opex_intervenants.public_missions"
+              name="Catalogue : filtres">
+        <xpath expr="//div[hasclass('row')][1]" position="after">
+            <form method="get" action="/missions" class="row g-2 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label small text-muted" for="domaine">
+                        Domaine d'expertise
+                    </label>
+                    <select class="form-select" name="domaine" id="domaine">
+                        <option value="">Tous les domaines</option>
+                        <t t-foreach="options['domaines']" t-as="domaine">
+                            <option t-att-value="domaine['id']"
+                                    t-att-selected="'selected' if filters['domaine'] == domaine['id'] else None"
+                                    t-out="domaine['nom']"/>
+                        </t>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted" for="type">
+                        Type de mission
+                    </label>
+                    <select class="form-select" name="type" id="type">
+                        <option value="">Tous les types</option>
+                        <t t-foreach="options['types']" t-as="mission_type">
+                            <option t-att-value="mission_type['id']"
+                                    t-att-selected="'selected' if filters['type'] == mission_type['id'] else None"
+                                    t-out="mission_type['nom']"/>
+                        </t>
+                    </select>
+                </div>
+
+                <!--
+                    Localisation en saisie libre et non en liste : le client
+                    la renseigne sur deux champs distincts, et le modèle
+                    cherche dans les deux. Une liste déroulante aurait dû
+                    choisir lequel des deux elle propose.
+                -->
+                <div class="col-md-3">
+                    <label class="form-label small text-muted" for="localisation">
+                        Localisation
+                    </label>
+                    <input type="text" class="form-control" name="localisation"
+                           id="localisation" placeholder="Alger, Oran…"
+                           t-att-value="filters['localisation']"
+                           t-att-list="'opex_localisations' if options['localisations'] else None"/>
+                    <datalist id="opex_localisations">
+                        <option t-foreach="options['localisations']" t-as="lieu"
+                                t-att-value="lieu"/>
+                    </datalist>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label small text-muted" for="date_min">
+                        Démarrage entre
+                    </label>
+                    <div class="d-flex gap-2">
+                        <input type="date" class="form-control" name="date_min"
+                               id="date_min" t-att-value="filters['date_min']"/>
+                        <input type="date" class="form-control" name="date_max"
+                               t-att-value="filters['date_max']"/>
+                    </div>
+                </div>
+
+                <div class="col-12 d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Filtrer</button>
+                    <a class="btn btn-link" href="/missions">Tout afficher</a>
+                </div>
+            </form>
+        </xpath>
+    </template>
+
+    <!--
+        L'ACCUEIL UNIQUE - §48
+
+        « Un espace unique permettant de gérer une mission depuis l'expression
+          du besoin jusqu'à l'évaluation de l'intervenant. »
+
+        La page ne reçoit que des dictionnaires à clés fermées : trois entrées
+        de domaine et des volumes. Aucun enregistrement des trois modules ne la
+        traverse, ce qui rend impossible la publication accidentelle d'un nom
+        de membre ou d'un intitulé de projet.
+    -->
+    <template id="portal_opex_home" name="Portail OPEX — accueil">
+        <t t-call="website.layout">
+            <div id="wrap" class="oe_structure">
+                <div class="container my-5">
+
+                    <div class="row mb-5">
+                        <div class="col-lg-9">
+                            <h1 class="mb-3">Le portail du GIC OPEX Group</h1>
+                            <p class="lead text-muted">
+                                Un espace unique pour rejoindre le cluster,
+                                porter un projet d'innovation et intervenir sur
+                                les missions de ses membres.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 mb-5">
+                        <div t-foreach="domaines" t-as="domaine" class="col-lg-4">
+                            <div class="card h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h4 class="card-title" t-out="domaine['titre']"/>
+                                    <p class="text-muted flex-grow-1"
+                                       t-out="domaine['texte']"/>
+                                    <div class="mb-3">
+                                        <span class="h4" t-out="domaine['compteur']"/>
+                                        <span class="text-muted ms-1"
+                                              t-out="domaine['compteur_libelle']"/>
+                                    </div>
+                                    <a class="btn btn-primary"
+                                       t-att-href="domaine['url']">
+                                        Ouvrir
+                                    </a>
+                                    <!--
+                                        Dit honnêtement ce qui demande un
+                                        compte. Le Module 2 ne publie pas de
+                                        catalogue : un visiteur y sera invité à
+                                        se connecter, et il vaut mieux le lui
+                                        annoncer que le laisser le découvrir.
+                                    -->
+                                    <div t-if="not domaine['public']"
+                                         class="small text-muted mt-2">
+                                        Accès après connexion.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h5 class="mb-3">Le cluster en chiffres</h5>
+                    <div class="row g-3">
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100">
+                                <div class="card-body">
+                                    <div class="h4 mb-0" t-out="indicateurs['membres']"/>
+                                    <div class="small text-muted">Membres</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100">
+                                <div class="card-body">
+                                    <div class="h4 mb-0"
+                                         t-out="indicateurs['projets_en_cours']"/>
+                                    <div class="small text-muted">Projets en cours</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100">
+                                <div class="card-body">
+                                    <div class="h4 mb-0"
+                                         t-out="indicateurs['missions_en_cours']"/>
+                                    <div class="small text-muted">Missions en cours</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100">
+                                <div class="card-body">
+                                    <div class="h4 mb-0">
+                                        <t t-out="indicateurs['taux_reussite']"/> %
+                                    </div>
+                                    <div class="small text-muted">Taux de réussite</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <record id="website_menu_opex_home" model="website.menu">
+        <field name="name">Le portail OPEX</field>
+        <field name="url">/opex</field>
+        <field name="parent_id" ref="website.main_menu"/>
+        <field name="sequence" type="int">48</field>
+    </record>
+
+    <!--
+        LE TABLEAU DE BORD KPI GLOBAL - US-20
+
+        La liste de contrôle du §21 y figure à côté des chiffres, et elle est
+        **calculée** : un critère qui cesserait d'être tenu le dirait à
+        l'écran, au lieu de rester vrai dans un document.
+    -->
+    <template id="staff_global_kpi" name="Staff : KPI global du portail">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h3 class="mb-0">Portail OPEX — indicateurs globaux</h3>
+                    <a class="btn btn-outline-secondary" href="/staff/queue">
+                        Smart Work Queue
+                    </a>
+                </div>
+
+                <div class="row g-3 mb-5">
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0" t-out="indicateurs['membres']"/>
+                                <div class="small text-muted">Membres publiés</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="indicateurs['projets_en_cours']"/>
+                                <div class="small text-muted">
+                                    Projets en cours
+                                    <t t-out="'sur %s' % indicateurs['projets_total']"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0"
+                                     t-out="indicateurs['missions_en_cours']"/>
+                                <div class="small text-muted">
+                                    Missions en cours
+                                    <t t-out="'sur %s' % indicateurs['missions_total']"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-lg-3">
+                        <div class="card text-center h-100">
+                            <div class="card-body">
+                                <div class="h4 mb-0">
+                                    <t t-out="indicateurs['taux_reussite']"/> %
+                                </div>
+                                <div class="small text-muted">Taux de réussite</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h5 class="mb-3">
+                    Critères d'acceptation du §21
+                </h5>
+                <p class="text-muted">
+                    Recalculés à l'affichage depuis la configuration et les
+                    données. Ce tableau n'est pas une déclaration : c'est une
+                    mesure.
+                </p>
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th style="width: 6rem;">État</th>
+                                <th>Critère</th>
+                                <th>Ce qui l'établit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="checklist" t-as="item">
+                                <td>
+                                    <span t-if="item['fait']"
+                                          class="badge text-bg-success">Tenu</span>
+                                    <span t-if="not item['fait']"
+                                          class="badge text-bg-danger">Non tenu</span>
+                                </td>
+                                <td t-out="item['critere']"/>
+                                <td class="small text-muted" t-out="item['preuve']"/>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        Le lien vers les indicateurs depuis la file de travail, et le retour.
+    -->
+    <template id="staff_queue_kpi_link"
+              inherit_id="opex_intervenants.staff_work_queue"
+              name="Staff : lien vers les indicateurs globaux">
+        <xpath expr="//a[@href='/staff/missions']" position="before">
+            <a class="btn btn-outline-secondary me-2" href="/staff/kpi">
+                Indicateurs globaux
+            </a>
+        </xpath>
+    </template>
+
+</odoo>

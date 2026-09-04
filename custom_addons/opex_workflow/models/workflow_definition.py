@@ -70,7 +70,7 @@ class WorkflowDefinition(models.Model):
     )
     active = fields.Boolean(string="Actif", default=True)
 
-    # ⚠ Le champ qui ferme un trou de sécurité par configuration.
+    # Le champ qui ferme un trou de sécurité par configuration.
     #
     # Un rôle sans `group_id` — Porteur en tête — n'est porté par personne en
     # permanence : il s'attribue dossier par dossier, par une ligne
@@ -86,7 +86,7 @@ class WorkflowDefinition(models.Model):
     # rôle que porte celui qui démarre l'instance, et `_start_for()` le pose.
     # Un module métier ne peut plus l'oublier — il n'a plus rien à écrire.
     #
-    # ⚠ Ce rôle va à l'**initiateur** (`instance.initiator_id`), c'est-à-dire à
+    # Ce rôle va à l'**initiateur** (`instance.initiator_id`), c'est-à-dire à
     # l'utilisateur qui exécute la création. C'est le bon titulaire quand le
     # déposant remplit son propre dossier — les demandes de profil, le dépôt
     # d'un projet au portail. Ce n'est **pas** le bon quand le dossier est

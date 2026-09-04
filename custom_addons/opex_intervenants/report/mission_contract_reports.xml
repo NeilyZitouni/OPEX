@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+        LES DEUX PIÈCES DU §18 ET DU §20 — CONTRAT ET ORDRE DE MISSION
+
+        **`wkhtmltopdf` n'est pas installé sur ce poste.**
+        `ir_actions_report.py:868` lève « Unable to find Wkhtmltopdf on this
+        system » dès qu'on demande le binaire. Les deux rapports sont
+        néanmoins déclarés en `qweb-pdf`, qui est leur forme juste : ils
+        produiront un PDF le jour où le paquet sera là, sans qu'une ligne
+        bouge.
+
+        En attendant, le bouton « Aperçu » de la fiche ouvre
+        `/report/html/<rapport>/<id>` — la route native du module `web`, qui
+        rend exactement le même gabarit sans binaire externe. C'est la même
+        catégorie de limite que le SMTP absent : un manque de poste, pas un
+        défaut du module, et il s'annonce plutôt qu'il ne se découvre.
+
+        Le contenu du contrat suit le §18 dans son ordre : client,
+        intervenant, mission, description, dates, durée, montant, conditions,
+        livrables, modalités de validation.
+    -->
+
+    <record id="action_report_mission_contract" model="ir.actions.report">
+        <field name="name">Contrat de mission</field>
+        <field name="model">opex.mission.contract</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">opex_intervenants.report_mission_contract_document</field>
+        <field name="report_file">opex_intervenants.report_mission_contract_document</field>
+        <field name="binding_model_id" ref="model_opex_mission_contract"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'%s - %s' % (object.name, object.partner_id.display_name)</field>
+    </record>
+
+    <record id="action_report_mission_order" model="ir.actions.report">
+        <field name="name">Ordre de mission</field>
+        <field name="model">opex.mission.contract</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">opex_intervenants.report_mission_order_document</field>
+        <field name="report_file">opex_intervenants.report_mission_order_document</field>
+        <field name="binding_model_id" ref="model_opex_mission_contract"/>
+        <field name="binding_type">report</field>
+        <field name="print_report_name">'Ordre de mission - %s' % (object.name)</field>
+    </record>
+
+    <!-- Le contrat — §18 -->
+
+    <template id="report_mission_contract_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <h2 class="text-center">Contrat de prestation de mission</h2>
+                        <p class="text-center">
+                            <strong t-out="doc.name"/>
+                            — version <span t-out="doc.version"/>
+                        </p>
+
+                        <h4 class="mt-4">Les parties</h4>
+                        <table class="table table-sm">
+                            <tr>
+                                <td style="width: 30%"><strong>Client</strong></td>
+                                <td t-out="doc.client_id.display_name or ''"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Intervenant</strong></td>
+                                <td t-out="doc.partner_id.display_name or ''"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Appel à mission</strong></td>
+                                <td t-out="doc.mission_id.display_name or ''"/>
+                            </tr>
+                        </table>
+
+                        <h4 class="mt-4">Objet de la mission</h4>
+                        <p t-out="doc.objet or doc.mission_id.description or ''"/>
+
+                        <h4 class="mt-4">Durée et calendrier</h4>
+                        <table class="table table-sm">
+                            <tr>
+                                <td style="width: 30%"><strong>Début</strong></td>
+                                <td t-out="doc.date_debut"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Fin</strong></td>
+                                <td t-out="doc.date_fin"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Durée estimée</strong></td>
+                                <td><span t-out="doc.duree_jours"/> jours</td>
+                            </tr>
+                        </table>
+
+                        <h4 class="mt-4">Conditions financières</h4>
+                        <table class="table table-sm">
+                            <tr>
+                                <td style="width: 30%"><strong>Montant</strong></td>
+                                <td>
+                                    <span t-out="doc.montant"
+                                          t-options='{"widget": "monetary", "display_currency": doc.currency_id}'/>
+                                </td>
+                            </tr>
+                        </table>
+                        <p t-if="doc.conditions" t-out="doc.conditions"/>
+
+                        <h4 class="mt-4">Livrables attendus</h4>
+                        <p t-out="doc.livrables or ''"/>
+
+                        <h4 class="mt-4">Modalités de validation</h4>
+                        <p t-out="doc.modalites_validation or ''"/>
+
+                        <!--
+                            Le bloc de signature reflète l'état **de la
+                            pièce**, jamais l'étape du processus. Un contrat
+                            imprimé alors qu'il n'est pas encore signé doit le
+                            dire : une case cochée d'avance sur un document
+                            qu'on fait signer est un faux.
+                        -->
+                        <h4 class="mt-5">Signatures</h4>
+                        <table class="table table-sm">
+                            <tr>
+                                <td style="width: 50%">
+                                    <strong>Pour le client</strong><br/>
+                                    <t t-if="doc.signature_client">
+                                        <span t-out="doc.signature_client_nom or ''"/><br/>
+                                        <small>Confirmé le <span t-out="doc.signature_client_date"/></small>
+                                    </t>
+                                    <t t-else="">
+                                        <small class="text-muted">En attente de signature</small>
+                                    </t>
+                                </td>
+                                <td>
+                                    <strong>Pour l'intervenant</strong><br/>
+                                    <t t-if="doc.signature_intervenant">
+                                        <span t-out="doc.signature_intervenant_nom or ''"/><br/>
+                                        <small>Confirmé le <span t-out="doc.signature_intervenant_date"/></small>
+                                    </t>
+                                    <t t-else="">
+                                        <small class="text-muted">En attente de signature</small>
+                                    </t>
+                                </td>
+                            </tr>
+                        </table>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <!-- L'ordre de mission — §20 -->
+
+    <template id="report_mission_order_document">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+
+                        <h2 class="text-center">Ordre de mission</h2>
+                        <p class="text-center"><strong t-out="doc.name"/></p>
+
+                        <p class="mt-4">
+                            Il est donné ordre de mission à
+                            <strong t-out="doc.partner_id.display_name or ''"/>
+                            d'intervenir pour le compte de
+                            <strong t-out="doc.client_id.display_name or ''"/>
+                            dans le cadre de l'appel
+                            <strong t-out="doc.mission_id.name or ''"/>.
+                        </p>
+
+                        <table class="table table-sm mt-4">
+                            <tr>
+                                <td style="width: 30%"><strong>Intitulé</strong></td>
+                                <td t-out="doc.mission_id.title or ''"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Mode d'intervention</strong></td>
+                                <td t-out="doc.mission_id.mode_intervention or ''"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Lieu</strong></td>
+                                <td t-out="doc.mission_id.localisation or ''"/>
+                            </tr>
+                            <tr>
+                                <td><strong>Période</strong></td>
+                                <td>
+                                    du <span t-out="doc.date_debut"/>
+                                    au <span t-out="doc.date_fin"/>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Durée</strong></td>
+                                <td><span t-out="doc.duree_jours"/> jours</td>
+                            </tr>
+                        </table>
+
+                        <h4 class="mt-4">Objet</h4>
+                        <p t-out="doc.objet or doc.mission_id.description or ''"/>
+
+                        <h4 class="mt-4">Livrables attendus</h4>
+                        <p t-out="doc.livrables or ''"/>
+
+                        <p class="mt-5">
+                            <small class="text-muted">
+                                Cet ordre de mission accompagne le contrat de
+                                prestation et n'est valable qu'une fois
+                                celui-ci validé.
+                            </small>
+                        </p>
+
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+</odoo>

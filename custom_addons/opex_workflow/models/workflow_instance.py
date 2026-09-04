@@ -123,7 +123,7 @@ class WorkflowInstance(models.Model):
 
     actor_ids = fields.One2many(
         'opex.workflow.instance.actor', 'instance_id', string="Acteurs")
-    # ⚠ One2many **filtré**, et c'est indispensable, pas cosmétique.
+    # One2many **filtré**, et c'est indispensable, pas cosmétique.
     #
     # Une `ir.rule` écrite `['&', ('actor_ids.user_id','=',user.id),
     # ('actor_ids.access_level','!=','none')]` serait fausse : Odoo produit
@@ -394,12 +394,12 @@ class WorkflowInstance(models.Model):
         for rule in transition.sudo().condition_ids:
             passed, error = self._evaluate_rule(rule)
             if error:
-                notes.append("⚠ %s — erreur d'évaluation : %s" % (rule.name, error))
+                notes.append("%s — erreur d'évaluation : %s" % (rule.name, error))
                 blocking.append(rule.message)
             elif passed:
-                notes.append("✓ %s" % rule.name)
+                notes.append("%s" % rule.name)
             else:
-                notes.append("✗ %s" % rule.name)
+                notes.append("%s" % rule.name)
                 blocking.append(rule.message)
         return (not blocking), blocking, "\n".join(notes)
 
@@ -648,7 +648,7 @@ class WorkflowInstance(models.Model):
     def available_transitions(self, user=None):
         """Transitions partant de l'étape courante que les rôles autorisent.
 
-        ⚠ **Elle ne filtre pas sur les conditions.** Une transition dont une
+        **Elle ne filtre pas sur les conditions.** Une transition dont une
         condition échoue reste dans la liste : elle sera présentée désactivée,
         accompagnée du message de la règle qui bloque. Une transition qui
         disparaît sans explication laisse l'utilisateur bloqué sans savoir
@@ -776,7 +776,7 @@ class WorkflowInstance(models.Model):
     def _execute_actions(self, transition):
         """Exécute les actions d'une transition, chacune isolée des autres.
 
-        ⚠ **Une action qui échoue ne rollback pas la transition.** Un serveur
+        **Une action qui échoue ne rollback pas la transition.** Un serveur
         mail en panne ne doit pas bloquer un processus métier : le dossier a
         avancé, c'est un fait métier acquis, et l'échec de la notification est
         un incident technique séparé.
@@ -804,7 +804,7 @@ class WorkflowInstance(models.Model):
             try:
                 with self.env.cr.savepoint():
                     detail = action.execute(self, transition)
-                notes.append("✓ %s%s" % (
+                notes.append("%s%s" % (
                     action.name, " — %s" % detail if detail else ''))
             except Exception as error:  # noqa: BLE001 — isolation volontaire
                 failures += 1
@@ -814,7 +814,7 @@ class WorkflowInstance(models.Model):
                     "l'instance %s ; la transition est conservée.",
                     action.name, action.code, self.id,
                 )
-                notes.append("✗ %s — %s" % (action.name, error))
+                notes.append("%s — %s" % (action.name, error))
 
         if failures:
             # `sudo()` sur la **lecture** aussi, pas seulement sur l'écriture.
@@ -1013,7 +1013,7 @@ class WorkflowInstance(models.Model):
         dit donc ce qu'on attend de lui, pas dans quel état est la machine.
         """
         self.ensure_one()
-        # ⚠ Résolu immédiatement, et ce n'est pas de la coquetterie.
+        # Résolu immédiatement, et ce n'est pas de la coquetterie.
         #
         # `_()` devine la langue en inspectant les **variables locales de
         # l'appelant** : `odoo/tools/translate.py` y cherche un nom `user` et
@@ -1085,10 +1085,10 @@ class WorkflowInstance(models.Model):
             applicable += criterion.weight
             if ok:
                 earned += criterion.weight
-                lines.append("✓ %s (poids %g) — %s" % (
+                lines.append("%s (poids %g) — %s" % (
                     criterion.name, criterion.weight, detail))
             else:
-                lines.append("✗ %s (poids %g) — %s" % (
+                lines.append("%s (poids %g) — %s" % (
                     criterion.name, criterion.weight, detail))
 
         score = (earned / applicable * 100.0) if applicable else 0.0
@@ -1101,7 +1101,7 @@ class WorkflowInstance(models.Model):
                      min_score=0.0):
         """Propose des candidats scorés sur ce dossier.
 
-        ⚠ **Ne déclenche aucune transition et n'écrit rien sur l'objet
+        **Ne déclenche aucune transition et n'écrit rien sur l'objet
         métier.** Elle produit une liste de propositions, rien de plus. C'est
         écrit dans les deux documents sources : l'IA recommande, elle ne décide
         pas. Le responsable Valide / Modifie / Exclut / Ajoute ensuite, et

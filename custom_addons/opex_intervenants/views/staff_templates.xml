@@ -1,0 +1,621 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- La file de travail du responsable -->
+
+    <template id="staff_missions" name="Staff : appels à mission">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h3 class="mb-3">Appels à mission — espace responsable</h3>
+
+                <div t-if="not missions" class="alert alert-light border">
+                    Aucun appel en cours.
+                </div>
+
+                <div t-if="missions" class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Référence</th><th>Mission</th><th>Client</th>
+                                <th>Type</th><th>État</th>
+                                <th class="text-end">Proposés</th>
+                                <th class="text-end">Candidatures</th><th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="missions" t-as="m">
+                                <td class="text-nowrap text-muted" t-out="m.name"/>
+                                <td t-out="m.title"/>
+                                <td t-out="m.client_id.display_name"/>
+                                <td t-out="m.mission_type_id.name"/>
+                                <td>
+                                    <span class="badge text-bg-light"
+                                          t-out="m.workflow_stage_label"/>
+                                </td>
+                                <td class="text-end" t-out="m.matching_candidate_count"/>
+                                <td class="text-end" t-out="m.received_application_count"/>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-outline-secondary"
+                                       t-attf-href="/staff/missions/#{m.id}/pool">
+                                        Pool
+                                    </a>
+                                    <a class="btn btn-sm btn-outline-primary ms-1"
+                                       t-attf-href="/staff/missions/#{m.id}/matching">
+                                        Smart Matching
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §6 — L'ÉCRAN DE MATCHING
+
+        Cinq actions, celles du §6 : Inviter · Écarter · Mettre en short-list ·
+        Consulter le profil · Voir l'explication du score.
+
+        Rien sur cet écran ne décide à la place du responsable. Aucun bouton
+        ne fait avancer l'appel, aucun score ne déclenche de transition.
+    -->
+    <template id="staff_matching" name="Staff : Smart Matching">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small" t-out="mission.name"/>
+                        <h3 class="mb-0" t-out="mission.title"/>
+                        <div class="text-muted">
+                            <t t-out="mission.mission_type_id.name"/> —
+                            <t t-out="mission.workflow_stage_label"/>
+                        </div>
+                    </div>
+                    <a class="btn btn-light" href="/staff/missions">Retour</a>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                <!--
+                     Les critères appliqués
+
+                    Affichés **avant** la liste : un score ne se lit pas sans
+                    savoir sur quoi il porte. C'est la première moitié de
+                    l'explicabilité — la seconde est le détail par candidat.
+                -->
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>
+                            <strong>Critères appliqués</strong>
+                            <span t-if="mission.matching_is_customised"
+                                  class="badge text-bg-info ms-2">Pondérations propres à cet appel</span>
+                            <span t-elif="mission.mission_type_id"
+                                  class="badge text-bg-light ms-2">
+                                Profil « <t t-out="mission.mission_type_id.name"/> »
+                            </span>
+                        </span>
+                        <form method="post"
+                              t-attf-action="/staff/missions/#{mission.id}/matching/run">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                Lancer le Smart Matching
+                            </button>
+                        </form>
+                    </div>
+                    <div class="card-body">
+                        <t t-set="total"
+                           t-value="sum(c.weight for c in criteres if not c.is_eliminatoire) or 1"/>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr><th>Critère</th><th>Compare</th>
+                                        <th class="text-end">Poids</th><th>Nature</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr t-foreach="criteres" t-as="c">
+                                        <td t-out="c.name"/>
+                                        <td class="small text-muted">
+                                            <code t-out="c.source_expression"/>
+                                            <t t-out="dict(c._fields['match_mode'].selection).get(c.match_mode, '')"/>
+                                            <code t-out="c.target_field"/>
+                                        </td>
+                                        <td class="text-end">
+                                            <t t-if="c.is_eliminatoire">—</t>
+                                            <t t-else="">
+                                                <t t-out="round(c.weight / total * 100)"/> %
+                                            </t>
+                                        </td>
+                                        <td>
+                                            <!-- Le critère d'acceptation du §21,
+                                                 rendu visible : éliminatoire et
+                                                 pondéré ne se confondent pas. -->
+                                            <span t-if="c.is_eliminatoire"
+                                                  class="badge text-bg-danger">Éliminatoire</span>
+                                            <span t-else=""
+                                                  class="badge text-bg-secondary">Pondéré</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!--
+                     Les écartés
+
+                    « Écarté, pas mal noté » : ils ne sont pas dans la liste des
+                    propositions. Mais un responsable qui ne voit pas un expert
+                    qu'il attendait doit pouvoir savoir **pourquoi** — sans
+                    cela, un critère éliminatoire mal réglé est indétectable.
+                -->
+                <div t-if="mission.matching_excluded_count" class="alert alert-secondary">
+                    <strong>
+                        <t t-out="mission.matching_excluded_count"/>
+                        intervenant(s) écarté(s) par un critère éliminatoire
+                    </strong>
+                    <div class="small mt-2" style="white-space: pre-line;"
+                         t-out="mission.matching_excluded_note"/>
+                    <div class="small text-muted mt-2">
+                        Ils ne sont pas mal notés : ils ne sont pas notés du
+                        tout. Le critère obligatoire est évalué avant le score.
+                    </div>
+                </div>
+
+                <!-- Les propositions -->
+
+                <div t-if="not candidats" class="alert alert-light border">
+                    <t t-if="mission.matching_date">
+                        Aucun intervenant proposé au dernier passage
+                        (<t t-out="mission.matching_date" t-options="{'widget': 'datetime'}"/>).
+                    </t>
+                    <t t-else="">
+                        Le matching n'a pas encore été lancé sur cet appel.
+                    </t>
+                </div>
+
+                <div t-foreach="candidats" t-as="c" class="card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="mb-1" t-out="c.partner_id.display_name"/>
+                                <div class="text-muted small">
+                                    <t t-if="c.partner_id.expert_seniorite">
+                                        <t t-out="dict(c.partner_id._fields['expert_seniorite'].selection).get(c.partner_id.expert_seniorite, '')"/> ·
+                                    </t>
+                                    <t t-if="c.partner_id.expert_disponible">
+                                        Disponible <t t-out="c.partner_id.expert_taux_disponibilite"/> %
+                                    </t>
+                                    <t t-else="">Indisponible</t>
+                                    <t t-if="c.partner_id.expert_tjm">
+                                        · TJM indicatif <t t-out="c.partner_id.expert_tjm"/>
+                                    </t>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <div class="display-6" t-out="'%.0f %%' % c.score"/>
+                                <span t-if="c.state == 'accepted'"
+                                      class="badge text-bg-success">Retenu</span>
+                                <span t-elif="c.state == 'rejected'"
+                                      class="badge text-bg-danger">Écarté</span>
+                                <span t-elif="c.state == 'excluded'"
+                                      class="badge text-bg-secondary">Exclu</span>
+                                <span t-else="" class="badge text-bg-light">Proposé</span>
+                            </div>
+                        </div>
+
+                        <!--
+                             L'explication du score
+
+                            Le quatrième critère d'acceptation du §21 :
+                            « le responsable peut comprendre les raisons d'un
+                            score ». Un score de 87 % sans explication n'est pas
+                            défendable devant un jury.
+
+                            Le texte vient du moteur — `_score_candidate()` le
+                            rédige ligne par ligne pendant le calcul. Ce n'est
+                            pas un commentaire ajouté après coup : c'est la
+                            trace de ce qui a effectivement été comparé.
+                        -->
+                        <details class="mt-3">
+                            <summary class="text-primary" style="cursor: pointer;">
+                                Voir l'explication du score
+                            </summary>
+                            <pre class="small bg-light p-3 mt-2 mb-0"
+                                 style="white-space: pre-wrap;" t-out="c.detail"/>
+                        </details>
+
+                        <div class="mt-3 d-flex gap-2 flex-wrap">
+                            <a class="btn btn-sm btn-outline-secondary"
+                               t-attf-href="/staff/missions/#{mission.id}/matching/#{c.id}/profil">
+                                Consulter le profil
+                            </a>
+
+                            <form method="post" t-if="c.state != 'accepted'"
+                                  t-attf-action="/staff/missions/#{mission.id}/matching/#{c.id}/invite">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-sm btn-primary">
+                                    Inviter
+                                </button>
+                            </form>
+
+                            <form method="post" t-if="c.state == 'proposed'"
+                                  t-attf-action="/staff/missions/#{mission.id}/matching/#{c.id}/shortlist">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-sm btn-outline-success">
+                                    Mettre en short-list
+                                </button>
+                            </form>
+
+                            <form method="post" t-if="c.state != 'rejected'"
+                                  t-attf-action="/staff/missions/#{mission.id}/matching/#{c.id}/reject">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                    Écarter
+                                </button>
+                            </form>
+
+                            <form method="post" t-if="c.state != 'proposed'"
+                                  t-attf-action="/staff/missions/#{mission.id}/matching/#{c.id}/reset">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <button type="submit" class="btn btn-sm btn-light">
+                                    Revenir sur ma décision
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info small">
+                    <strong>Le score est une aide à la décision.</strong>
+                    La sélection finale reste réalisée par les responsables
+                    habilités du cluster (§16). Aucune de ces actions ne fait
+                    avancer l'appel : inviter crée une candidature, qui suit sa
+                    propre machine à états.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §10 — LE POOL UNIQUE ET LA COMPARAISON
+
+        Le deuxième critère d'acceptation du §21 se lit dans **une seule
+        ligne de ce gabarit** : le tableau de comparaison n'a pas de branche
+        par origine. Matching et portail y arrivent avec les mêmes colonnes,
+        parce qu'ils sortent du même modèle. « Origine » est une colonne comme
+        une autre.
+    -->
+    <template id="staff_pool" name="Staff : pool de candidatures">
+        <t t-call="portal.portal_layout">
+            <div class="container-fluid my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small" t-out="mission.name"/>
+                        <h3 class="mb-0" t-out="mission.title"/>
+                        <div class="text-muted">
+                            <!-- L'étape de **l'appel**, affichée à côté de
+                                 celles des candidatures : c'est la séparation
+                                 des deux machines, rendue visible. -->
+                            Appel : <t t-out="mission.workflow_stage_label"/>
+                            — <t t-out="len(lignes)"/> candidature(s)
+                        </div>
+                    </div>
+                    <div>
+                        <a class="btn btn-outline-primary"
+                           t-attf-href="/staff/missions/#{mission.id}/matching">
+                            Smart Matching
+                        </a>
+                        <a class="btn btn-light ms-1" href="/staff/missions">
+                            Retour
+                        </a>
+                    </div>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                <!-- Les colonnes du §10 -->
+
+                <div class="row g-3 mb-4">
+                    <div t-foreach="colonnes" t-as="col" class="col">
+                        <div class="card h-100">
+                            <div class="card-header py-2">
+                                <strong class="small" t-out="col[1]"/>
+                                <span class="badge text-bg-light float-end"
+                                      t-out="len(par_colonne.get(col[0], []))"/>
+                            </div>
+                            <div class="card-body p-2">
+                                <div t-foreach="par_colonne.get(col[0], [])"
+                                     t-as="c" class="border rounded p-2 mb-2">
+                                    <div class="d-flex justify-content-between">
+                                        <strong class="small" t-out="c['candidat']"/>
+                                        <span t-if="c['score']"
+                                              class="badge text-bg-primary"
+                                              t-out="'%.0f %%' % c['score']"/>
+                                    </div>
+                                    <div class="small text-muted"
+                                         t-out="c['source']"/>
+                                    <div t-if="c['alertes']" class="mt-1">
+                                        <span t-if="any(a['niveau'] == 'danger' for a in c['alertes'])"
+                                              class="badge text-bg-danger">
+                                            <t t-out="len(c['alertes'])"/> alerte(s)
+                                        </span>
+                                        <span t-else="" class="badge text-bg-warning">
+                                            <t t-out="len(c['alertes'])"/> vigilance
+                                        </span>
+                                    </div>
+                                </div>
+                                <p t-if="not par_colonne.get(col[0])"
+                                   class="text-muted small mb-0">—</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- La comparaison -->
+
+                <div t-if="not lignes" class="alert alert-light border">
+                    Aucune candidature sur cet appel.
+                </div>
+
+                <div t-if="lignes" class="table-responsive">
+                    <table class="table align-middle">
+                        <thead>
+                            <tr>
+                                <th>Candidat</th><th>Origine</th><th>Étape</th>
+                                <th class="text-end">Score</th>
+                                <th>Disponibilité</th>
+                                <th class="text-end">Délai</th>
+                                <th class="text-end">Tarif</th>
+                                <th>Séniorité</th>
+                                <th class="text-end">Réputation</th>
+                                <th>Alertes</th><th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <t t-foreach="lignes" t-as="c">
+                                <tr t-att-class="'table-danger' if any(a['niveau'] == 'danger' for a in c['alertes']) else ''">
+                                    <td>
+                                        <strong t-out="c['candidat']"/>
+                                        <div class="small text-muted">
+                                            <span t-foreach="c['competences']" t-as="k"
+                                                  class="badge text-bg-light me-1"
+                                                  t-out="k"/>
+                                        </div>
+                                    </td>
+                                    <td><span class="badge text-bg-light"
+                                              t-out="c['source']"/></td>
+                                    <td class="small" t-out="c['etape']"/>
+                                    <td class="text-end">
+                                        <t t-if="c['score']"
+                                           t-out="'%.0f %%' % c['score']"/>
+                                        <span t-else="" class="text-muted">—</span>
+                                    </td>
+                                    <td class="small" t-out="c['disponibilite']"/>
+                                    <td class="text-end">
+                                        <t t-if="c['delai']">
+                                            <t t-out="c['delai']"/> j
+                                        </t>
+                                        <span t-else="" class="text-muted">—</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <t t-if="c['tarif']" t-out="c['tarif']"/>
+                                        <span t-else="" class="text-muted">—</span>
+                                    </td>
+                                    <td class="small" t-out="c['seniorite'] or '—'"/>
+                                    <td class="text-end">
+                                        <t t-if="c['reputation']"
+                                           t-out="c['reputation']"/>
+                                        <span t-else="" class="text-muted">—</span>
+                                    </td>
+                                    <td>
+                                        <span t-if="not c['alertes']"
+                                              class="badge text-bg-success">OK</span>
+                                        <span t-else="" class="badge text-bg-warning"
+                                              t-out="len(c['alertes'])"/>
+                                    </td>
+                                    <td class="text-end">
+                                        <!--
+                                            Les actions viennent du **moteur** :
+                                            `transition_options()` dit ce qui
+                                            est ouvert à cet utilisateur, et
+                                            pourquoi une action est bloquée.
+                                        -->
+                                        <t t-foreach="actions.get(c['id'], [])"
+                                           t-as="opt">
+                                            <form method="post" class="d-inline"
+                                                  t-if="opt['available']"
+                                                  t-attf-action="/staff/missions/#{mission.id}/pool/#{c['id']}/#{opt['transition'].code}">
+                                                <input type="hidden" name="csrf_token"
+                                                       t-att-value="request.csrf_token()"/>
+                                                <input type="hidden" name="comment"
+                                                       t-attf-value="Décision prise depuis l'écran de comparaison."/>
+                                                <button type="submit"
+                                                        class="btn btn-sm btn-outline-secondary mb-1"
+                                                        t-out="opt['transition'].name"/>
+                                            </form>
+                                        </t>
+                                    </td>
+                                </tr>
+
+                                <!--
+                                     Alertes et explication
+
+                                    Sur une ligne dépliable sous chaque candidat :
+                                    le §10 demande « accès au score, aux alertes
+                                    d'éligibilité et à la comparaison ». Les
+                                    trois au même endroit, sans changer d'écran.
+                                -->
+                                <tr t-if="c['alertes'] or c['explication']">
+                                    <td colspan="11" class="bg-light">
+                                        <div t-foreach="c['alertes']" t-as="a"
+                                             t-att-class="'alert alert-%s py-2 px-3 mb-2 small' % a['niveau']">
+                                            <strong t-out="a['titre']"/>
+                                            <span t-if="a['detail']">
+                                                — <t t-out="a['detail']"/>
+                                            </span>
+                                        </div>
+                                        <details t-if="c['explication']">
+                                            <summary class="small text-primary"
+                                                     style="cursor: pointer;">
+                                                Explication du score de
+                                                <t t-out="c['candidat']"/>
+                                            </summary>
+                                            <pre class="small mb-0 mt-2"
+                                                 style="white-space: pre-wrap;"
+                                                 t-out="c['explication']"/>
+                                        </details>
+                                    </td>
+                                </tr>
+                            </t>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-info small">
+                    <strong>Les deux machines à états sont indépendantes.</strong>
+                    Qualifier, short-lister ou écarter un candidat ne déplace pas
+                    l'appel : il reste à l'étape
+                    « <t t-out="mission.workflow_stage_label"/> ». L'appel
+                    n'avance que par ses propres transitions, quand le décideur
+                    attribue la mission.
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!-- « Consulter le profil » -->
+
+    <template id="staff_candidate_profile" name="Staff : profil du candidat">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <h3 class="mb-0" t-out="candidat.partner_id.display_name"/>
+                        <div class="text-muted">
+                            Proposé sur <t t-out="mission.name"/> —
+                            score <t t-out="'%.0f %%' % candidat.score"/>
+                        </div>
+                    </div>
+                    <a class="btn btn-light"
+                       t-attf-href="/staff/missions/#{mission.id}/matching">Retour</a>
+                </div>
+
+                <!--
+                    On sert **ce que le matching a comparé**, pas la fiche
+                    complète du contact. Le responsable doit pouvoir vérifier un
+                    score, pas parcourir les données personnelles d'un expert
+                    qu'il n'a pas encore rencontré. « Le candidat n'accède qu'aux
+                    données nécessaires » du §14 vaut dans les deux sens.
+                -->
+                <div t-if="not profile" class="alert alert-warning">
+                    Ce contact n'a pas de profil expert activé.
+                </div>
+
+                <div t-if="profile">
+                    <div class="row g-3 mb-4">
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100"><div class="card-body">
+                                <div class="display-6" t-out="summary['competences']"/>
+                                <div class="text-muted">Compétences</div>
+                            </div></div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100"><div class="card-body">
+                                <div class="display-6" t-out="summary['experiences']"/>
+                                <div class="text-muted">Expériences</div>
+                            </div></div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100"><div class="card-body">
+                                <div class="display-6" t-out="summary['certifications_valides']"/>
+                                <div class="text-muted">Certifications valides</div>
+                            </div></div>
+                        </div>
+                        <div class="col-6 col-lg-3">
+                            <div class="card text-center h-100"><div class="card-body">
+                                <div class="display-6">
+                                    <t t-if="summary['evaluations']">
+                                        <t t-out="summary['reputation']"/>
+                                    </t>
+                                    <span t-else="" class="text-muted">—</span>
+                                </div>
+                                <div class="text-muted">Réputation</div>
+                            </div></div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>Compétences</strong></div>
+                        <div class="card-body">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <tr t-foreach="profile.expert_skill_ids" t-as="s">
+                                        <td t-out="s.competence_id.name"/>
+                                        <td t-out="dict(s._fields['niveau'].selection).get(s.niveau, '')"/>
+                                        <td class="text-end"><t t-out="s.annees"/> ans</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p t-if="not profile.expert_skill_ids" class="text-muted mb-0">
+                                Aucune compétence déclarée.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header"><strong>Expériences</strong></div>
+                        <div class="card-body">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <tr t-foreach="profile.expert_experience_ids" t-as="e">
+                                        <td>
+                                            <div t-out="e.name"/>
+                                            <div class="small text-muted" t-out="e.organisation or ''"/>
+                                        </td>
+                                        <td t-out="e.mission_type_id.name or '—'"/>
+                                        <td t-out="e.domaine_id.name or '—'"/>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p t-if="not profile.expert_experience_ids" class="text-muted mb-0">
+                                Aucune expérience déclarée.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header"><strong>Certifications</strong></div>
+                        <div class="card-body">
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    <tr t-foreach="profile.expert_certification_ids" t-as="c">
+                                        <td t-out="c.name"/>
+                                        <td t-out="c.organisme or '—'"/>
+                                        <td>
+                                            <span t-if="c.is_valid" class="badge text-bg-success">Valide</span>
+                                            <span t-else="" class="badge text-bg-secondary">Expirée</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <p t-if="not profile.expert_certification_ids" class="text-muted mb-0">
+                                Aucune certification déclarée.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </t>
+    </template>
+
+</odoo>

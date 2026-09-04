@@ -1,6 +1,6 @@
 # CLAUDE.md — `opex_membership`
 
-⚠ **Ce fichier ne contient plus aucune spécification.** Il en contenait deux, qui
+**Ce fichier ne contient plus aucune spécification.** Il en contenait deux, qui
 ne concernaient ni l'une ni l'autre ce module, concaténées bout à bout :
 
 | Ancien contenu | Où il vit maintenant |
@@ -14,7 +14,7 @@ jamais été dans ce fichier-ci.
 
 ---
 
-⛔ **`opex_membership` est gelé avant sa présentation à l'encadrant.** Ne rien y
+**`opex_membership` est gelé avant sa présentation à l'encadrant.** Ne rien y
 modifier. Les modules qui ont besoin d'étendre `res.partner` ou de lire les
 catégories d'adhésion le font depuis chez eux — voir
 `opex_innovation/models/res_partner.py`, qui déclare les profils Expert et

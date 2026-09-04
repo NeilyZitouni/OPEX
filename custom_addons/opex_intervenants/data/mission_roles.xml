@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+
+        <!--
+            LES RÔLES — on enrichit le référentiel du moteur, on n'en fait
+            pas un second
+
+            `opex.workflow.role` est **global** par construction : Porteur,
+            Secrétariat, Comité, Expert, Investisseur et CEO se réutilisent
+            d'un workflow à l'autre, et c'est ce partage qui permet à une
+            nouvelle définition de s'appuyer sur les rôles des précédentes.
+
+            Le Module 3 y ajoute quatre rôles et en réutilise un.
+
+            Ce bloc n'est **pas** en `noupdate` : il crée des rôles, et le
+            `<function>` plus bas modifie un rôle semé ailleurs.
+        -->
+
+        <!--
+            Sans `group_id` : personne ne porte ce rôle en permanence. Il est
+            attribué appel par appel, par la ligne d'acteur que
+            `MissionRequest._grant_client_actor()` pose depuis `client_id`.
+
+            C'est le principe même des droits dynamiques du moteur : être client
+            du cluster n'ouvre aucun appel, c'est le dépôt qui ouvre celui-là.
+        -->
+        <record id="role_client" model="opex.workflow.role">
+            <field name="name">Client</field>
+            <field name="code">client</field>
+            <field name="description">L'organisation qui exprime le besoin. Dépose la demande, la complète quand un complément lui est demandé, valide la réalisation et évalue l'intervenant. §2.1 du Module 3.</field>
+        </record>
+
+        <!--
+            Sans `group_id` non plus, et pour la même raison — mais celle-ci
+            mérite d'être dite en toutes lettres : être expert du vivier
+            n'ouvre **aucune** candidature. C'est la ligne d'acteur posée par
+            `MissionApplication._grant_intervenant_actor()`, depuis
+            `partner_id`, qui ouvre celle-ci.
+
+            Rôle distinct d'`opex_workflow.role_expert`, qui désigne dans le
+            Module 2 l'expert affecté à un projet d'innovation. Même personne
+            parfois, deux fonctions différentes : un rôle partagé aurait donné
+            à l'expert d'un projet d'innovation des droits sur les candidatures
+            aux missions.
+        -->
+        <record id="role_intervenant" model="opex.workflow.role">
+            <field name="name">Intervenant</field>
+            <field name="code">intervenant</field>
+            <field name="description">L'expert, le consultant ou le cabinet qui réalise la mission. Consulte les appels, candidate, dépose ses livrables. §3.4 du Module 3.</field>
+        </record>
+
+        <record id="role_mission_manager" model="opex.workflow.role">
+            <field name="name">Responsable de mission</field>
+            <field name="code">mission_manager</field>
+            <field name="description">Analyse le besoin, publie l'appel, pilote le sourcing, la sélection et l'exécution. §2.3 du Module 3.</field>
+        </record>
+
+        <record id="role_decideur" model="opex.workflow.role">
+            <field name="name">Décideur</field>
+            <field name="code">decideur</field>
+            <field name="description">Compare les candidats et rend la décision d'attribution. « L'IA recommande. Elle ne doit pas automatiquement décider seule. »</field>
+        </record>
+
+    </data>
+
+    <!--
+        LES RATTACHEMENTS SE FONT PAR `<function>`, HORS BLOC `noupdate`
+
+        Trois fois le même piège, payé sur `opex_innovation` aux Extensions 10,
+        12, 15, 17 et 20.
+
+        `noupdate` n'est pas une propriété du bloc XML : c'est une colonne de
+        `ir_model_data`, écrite à la **création** de l'enregistrement et héritée
+        du module qui l'a créé. `opex_workflow.role_secretariat` est semé par le
+        moteur dans un bloc `noupdate="1"` ; sa ligne porte donc le drapeau
+        définitivement, et un `<record id="opex_workflow.role_secretariat">`
+        d'ici — même hors bloc `noupdate` — serait **ignoré** à toute mise à
+        jour. Aucune restructuration du XML n'y change rien.
+
+        Un `<function>` hors bloc, lui, s'exécute à chaque `-u`.
+
+        Symptôme si on l'oublie : le rôle reste sans groupe, plus personne ne le
+        porte, et toutes les transitions qu'il garde deviennent infranchissables
+        — sans qu'aucune erreur ne le signale au chargement.
+
+        **Le Secrétariat est réutilisé, pas recréé.** C'est le même
+        secrétariat que celui des adhésions et des projets d'innovation, et
+        `opex_innovation` l'a déjà rattaché à `opex_membership.group_secretariat`.
+        On ne réécrit donc pas ce rattachement : on s'appuie dessus. Le
+        `role_secretariat` du moteur porte les mêmes personnes dans les trois
+        modules, et c'est exactement ce qu'on veut.
+    -->
+
+    <function model="opex.workflow.role" name="write"
+              eval="[[ref('role_mission_manager')],
+                     {'group_id': ref('group_mission_manager')}]"/>
+
+    <function model="opex.workflow.role" name="write"
+              eval="[[ref('role_decideur')],
+                     {'group_id': ref('group_mission_committee')}]"/>
+
+</odoo>

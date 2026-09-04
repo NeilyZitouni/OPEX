@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data noupdate="1">
+
+        <!--
+            LE CYCLE DE VIE D'UN LIVRABLE — §23, §24, §25
+
+            Troisième définition du module, neuvième du projet. Elle vaut
+            démonstration autant que fonction : le moteur porte aussi les
+            **petits** processus, et il n'y a pas de seuil en dessous duquel
+            on se remettrait à écrire des `if` sur un champ d'état.
+
+            **Cinq étapes, et non les quatre du livrable d'`opex_innovation`.**
+
+            Le Schéma 9 du §23 intercale « En cours » entre « À faire » et
+            « Soumise », et c'est le `Module3_OPEX_Intervenants.md` qui fait
+            foi sur l'UX. La distinction porte : sans elle, « pas commencé » et
+            « commencé, pas rendu » se confondent, et le §43 ne peut plus
+            signaler un livrable en retard sur ce qui a réellement démarré.
+
+            **Cinq transitions**, dont deux pour la seule boucle de
+            correction. C'est elle qui fait de ce cycle un graphe plutôt
+            qu'une séquence — le §25 l'exige explicitement :
+
+                « Correction : Livrable soumis → Corrections demandées →
+                  Intervenant → Nouvelle version.
+                  L'historique des versions doit être conservé. »
+
+            Le gain à montrer en soutenance : « faire relire par le client
+            avant le responsable » s'obtient en insérant une étape au
+            configurateur, sans une ligne de Python. C'est l'exercice du Demo
+            Day, sur un troisième processus.
+        -->
+
+        <record id="rule_deliverable_has_file" model="opex.workflow.rule">
+            <field name="name">Fichier joint</field>
+            <field name="code">mission_deliverable_has_file</field>
+            <field name="expression">bool(field('file'))</field>
+            <field name="message">Joignez le fichier du livrable avant de le soumettre à validation.</field>
+        </record>
+
+        <!-- Les notifications du §24 et du §47
+
+             « Déposer le livrable → Le responsable est notifié. »
+             La logique « une action → une conséquence claire » du §47 est
+             tenue par des actions configurées, jamais par des `message_post()`
+             dispersés dans le code métier.
+
+             Déclarées **avant** les transitions qui les référencent : le
+             chargement d'un fichier de données est séquentiel, et un `ref()`
+             vers un enregistrement pas encore créé fait échouer l'installation.
+        -->
+
+        <record id="action_dl_notify_submitted" model="opex.workflow.action">
+            <field name="name">Prévenir le responsable du dépôt</field>
+            <field name="code">deliverable_notify_submitted</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">note</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="body" type="html"><p>Un nouveau livrable a été soumis pour validation.</p></field>
+        </record>
+
+        <record id="action_dl_notify_validated" model="opex.workflow.action">
+            <field name="name">Annoncer la validation du livrable</field>
+            <field name="code">deliverable_notify_validated</field>
+            <field name="action_type">notify</field>
+            <!--
+                `comment` : l'intervenant est un compte portail, et la cloche
+                écarte les `mt_note` via `_get_search_domain_share()`. En
+                `note`, il ne verrait rien — ni email, ni cloche.
+            -->
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Votre livrable est validé.</p></field>
+        </record>
+
+        <record id="action_dl_notify_correction" model="opex.workflow.action">
+            <field name="name">Demander la correction à l'intervenant</field>
+            <field name="code">deliverable_notify_correction</field>
+            <field name="action_type">notify</field>
+            <field name="notify_subtype">comment</field>
+            <field name="sequence">10</field>
+            <field name="target_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="body" type="html"><p>Une correction est demandée sur votre livrable. Le motif figure dans l'historique du dossier.</p></field>
+        </record>
+
+        <!-- La définition -->
+
+        <record id="wf_mission_deliverable" model="opex.workflow.definition">
+            <field name="name">Livrable de mission</field>
+            <field name="code">mission_deliverable</field>
+            <field name="model_id" ref="model_opex_mission_deliverable"/>
+            <field name="description">Dépôt, validation et correction d'un livrable de mission. §23, §24 et §25 du Module 3 — Schéma 9.</field>
+        </record>
+
+        <!-- Étapes -->
+
+        <record id="dlst_todo" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">todo</field>
+            <field name="name">À faire</field>
+            <field name="user_label">À produire</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="dlst_in_progress" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">in_progress</field>
+            <field name="name">En cours</field>
+            <field name="user_label">En cours de production</field>
+            <field name="sequence">20</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+            <field name="description">L'étape du Schéma 9 que le livrable du Module 2 n'a pas. Elle distingue « pas commencé » de « commencé, pas rendu » — ce dont le §43 a besoin pour signaler un retard.</field>
+        </record>
+
+        <record id="dlst_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">submitted</field>
+            <field name="name">Soumis</field>
+            <field name="user_label">En attente de validation</field>
+            <field name="sequence">30</field>
+            <field name="sla_days">7</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="dlst_correction" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">correction_requested</field>
+            <field name="name">Corrections demandées</field>
+            <field name="user_label">Action requise : corriger mon livrable</field>
+            <field name="sequence">40</field>
+            <field name="sla_days">5</field>
+            <field name="actor_role_ids" eval="[Command.set([ref('role_intervenant')])]"/>
+        </record>
+
+        <record id="dlst_validated" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">validated</field>
+            <field name="name">Validé</field>
+            <field name="user_label">Livrable validé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">50</field>
+        </record>
+
+        <!-- Transitions -->
+
+        <record id="dltr_start" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">deliverable_start</field>
+            <field name="name">Commencer</field>
+            <field name="source_stage_id" ref="dlst_todo"/>
+            <field name="target_stage_id" ref="dlst_in_progress"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+        </record>
+
+        <record id="dltr_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">deliverable_submit</field>
+            <field name="name">Soumettre à validation</field>
+            <field name="source_stage_id" ref="dlst_in_progress"/>
+            <field name="target_stage_id" ref="dlst_submitted"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_deliverable_has_file')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_dl_notify_submitted')])]"/>
+        </record>
+
+        <record id="dltr_validate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">deliverable_validate</field>
+            <field name="name">Valider</field>
+            <field name="source_stage_id" ref="dlst_submitted"/>
+            <field name="target_stage_id" ref="dlst_validated"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_dl_notify_validated')])]"/>
+        </record>
+
+        <!--
+            Le commentaire est obligatoire, et c'est le cœur du §25.
+
+            « Demander une correction » sans dire laquelle est le « améliorez
+            votre livrable » qui n'appelle aucune réponse. Le motif est
+            journalisé par le moteur, et c'est **lui** qu'on recopie sur la
+            version archivée — pas un champ du livrable, qui serait écrasé au
+            refus suivant.
+        -->
+        <record id="dltr_request_correction" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">deliverable_request_correction</field>
+            <field name="name">Demander une correction</field>
+            <field name="source_stage_id" ref="dlst_submitted"/>
+            <field name="target_stage_id" ref="dlst_correction"/>
+            <field name="sequence">40</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_mission_manager')])]"/>
+            <field name="requires_comment" eval="True"/>
+            <field name="action_ids" eval="[Command.set([ref('action_dl_notify_correction')])]"/>
+        </record>
+
+        <record id="dltr_resubmit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_mission_deliverable"/>
+            <field name="code">deliverable_resubmit</field>
+            <field name="name">Déposer une nouvelle version</field>
+            <field name="source_stage_id" ref="dlst_correction"/>
+            <field name="target_stage_id" ref="dlst_submitted"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_mission_manager')])]"/>
+            <field name="condition_ids" eval="[Command.set([ref('rule_deliverable_has_file')])]"/>
+            <field name="action_ids" eval="[Command.set([ref('action_dl_notify_submitted')])]"/>
+        </record>
+
+    </data>
+
+    <!--
+        HORS DU BLOC `noupdate`
+
+        Deux choses ici, et les deux échoueraient silencieusement à l'intérieur
+        du bloc (`convert.py`, `_tag_function` : « if self.noupdate and
+        self.mode != 'init': return »).
+    -->
+
+    <!--
+        1. LA CONDITION DE DÉPÔT DES LIVRABLES TROUVE SON CHAMP.
+
+        `rule_mission_deliverables_submitted` a été déclarée à l'Extension 1 et
+        rattachée à rien : `field('deliverable_pending_count', 1)` valait 1 —
+        son défaut — tant que le champ n'existait pas, donc la condition était
+        **fermée** et aurait rendu « Soumettre les livrables » infranchissable.
+
+        Le champ existe depuis cette extension. La règle prend sa place.
+
+        `rule_mission_deliverables_validated`, elle, **reste en attente** :
+        `mission_request_workflow.xml` écrit sur `mtr_accept_service` que
+        « la règle 6 y sera rattachée par l'Extension 9 ». On ne déborde pas.
+    -->
+    <function model="opex.workflow.transition" name="write">
+        <value eval="[ref('mtr_deliver')]"/>
+        <value eval="{'condition_ids': [
+            Command.link(ref('rule_mission_deliverables_submitted')),
+        ]}"/>
+    </function>
+
+    <function model="opex.workflow.definition" name="action_publish"
+              eval="[[ref('wf_mission_deliverable')]]"/>
+</odoo>

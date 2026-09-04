@@ -34,7 +34,7 @@ class TestProfiles(TransactionCase):
     def test_the_workflow_is_configured_not_coded(self):
         """Six étapes et six transitions, décrites en données.
 
-        ⚠ La consigne annonçait « cinq étapes, quatre transitions ». Le
+        La consigne annonçait « cinq étapes, quatre transitions ». Le
         schéma 2 du PDF en demande davantage : la boucle
         Complément → Resoumission → Contrôle en fait partie, et c'est elle qui
         prouve qu'on gère un graphe et non une séquence. Le PDF fait foi.
@@ -83,7 +83,7 @@ class TestProfiles(TransactionCase):
     def _expert_request(self):
         """La demande est créée **par le membre**, comme au portail.
 
-        ⚠ Ce test posait ici la ligne d'acteur à la main, et c'est ce geste qui
+        Ce test posait ici la ligne d'acteur à la main, et c'est ce geste qui
         a masqué le bug pendant toute l'Extension 9 : `create()` ne la posait
         pas, le portail non plus, et le déposant réel ne pouvait pas soumettre
         sa propre demande. Le test, lui, était vert.
@@ -374,7 +374,7 @@ class TestProfiles(TransactionCase):
         self.assertFalse(user.partner_id.opex_can_request_expert())
 
     def test_server_refuses_a_duplicate_even_if_the_button_was_bypassed(self):
-        """⚠ Le `t-if` masque, il n'interdit pas.
+        """Le `t-if` masque, il n'interdit pas.
 
         Une requête forgée n'a jamais vu le gabarit. C'est le bug symétrique
         déjà rencontré sur le Module 1 — « Devenir membre » resté visible pour

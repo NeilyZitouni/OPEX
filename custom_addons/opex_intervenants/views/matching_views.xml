@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!--
+         Le bouton et l'onglet sur l'appel à mission
+
+        On hérite du formulaire posé à l'Extension 1 : le responsable qui
+        consulte un appel ne doit pas avoir à ouvrir un second écran pour voir
+        qui lui est proposé.
+    -->
+    <record id="view_mission_request_form_matching" model="ir.ui.view">
+        <field name="name">opex.mission.request.form.matching</field>
+        <field name="model">opex.mission.request</field>
+        <field name="inherit_id" ref="view_mission_request_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//div[@name='button_box']" position="inside">
+                <button name="action_view_matching_candidates" type="object"
+                        class="oe_stat_button" icon="fa-magic">
+                    <field name="matching_candidate_count" widget="statinfo"
+                           string="Proposés"/>
+                </button>
+            </xpath>
+
+            <xpath expr="//page[@name='candidatures']" position="after">
+                <page string="Smart Matching" name="matching">
+                    <div class="d-flex gap-2 mb-3">
+                        <button name="action_run_smart_matching" type="object"
+                                string="Lancer le Smart Matching"
+                                class="btn-primary"/>
+                        <button name="action_customise_matching_criteria"
+                                type="object"
+                                string="Personnaliser les critères de cet appel"
+                                class="btn-secondary"
+                                invisible="matching_is_customised"/>
+                    </div>
+
+                    <group>
+                        <group>
+                            <field name="matching_date"/>
+                            <field name="matching_candidate_count"/>
+                        </group>
+                        <group>
+                            <field name="matching_is_customised"/>
+                            <field name="matching_excluded_count"/>
+                        </group>
+                    </group>
+
+                    <!--
+                        Les écartés, et leur motif.
+
+                        « Écarté, pas mal noté » : ils n'apparaissent pas dans
+                        les propositions. Mais sans ce compte rendu, un critère
+                        éliminatoire mal réglé est indétectable — la liste est
+                        simplement plus courte, et rien ne le dit.
+                    -->
+                    <group string="Écartés par un critère éliminatoire"
+                           invisible="not matching_excluded_count">
+                        <field name="matching_excluded_note" nolabel="1"
+                               readonly="1"/>
+                    </group>
+
+                    <!--
+                        Les pondérations propres à cet appel. Vides, l'appel
+                        suit le profil de son type de mission, ou le profil par
+                        défaut du §11.
+                    -->
+                    <group string="Pondérations propres à cet appel"
+                           invisible="not matching_is_customised">
+                        <field name="matching_criteria_ids" nolabel="1">
+                            <list editable="bottom">
+                                <field name="sequence" widget="handle"/>
+                                <field name="name"/>
+                                <field name="family"/>
+                                <field name="weight"/>
+                                <field name="is_eliminatoire" widget="boolean_toggle"/>
+                                <field name="active" widget="boolean_toggle"/>
+                            </list>
+                        </field>
+                    </group>
+
+                    <field name="matching_candidate_ids" nolabel="1" readonly="1">
+                        <list default_order="score desc">
+                            <field name="partner_id"/>
+                            <field name="score"/>
+                            <field name="state"/>
+                            <field name="candidate_response" optional="hide"/>
+                            <field name="decided_by_id" optional="hide"/>
+                        </list>
+                    </field>
+                </page>
+            </xpath>
+        </field>
+    </record>
+
+    <!--
+         Les critères, en back-office
+
+        Le moteur ne fournit pas de vue formulaire pour ses critères : c'est
+        `opex_workflow/views/matching_views.xml` qui en pose une liste. On en
+        ajoute une ici, avec **nos** trois champs — sinon les pondérations par
+        type ne seraient réglables que par l'import de données.
+    -->
+    <record id="view_matching_criteria_mission_list" model="ir.ui.view">
+        <field name="name">opex.matching.criteria.mission.list</field>
+        <field name="model">opex.matching.criteria</field>
+        <field name="arch" type="xml">
+            <list string="Critères de matching" editable="bottom"
+                  decoration-danger="is_eliminatoire">
+                <field name="sequence" widget="handle"/>
+                <field name="name"/>
+                <field name="family"/>
+                <field name="mission_type_id"/>
+                <field name="mission_id" optional="hide"/>
+                <field name="weight" sum="Total"/>
+                <field name="is_eliminatoire" widget="boolean_toggle"/>
+                <field name="criteria_type" optional="hide"/>
+                <field name="source_expression" optional="hide"/>
+                <field name="target_field" optional="hide"/>
+                <field name="match_mode" optional="hide"/>
+                <field name="active" widget="boolean_toggle"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_matching_criteria_mission_search" model="ir.ui.view">
+        <field name="name">opex.matching.criteria.mission.search</field>
+        <field name="model">opex.matching.criteria</field>
+        <field name="arch" type="xml">
+            <search string="Critères de matching">
+                <field name="name"/>
+                <field name="family"/>
+                <field name="mission_type_id"/>
+                <separator/>
+                <filter name="filter_default" string="Profil par défaut"
+                        domain="[('mission_type_id', '=', False), ('mission_id', '=', False)]"/>
+                <filter name="filter_type" string="Profils par type de mission"
+                        domain="[('mission_type_id', '!=', False)]"/>
+                <filter name="filter_mission" string="Propres à un appel"
+                        domain="[('mission_id', '!=', False)]"/>
+                <separator/>
+                <filter name="filter_eliminatoire" string="Éliminatoires"
+                        domain="[('is_eliminatoire', '=', True)]"/>
+                <group name="group_by">
+                    <filter name="group_type" string="Type de mission"
+                            context="{'group_by': 'mission_type_id'}"/>
+                    <filter name="group_family" string="Famille"
+                            context="{'group_by': 'family'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_matching_criteria_mission" model="ir.actions.act_window">
+        <field name="name">Critères de matching</field>
+        <field name="res_model">opex.matching.criteria</field>
+        <field name="view_mode">list,form</field>
+        <field name="search_view_id" ref="view_matching_criteria_mission_search"/>
+        <field name="domain">[('definition_id.code', '=', 'mission_request')]</field>
+        <field name="context">{'search_default_filter_default': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">Les sept critères du §11</p>
+            <p>Compétences 30 %, expérience 20 %, secteur 15 %, disponibilité
+               10 %, budget 10 %, réputation 10 %, localisation 5 %.</p>
+            <p>Un critère portant un <b>type de mission</b> remplace celui de la
+               même famille pour ce type. Un critère <b>éliminatoire</b> n'entre
+               pas dans le score : il écarte.</p>
+        </field>
+    </record>
+
+    <menuitem id="menu_matching_criteria"
+              name="Critères de matching"
+              parent="menu_intervenants_config"
+              action="action_matching_criteria_mission"
+              sequence="30"/>
+
+</odoo>

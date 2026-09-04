@@ -2,11 +2,9 @@
 <odoo>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Section 26 — [Voir le projet]
-        ═══════════════════════════════════════════════════════════════
 
-        ⚠ Ce gabarit ne reçoit **aucun recordset de projet**. Il itère sur le
+        Ce gabarit ne reçoit **aucun recordset de projet**. Il itère sur le
         dictionnaire `d`, construit par `_matching_detail()`. C'est la même
         discipline que la vignette de la section 20, et pour la même raison :
         ce qui n'est pas dans le dictionnaire ne peut pas être rendu par
@@ -75,7 +73,7 @@
                                     </tr>
                                 </table>
                                 <!--
-                                    ⚠ `t-attf-` et non `t-att-`.
+                                    `t-attf-` et non `t-att-`.
 
                                     Écrite en `t-att-style="'width: %s%%' % ..."`,
                                     cette barre levait `ValueError: incomplete
@@ -105,10 +103,10 @@
                                 <li t-foreach="d.get('etapes_financement')" t-as="step"
                                     class="list-group-item d-flex justify-content-between">
                                     <span t-esc="step['label']"/>
-                                    <span t-if="step['state'] == 'done'" class="text-success">✓</span>
+                                    <span t-if="step['state'] == 'done'" class="text-success"></span>
                                     <span t-elif="step['state'] == 'current'"
                                           class="badge text-bg-primary">en cours</span>
-                                    <span t-else="" class="text-muted">○</span>
+                                    <span t-else="" class="text-muted"></span>
                                 </li>
                             </ul>
                         </div>
@@ -138,9 +136,7 @@
     </template>
 
     <!--
-        ═══════════════════════════════════════════════════════════════
         Section 29 — l'évaluation finale
-        ═══════════════════════════════════════════════════════════════
     -->
     <template id="portal_final_evaluation" name="Évaluation finale">
         <t t-call="portal.portal_layout">
@@ -187,7 +183,7 @@
                            t-att-value="request.csrf_token()"/>
 
                     <!--
-                        ⚠ Aucun champ ne porte le côté (porteur / cluster). Il
+                        Aucun champ ne porte le côté (porteur / cluster). Il
                         est déduit de l'identité côté serveur. Un `<input
                         type="hidden" name="side">` serait modifiable par qui
                         sait ouvrir les outils de développement.
