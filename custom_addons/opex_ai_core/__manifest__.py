@@ -70,6 +70,7 @@ qu'ils écrivent en base.
         # ne portent que des chaînes de caractères.
         'data/prompts_cv.xml',
         'data/prompts_taxonomy.xml',
+        'data/prompts_qualification.xml',
         'views/ai_views.xml',
     ],
 

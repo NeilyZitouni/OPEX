@@ -107,8 +107,11 @@ class InnovationHolderDashboard(InnovationProjectPortal):
     """
 
     @http.route(['/my/innovation'], type='http', auth='user', website=True)
-    def portal_my_projects(self, **kw):
-        response = super().portal_my_projects(**kw)
+    def portal_innovation_my_projects(self, **kw):
+        # Le préfixe suit celui du contrôleur parent : voir la note sur
+        # `InnovationProjectPortal.portal_innovation_my_projects`, qui dit
+        # quelle route native le nom d'origine faisait disparaître.
+        response = super().portal_innovation_my_projects(**kw)
         # `qcontext` plutôt qu'un second `render()` : on enrichit la page que le
         # contrôleur parent a préparée, on ne la reconstruit pas. Recopier son
         # corps ici ferait diverger les deux au premier changement.

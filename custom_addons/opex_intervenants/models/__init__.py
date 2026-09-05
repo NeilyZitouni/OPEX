@@ -77,3 +77,7 @@ from . import certification_resolution
 from . import certification_axes
 from . import mission_certification
 from . import res_partner_certification
+# Extension IA-3 - le controle qualite assiste du §11, et la machine a etats
+# du cycle de qualification. Charge en dernier : il lit le capital de
+# l'Extension 3, les axes de l'IA-1 et le referentiel de certifications de D1.
+from . import expert_qualification_review

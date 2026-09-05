@@ -126,6 +126,16 @@ class ResPartnerBell(models.Model):
 
         Le candidat va à sa candidature ; toute autre personne va à la mission,
         qu'elle a le droit de lire si le message la concerne.
+
+        ⚠ La branche **candidat** portait `/my/candidatures/<id>`, une URL
+        qu'aucune route n'a jamais déclarée : l'espace de noms du module est
+        `/my/missions/*` (règle 1). Seule la branche client avait été corrigée
+        à l'Extension 11 — celle-ci n'avait pas été mise en cause, et le
+        candidat qui cliquait sur sa propre notification tombait sur un 404.
+
+        Le test qui gardait cette méthode ne pouvait pas le voir : il comparait
+        la valeur rendue à une chaîne construite par le même `%`. Il assertait
+        donc l'URL fautive. Il **résout** désormais la route.
         """
         self.ensure_one()
         application = self.env['opex.mission.application'].sudo().browse(
@@ -133,5 +143,5 @@ class ResPartnerBell(models.Model):
         if not application.exists():
             return '/my'
         if application.partner_id == self:
-            return '/my/candidatures/%s' % application.id
+            return '/my/missions/candidature/%s' % application.id
         return '/my/missions/%s' % application.mission_id.id

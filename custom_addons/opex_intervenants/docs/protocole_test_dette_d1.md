@@ -196,7 +196,40 @@ Avec un compte **intervenant** :
       seulement sur l'écran : le référentiel décide de l'éligibilité aux
       appels, il ne s'enrichit pas par le portail.
 
-## 8 — Ce qui n'est pas rapproché ne compte pas
+## 8 — Une réponse et une question ne se lisent pas pareil
+
+C'est la note du §11, et elle se vérifie sur la liste des écartés.
+
+Sur l'appel exigeant *ISO 27001 Lead Auditor*, ajouter un troisième
+intervenant qui **déclare** « ISO 27001 Lead Auditor » en texte libre, sans
+rapprochement. Relancer le matching.
+
+- [ ] il est **écarté**, comme celui qui ne détient rien ;
+- [ ] mais son motif est **différent** : « déclaration(s) non rapprochée(s), à
+      arbitrer : ISO 27001 Lead Auditor », là où l'autre lit « il manque : … » ;
+- [ ] sa déclaration apparaît dans **Certifications → À arbitrer**, avec le
+      profil d'où elle vient et la mention du matching.
+
+⚠ Il reste écarté, et ce n'est pas négociable : une certification non
+rapprochée n'est comparable à rien. L'admettre ferait franchir le critère
+éliminatoire à un intitulé libre — la dette D1 rouverte par la porte de
+derrière.
+
+Ce qui change est ce que le responsable **lit** : « il manque » est une
+réponse, « à arbitrer » est une question. Une réponse se lit, une question se
+traite.
+
+- [ ] relancer le matching une seconde fois : la file ne contient **toujours
+      qu'une** ligne pour ce libellé. Sans cette idempotence, chaque passage
+      reposerait la même question.
+
+Enfin, sur une déclaration libre **périmée** :
+
+- [ ] le motif est « il manque : … », et **rien ne part en file**. Une
+      certification expirée a sa réponse ; même rapprochée, elle ne compterait
+      pas.
+
+## 9 — Ce qui n'est pas rapproché ne compte pas
 
 **Certifications des intervenants**, filtre **Non rapprochées** (actif par
 défaut).
@@ -212,7 +245,7 @@ les certifications déclarées avant D1 ne comptent plus pour aucun appel.
 
 ## Les tests automatiques correspondants
 
-`tests/test_certification_d1.py` — 21 tests.
+`tests/test_certification_d1.py` — 24 tests.
 
 | Ce qui est vérifié | Test |
 |---|---|
@@ -234,6 +267,9 @@ les certifications déclarées avant D1 ne comptent plus pour aucun appel.
 | La chaîne atteint le critère | `test_the_promoted_certification_reaches_the_matching` |
 | Une expirée sort du vivier | `test_an_expired_certification_leaves_the_pool` |
 | Calcul et recherche s'accordent | `test_the_eligibility_search_matches_its_computation` |
+| **Déclaration non rapprochée ≠ non-conformité** | `test_an_unmatched_declaration_is_not_a_missing_certification` |
+| **Elle part en file d'arbitrage** | `test_an_unmatched_declaration_goes_to_the_arbitration_queue` |
+| Une déclaration périmée ne pose pas de question | `test_an_expired_unmatched_declaration_poses_no_question` |
 
 ### La régression volontaire, et ce qu'elle a révélé
 

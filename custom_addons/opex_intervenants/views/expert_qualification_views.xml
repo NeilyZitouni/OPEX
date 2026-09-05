@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="view_qualification_review_form" model="ir.ui.view">
+        <field name="name">opex.expert.qualification.review.form</field>
+        <field name="model">opex.expert.qualification.review</field>
+        <field name="arch" type="xml">
+            <form string="Dossier de qualification">
+                <header>
+                    <button name="action_run" type="object"
+                            string="Lancer le contrôle" class="btn-primary"/>
+                    <!-- Le bouton « Action » du moteur : c'est LUI qui fait
+                         avancer le dossier. « Lancer le contrôle » ne franchit
+                         aucune transition - il produit un avis. -->
+                    <button name="action_workflow_transition" type="object"
+                            string="Action" class="btn-secondary"/>
+                    <field name="workflow_state" invisible="1"/>
+                    <field name="workflow_stage_id" widget="statusbar"
+                           options="{'clickable': false}"
+                           domain="[('definition_id', '=', workflow_definition_id)]"/>
+                    <field name="workflow_definition_id" invisible="1"/>
+                </header>
+                <sheet>
+                    <div class="oe_button_box" name="button_box">
+                        <button name="action_view_profile" type="object"
+                                class="oe_stat_button" icon="fa-user">
+                            <span class="o_stat_text">Profil</span>
+                        </button>
+                    </div>
+                    <div class="oe_title">
+                        <h1><field name="partner_id" readonly="1"/></h1>
+                    </div>
+
+                    <div class="alert alert-info" role="alert">
+                        <strong>Cet avis ne décide rien.</strong> Il prépare le
+                        contrôle : les anomalies déterministes sont des faits,
+                        celles de l'assistance IA sont des jugements proposés.
+                        La décision d'activation reste gouvernée par les règles
+                        OPEX, et se prend par le bouton <em>Action</em>.
+                    </div>
+
+                    <group>
+                        <group string="Dernier contrôle">
+                            <field name="date_controle" readonly="1"/>
+                            <field name="anomaly_count" readonly="1"/>
+                            <field name="blocking_count" readonly="1"/>
+                        </group>
+                        <group string="Assistance IA">
+                            <field name="ia_sollicitee" readonly="1"/>
+                            <field name="ia_indisponible_motif" readonly="1"
+                                   invisible="ia_sollicitee"/>
+                        </group>
+                    </group>
+
+                    <field name="recommandation" readonly="1" nolabel="1"
+                           placeholder="Lancez le contrôle pour produire un avis."/>
+
+                    <notebook>
+                        <page string="Anomalies" name="anomalies">
+                            <field name="anomaly_ids" readonly="1">
+                                <list decoration-danger="severity == 'blocking'"
+                                      decoration-warning="severity == 'warning'"
+                                      decoration-muted="severity == 'info'">
+                                    <field name="control"/>
+                                    <field name="name"/>
+                                    <field name="severity"/>
+                                    <!-- La colonne qui rend l'avis lisible :
+                                         un fait et un jugement ne se traitent
+                                         pas avec la meme confiance. -->
+                                    <field name="origin"/>
+                                    <field name="detail" optional="show"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+                </sheet>
+                <chatter/>
+            </form>
+        </field>
+    </record>
+
+    <record id="view_qualification_review_list" model="ir.ui.view">
+        <field name="name">opex.expert.qualification.review.list</field>
+        <field name="model">opex.expert.qualification.review</field>
+        <field name="arch" type="xml">
+            <list string="Dossiers de qualification"
+                  decoration-danger="blocking_count > 0"
+                  decoration-muted="not date_controle">
+                <field name="partner_id"/>
+                <field name="workflow_stage_id"/>
+                <field name="date_controle"/>
+                <field name="anomaly_count"/>
+                <field name="blocking_count"/>
+                <field name="ia_sollicitee" optional="show"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="view_qualification_review_search" model="ir.ui.view">
+        <field name="name">opex.expert.qualification.review.search</field>
+        <field name="model">opex.expert.qualification.review</field>
+        <field name="arch" type="xml">
+            <search string="Dossiers de qualification">
+                <field name="partner_id"/>
+                <field name="workflow_stage_id"/>
+                <!-- La file du §20, en trois filtres. -->
+                <filter name="a_controler" string="À contrôler"
+                        domain="[('date_controle', '=', False)]"/>
+                <filter name="bloquants" string="Avec anomalie bloquante"
+                        domain="[('blocking_count', '&gt;', 0)]"/>
+                <filter name="sans_ia" string="Contrôlés sans assistance IA"
+                        domain="[('date_controle', '!=', False),
+                                 ('ia_sollicitee', '=', False)]"/>
+                <group name="group_by">
+                    <filter name="group_stage" string="Étape"
+                            context="{'group_by': 'workflow_stage_id'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="action_qualification_review" model="ir.actions.act_window">
+        <field name="name">Qualification des intervenants</field>
+        <field name="res_model">opex.expert.qualification.review</field>
+        <field name="view_mode">list,form</field>
+        <field name="context">{'search_default_a_controler': 1}</field>
+        <field name="help" type="html">
+            <p class="o_view_nocontent_smiling_face">La file de contrôle qualité du §20</p>
+            <p>Le contrôle prépare la décision, il ne la prend pas. Les
+               contrôles déterministes tournent toujours ; l'assistance IA
+               n'instruit que ce qu'ils ne savent pas faire.</p>
+        </field>
+    </record>
+
+    <record id="view_qualification_anomaly_list" model="ir.ui.view">
+        <field name="name">opex.expert.qualification.anomaly.list</field>
+        <field name="model">opex.expert.qualification.anomaly</field>
+        <field name="arch" type="xml">
+            <list string="Anomalies" create="false"
+                  decoration-danger="severity == 'blocking'">
+                <field name="partner_id"/>
+                <field name="control"/>
+                <field name="name"/>
+                <field name="severity"/>
+                <field name="origin"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="action_qualification_anomaly" model="ir.actions.act_window">
+        <field name="name">Anomalies de qualification</field>
+        <field name="res_model">opex.expert.qualification.anomaly</field>
+        <field name="view_mode">list</field>
+    </record>
+
+    <menuitem id="menu_qualification_root"
+              name="Qualification"
+              parent="menu_intervenants_config"
+              sequence="40"/>
+
+    <menuitem id="menu_qualification_review"
+              name="Dossiers de qualification"
+              parent="menu_qualification_root"
+              action="action_qualification_review"
+              sequence="10"/>
+
+    <menuitem id="menu_qualification_anomaly"
+              name="Anomalies relevées"
+              parent="menu_qualification_root"
+              action="action_qualification_anomaly"
+              sequence="20"/>
+
+</odoo>

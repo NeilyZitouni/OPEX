@@ -17,13 +17,35 @@
         </record>
 
         <!--
-            Inscription par le flux natif `/web/signup` (Extension 5) : le
-            candidat crée son compte portail puis atterrit directement sur le
-            formulaire de dépôt de dossier, sans redirection custom.
+            POURQUOI PLUS `/web/signup`, ET C'EST UNE CORRECTION.
+
+            L'entrée pointait sur `/web/signup?redirect=/my/membership/new`.
+            Elle rendait un **404** pour tout le monde, connecté ou non :
+            `auth_signup` refuse la route quand le signup n'est pas ouvert
+            (`main.py:43`), et il ne l'était pas — mais pas pour la raison
+            qu'affichait l'ecran Parametres.
+
+            `website/models/res_users.py:66` surcharge
+            `_get_signup_invitation_scope()` : c'est le champ
+            `auth_signup_uninvited` du **site web** qui decide, pas le
+            parametre systeme. Ici : parametre = `b2c`, site = `b2b`. L'ecran
+            de configuration affichait donc une valeur qui n'etait pas celle
+            appliquee. Voir la regle transversale du CLAUDE.md.
+
+            L'entree pointe desormais sur la route metier. Elle est
+            `auth='user'` : un visiteur anonyme est renvoye vers le login par
+            Odoo, avec son `redirect`, et revient ici une fois connecte. Aucun
+            reglage de securite n'est touche, et rien ne depend plus d'un
+            parametre trompeur.
+
+            ⚠ Les QUATRE points d'entree du parcours portent maintenant la
+            MEME URL - menu, accueil, annuaire, portail. Deux chemins sous un
+            seul libelle etaient la cause du « parfois » qui a coute un
+            diagnostic.
         -->
         <record id="website_menu_become_member" model="website.menu">
             <field name="name">Devenir membre</field>
-            <field name="url">/web/signup?redirect=/my/membership/new</field>
+            <field name="url">/my/membership/new</field>
             <field name="parent_id" ref="website.main_menu"/>
             <field name="sequence" type="int">55</field>
         </record>
@@ -46,4 +68,46 @@
         </record>
 
     </data>
+
+    <!--
+        PAR `<function>`, ET C'EST LA MEME NECESSITE QU'A LA DETTE D1.
+
+        Le bloc ci-dessus est en `noupdate="1"` - les entrees de menu sont
+        editables depuis l'editeur de site, et un `-u` ne doit pas ecraser les
+        choix de l'administrateur. Le drapeau est porte par la ligne
+        `ir.model.data` : une fois pose, la modification de l'URL ci-dessus ne
+        s'applique QU'A une installation neuve.
+
+        Mesure : le test qui compare l'URL du menu a celle de la greffe a
+        rougi, l'enregistrement en base portant toujours
+        `/web/signup?redirect=...`. Sans cette fonction, les bases existantes
+        auraient garde le 404 pendant que le fichier disait le contraire.
+    -->
+    <function model="website.menu" name="write">
+        <value eval="[ref('website_menu_become_member')]"/>
+        <value eval="{'url': '/my/membership/new'}"/>
+    </function>
+
+    <!--
+        ET LA MEME NECESSITE UN CRAN PLUS LOIN, CELUI-LA MESURE APRES COUP.
+
+        La fonction ci-dessus realigne l'enregistrement porteur du xmlid. Or
+        `website.menu` en porte DEUX par entree : le modele par defaut
+        (`website_id = False`, celui du xmlid) et **une copie par site**, sans
+        xmlid, instanciee a la creation du site. C'est la copie qui est servie
+        au visiteur.
+
+        Mesure faite apres la correction precedente :
+
+            id=10   /my/membership/new                        <- corrige
+            id=9    /web/signup?redirect=/my/membership/new   <- site 1, oublie
+
+        Le site public affichait donc encore le lien mort, pendant que le
+        fichier, le xmlid et le test qui les lisait disaient tous l'inverse.
+
+        Trouve par `test_portal_links.py`, qui lit les menus **en base** et non
+        dans le source - la moitie du probleme que la lecture statique ne peut
+        pas voir.
+    -->
+    <function model="website.menu" name="_opex_realign_website_copies"/>
 </odoo>

@@ -139,7 +139,7 @@
 
                         <div class="alert alert-light border mt-4" role="alert">
                             Votre entreprise n'apparaît pas encore dans cet annuaire ?
-                            <a href="/web/signup?redirect=/my/membership/new">Devenez membre du cluster</a>.
+                            <a href="/my/membership/new">Devenez membre du cluster</a>.
                         </div>
                     </div>
                 </section>

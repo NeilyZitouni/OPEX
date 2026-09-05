@@ -20,6 +20,19 @@ class OpexMembershipCategory(models.Model):
         help="Membres adhérents, Membres associés, Partenaires/Sponsors, Experts/Consultants.",
     )
     sequence = fields.Integer(string="Séquence", default=10)
+
+    #: Une catégorie retirée du parcours **sans être supprimée**.
+    #:
+    #: La suppression n'est pas une option : une catégorie de test a servi à
+    #: quatre adhésions actives, et la supprimer les orphelinerait. Odoo
+    #: exclut d'office les enregistrements archivés de `search()`, ce qui les
+    #: fait disparaître du parcours de dépôt sans toucher aux dossiers qui les
+    #: référencent — ils continuent de l'afficher.
+    active = fields.Boolean(
+        string="Actif", default=True,
+        help="Décochez pour retirer cette entrée du parcours de dépôt sans "
+             "perdre les dossiers qui l'utilisent déjà.")
+
     subcategory_ids = fields.One2many(
         'opex.membership.subcategory', 'category_id', string="Sous-catégories"
     )

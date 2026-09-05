@@ -18,3 +18,4 @@ from . import opex_cluster_committee
 from . import opex_cluster_vote
 from . import opex_cluster_assembly
 from . import account_move
+from . import website_menu

@@ -29,6 +29,44 @@ class TestDashboard(MissionCase):
     def _dashboard(self):
         return self.env['opex.mission.dashboard'].sudo()
 
+    def _assert_route_resolves(self, url, endpoint, **arguments):
+        """L'URL est-elle servie par une règle, et par laquelle ?
+
+        Écrit après un 404 qu'aucun test ne voyait. Les assertions d'alors
+        comparaient la valeur rendue à une chaîne construite par le même `%` :
+
+            self.assertEqual(url, '/my/candidatures/%s' % application.id)
+
+        Les deux côtés étaient faux de la même façon, donc l'égalité tenait.
+        L'URL ne correspondait à **aucune** route — l'espace de noms du module
+        est `/my/missions/*` — et le candidat qui cliquait sur sa propre
+        notification de cloche tombait sur une page introuvable.
+
+        Confronter l'URL au routing map est la seule forme qui ne peut pas
+        être fausse des deux côtés : la carte est construite par les
+        `@http.route`, pas par le test.
+        """
+        from werkzeug.exceptions import NotFound
+
+        adaptateur = self.env['ir.http'].routing_map().bind('localhost')
+        try:
+            trouve, valeurs = adaptateur.match(url, method='GET')
+        except NotFound:
+            raise AssertionError(
+                "« %s » ne correspond à aucune route : l'écran renverra un "
+                "404. Comparer cette chaîne à une autre chaîne ne l'aurait "
+                "pas dit." % url)
+        nom = getattr(getattr(trouve, 'func', trouve), '__name__', str(trouve))
+        self.assertEqual(
+            nom, endpoint,
+            "« %s » est servie par `%s`, pas par `%s` : l'utilisateur "
+            "n'atterrit pas sur l'écran attendu." % (url, nom, endpoint))
+        for cle, attendu in arguments.items():
+            self.assertEqual(
+                valeurs.get(cle), attendu,
+                "« %s » désigne %s=%s au lieu de %s : le lien mène au dossier "
+                "de quelqu'un d'autre." % (url, cle, valeurs.get(cle), attendu))
+
     #
     # Les quatre espaces du §18
     #
@@ -99,8 +137,13 @@ class TestDashboard(MissionCase):
         self.assertEqual(space['indicateurs']['candidatures'], 1)
         self.assertEqual(space['indicateurs']['en_cours'], 1)
         self.assertNotIn('priorites', space)
-        self.assertEqual(
-            space['suivi'][0]['url'], '/my/candidatures/%s' % application.id)
+        # La file « suivi » porte un lien cliquable : il doit mener quelque
+        # part, et au bon dossier. Résolu contre le routing map, pas comparé
+        # à une chaîne que ce test construirait lui-même.
+        self._assert_route_resolves(
+            space['suivi'][0]['url'],
+            'portal_intervenants_candidature',
+            application_id=application.id)
 
     def test_no_space_hands_a_recordset_to_the_template(self):
         """Règle 12 - la donnée réservée se filtre au modèle.
@@ -242,6 +285,16 @@ class TestDashboard(MissionCase):
             'mission_contract.py',
             'mission_invoicing.py',
             'mission_operational.py',
+            # IA-3 : l'avis de contrôle qualité. C'est un **compte rendu posé
+            # sur le dossier**, pas une notification à un rôle — il n'a pas
+            # de destinataire, il documente un passage du contrôle.
+            #
+            # Et il ne PEUT pas être une action `notify` : celles-ci se
+            # déclenchent sur une transition, or tout l'objet du §12 est que
+            # le contrôle ne franchit aucune transition. Une notification
+            # configurée supposerait exactement la décision automatique que
+            # l'extension existe pour interdire.
+            'expert_qualification_review.py',
         }
         models_dir = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -428,6 +481,12 @@ class TestDashboard(MissionCase):
         Le test précédent ne pouvait pas le voir : il vérifiait que l'URL
         commence par `/my/`, ce qui restait vrai. Celui-ci vérifie que le
         lecteur peut y aller.
+
+        ⚠ Et il ne le vérifiait toujours pas. Écrit pour la branche client, il
+        assertait les deux branches par comparaison de chaînes — donc il a
+        figé l'URL fautive de la branche **candidat**, qui ne correspondait à
+        aucune route. Les deux côtés de l'égalité étaient faux de la même
+        façon. Les deux résolvent désormais contre le routing map.
         """
         mission = self._new_mission()
         self._open_the_call(mission)
@@ -438,16 +497,17 @@ class TestDashboard(MissionCase):
             'res_id': application.id,
         })
 
-        # Le candidat va à sa candidature.
-        self.assertEqual(
+        # Le candidat va à sa candidature — et cette route existe.
+        self._assert_route_resolves(
             self.intervenant.partner_id.sudo()._opex_notification_url(message),
-            '/my/candidatures/%s' % application.id)
+            'portal_intervenants_candidature',
+            application_id=application.id)
 
         # Le client va à sa mission, pas au dossier du candidat.
-        self.assertEqual(
+        self._assert_route_resolves(
             self.client_user.partner_id.sudo()._opex_notification_url(message),
-            '/my/missions/%s' % mission.id,
-            "Le client est renvoyé vers un écran que l'`ir.rule` lui refuse.")
+            'portal_intervenants_mission_detail',
+            mission_id=mission.id)
 
     #
     # Le contrat de /my/counters

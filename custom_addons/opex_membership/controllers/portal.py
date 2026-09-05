@@ -82,8 +82,22 @@ class MembershipCustomerPortal(CustomerPortal):
     )
     def portal_my_membership_files(self, page=1, sortby=None, **kw):
         MembershipFile = request.env['opex.membership.file']
+        # Même motif que le dépôt : un refus affiche sa raison sur une page
+        # rendue, il ne rebondit pas.
+        #
+        # Celui-ci attendait son tour. Il ne produisait pas le symptôme
+        # signalé — mais c'est lui qui avalait le message du dépôt quand
+        # celui-ci redirigeait ici, et il mordra le jour où un compte interne
+        # cliquera sur « Mes dossiers d'adhésion ».
         if not MembershipFile.has_access('read'):
-            return request.redirect('/my')
+            return request.render(
+                'opex_membership.membership_access_refused',
+                {'refus': _(
+                    "La consultation des dossiers d'adhésion se fait depuis "
+                    "un compte portail. Votre compte est un compte interne du "
+                    "cluster : les dossiers se suivent depuis l'espace de "
+                    "gestion, pas depuis le portail candidat."),
+                 'peut_lire': False})
 
         searchbar_sortings = self._membership_searchbar_sortings()
         if sortby not in searchbar_sortings:
@@ -118,8 +132,14 @@ class MembershipCustomerPortal(CustomerPortal):
             # du menu : masqué par la même règle, sans quoi il ne mènerait
             # qu'au refus ci-dessus. Le brouillon fait exception — le bouton
             # est alors le seul chemin pour le reprendre depuis cette page.
-            'can_deposit': (request.env.user.partner_id.opex_can_apply_membership()
-                            or bool(self._current_draft())),
+            # La **même** fonction que la route, et c'est le point de la
+            # correction : le bouton ne peut plus promettre ce que le serveur
+            # refusera. Avant, il ne testait que la règle du dossier engagé et
+            # ignorait les droits de création — un compte interne le voyait,
+            # cliquait, et rebondissait sans explication.
+            'can_deposit': not request.env['opex.membership.file']
+            .deposit_refusal(request.env.user.partner_id,
+                             draft=self._membership_current_draft()),
             'page_name': 'membership',
             'pager': pager_values,
             'default_url': '/my/membership',
@@ -232,7 +252,39 @@ class MembershipCustomerPortal(CustomerPortal):
     # décide à la fois ce que l'écran affiche et ce que le `write()` accepte,
     # de sorte qu'un champ ajouté au gabarit sans l'être ici est simplement
     # ignoré côté serveur.
-    _STEP_FIELDS = {
+    # ------------------------------------------------------------
+    # POURQUOI TOUT EST PREFIXE `_membership_` ICI
+    # ------------------------------------------------------------
+    #
+    # Règle 1 du CLAUDE.md, payée pour de bon sur ce parcours :
+    #
+    #   « deux modules qui héritent du même arbre `CustomerPortal` et nomment
+    #     une méthode pareil → Odoo n'en garde qu'une, sans erreur. »
+    #
+    # Odoo fusionne toutes les sous-classes de `CustomerPortal` en une seule
+    # classe. `opex_innovation` dépend de `opex_membership`, il est donc chargé
+    # **après** : ses attributs écrasent les nôtres, silencieusement.
+    #
+    # Trois noms étaient partagés avec `InnovationProjectPortal`, et les trois
+    # portaient le parcours d'adhésion :
+    #
+    #   `_current_draft`  -> cherchait un projet d'innovation, jamais un
+    #                        dossier. `/my/membership/new/organisation` ne
+    #                        trouvait aucun brouillon et renvoyait au premier
+    #                        écran : le parcours bouclait, et chaque tentative
+    #                        créait un dossier de plus.
+    #   `_STEP_FIELDS`    -> rendait les étapes de l'innovation. `.get(
+    #                        'organisation', ())` valait `()` : **aucun champ
+    #                        du formulaire n'était enregistré**.
+    #   `_save_step`      -> écrivait selon les règles de l'innovation.
+    #
+    # Aucune erreur, aucun avertissement. Le symptôme était « la même page
+    # revient », ce qui ne ressemble pas à une collision de noms.
+    #
+    # Un test de garde relève désormais les attributs partagés entre toutes
+    # les classes héritant de `CustomerPortal` et refuse un nom non préfixé.
+
+    _MEMBERSHIP_STEP_FIELDS = {
         'organisation': (
             'nom_legal', 'nom_commercial', 'forme_juridique', 'nif', 'rc',
             'adresse', 'wilaya', 'commune', 'site_web', 'email_pro', 'telephone',
@@ -266,8 +318,12 @@ class MembershipCustomerPortal(CustomerPortal):
         keys = [key for key, _url in self._PARCOURS_STEPS]
         return keys[min(keys.index(step) + 1, len(keys) - 1)]
 
-    def _current_draft(self):
+    def _membership_current_draft(self):
         """Brouillon en cours du candidat connecté, ou recordset vide.
+
+        ⚠ Le préfixe n'est pas décoratif : sans lui, cette méthode est écrasée
+        par celle d'`opex_innovation`, qui cherche un projet. Voir le bloc en
+        tête de classe.
 
         Retrouvé par une recherche sur `partner_id`, jamais par un
         identifiant reçu du client : le parcours n'expose aucun id de dossier
@@ -300,12 +356,12 @@ class MembershipCustomerPortal(CustomerPortal):
 
     def _require_draft(self):
         """Brouillon en cours, ou renvoi au premier écran s'il n'y en a pas."""
-        membership_file = self._current_draft()
+        membership_file = self._membership_current_draft()
         if not membership_file:
             return None, request.redirect('/my/membership/new')
         return membership_file, None
 
-    def _save_step(self, membership_file, step, post):
+    def _membership_save_step(self, membership_file, step, post):
         """Écrit la part du dossier saisie à cet écran, puis avance l'étape.
 
         Écriture partielle : seuls les champs de l'écran courant sont touchés,
@@ -317,7 +373,7 @@ class MembershipCustomerPortal(CustomerPortal):
         # défaut à vide plutôt qu'une entrée factice dans la table.
         values = {
             field: (post.get(field) or '').strip()
-            for field in self._STEP_FIELDS.get(step, ())
+            for field in self._MEMBERSHIP_STEP_FIELDS.get(step, ())
             if isinstance(post.get(field), str)
         }
         # L'étape n'est jamais reculée : un candidat qui revient corriger un
@@ -349,21 +405,46 @@ class MembershipCustomerPortal(CustomerPortal):
         formulaire qui finirait en erreur, et lui dire pourquoi.
         """
         MembershipFile = request.env['opex.membership.file']
-        if not MembershipFile.has_access('create'):
-            return request.redirect('/my')
-
         Category = request.env['opex.membership.category']
         categories = Category.sudo().search([('subcategory_ids', '!=', False)])
-        draft = self._current_draft()
+        draft = self._membership_current_draft()
 
-        # Un brouillon se reprend : rien ne sera créé, le garde-fou ne
-        # s'applique pas. Sans brouillon, cet écran mène droit à un `create()`.
-        if not draft:
-            try:
-                MembershipFile._check_no_engaged_file(request.env.user.partner_id)
-            except UserError as error:
-                return request.redirect(
-                    '/my/membership?error=%s' % quote(error.args[0]))
+        # LA fonction d'accès, la même que celle qui décide de l'affichage du
+        # bouton (règle 2). Elle rend le **motif**, jamais un simple booléen.
+        #
+        # Le rebond silencieux d'avant — `redirect('/my')` sans un mot quand
+        # les droits manquaient — est indistinguable d'une panne : on clique,
+        # on revient sur son profil, et rien n'explique pourquoi. C'est
+        # exactement ce qui a été signalé.
+        # LA fonction d'accès, la même que celle qui décide de l'affichage du
+        # bouton (règle 2). Elle rend le **motif**, jamais un simple booléen.
+        #
+        # Le rebond silencieux d'avant — `redirect('/my')` sans un mot quand
+        # les droits manquaient — est indistinguable d'une panne : on clique,
+        # on revient sur son profil, et rien n'explique pourquoi.
+        #
+        # Mesuré par régression volontaire : en rétablissant l'ancienne paire
+        # de contrôles, deux tests rougissent — l'un sur le comportement
+        # (« compte interne » absent de la page), l'autre sur l'asymétrie
+        # elle-même (« le contrôleur refait le contrôle de droits à la main »).
+        refus = MembershipFile.deposit_refusal(
+            request.env.user.partner_id, draft=draft)
+        if refus:
+            # On **rend** le motif, on ne redirige pas.
+            #
+            # Rediriger vers `/my/membership` paraissait naturel — la page
+            # affiche déjà une bannière d'erreur. Mesuré : elle rebondit
+            # elle-même vers `/my` pour qui n'a pas le droit de **lire** les
+            # dossiers (même motif, ligne 85), et le compte interne qui vient
+            # d'être refusé est précisément celui-là. Le message se perdait en
+            # route et l'utilisateur revenait sur son profil : le rebond muet,
+            # une seconde fois.
+            #
+            # Une page rendue ne peut pas se perdre.
+            return request.render(
+                'opex_membership.membership_access_refused',
+                {'refus': refus,
+                 'peut_lire': MembershipFile.has_access('read')})
 
         if request.httprequest.method == 'POST':
             subcategory = self._selected_subcategory(post.get('subcategory_id'))
@@ -419,7 +500,7 @@ class MembershipCustomerPortal(CustomerPortal):
                 return self._render_step(
                     'organisation', membership_file,
                     error=_("Le nom légal de l'organisation est obligatoire."))
-            self._save_step(membership_file, 'organisation', post)
+            self._membership_save_step(membership_file, 'organisation', post)
             self._update_candidate_profile(post)
             return request.redirect(self._step_url('activite'))
         return self._render_step('organisation', membership_file)
@@ -435,7 +516,7 @@ class MembershipCustomerPortal(CustomerPortal):
 
         certifications = request.env['opex.certification'].sudo().search([])
         if request.httprequest.method == 'POST':
-            self._save_step(membership_file, 'activite', post)
+            self._membership_save_step(membership_file, 'activite', post)
             self._save_activity_extras(membership_file, post, certifications)
             self._update_candidate_profile(post)
             return request.redirect(self._step_url('representant'))
@@ -473,7 +554,7 @@ class MembershipCustomerPortal(CustomerPortal):
         if redirect:
             return redirect
         if request.httprequest.method == 'POST':
-            self._save_step(membership_file, 'representant', post)
+            self._membership_save_step(membership_file, 'representant', post)
             return request.redirect(self._step_url('complement'))
         return self._render_step('representant', membership_file)
 
@@ -486,7 +567,7 @@ class MembershipCustomerPortal(CustomerPortal):
         if redirect:
             return redirect
         if request.httprequest.method == 'POST':
-            self._save_step(membership_file, 'complement', post)
+            self._membership_save_step(membership_file, 'complement', post)
             return request.redirect(self._step_url('documents'))
         return self._render_step('complement', membership_file)
 
@@ -504,7 +585,7 @@ class MembershipCustomerPortal(CustomerPortal):
             return redirect
         if request.httprequest.method == 'POST':
             self._save_parcours_documents(membership_file)
-            self._save_step(membership_file, 'documents', post)
+            self._membership_save_step(membership_file, 'documents', post)
             return request.redirect(self._step_url('recap'))
         return self._render_step(
             'documents', membership_file, document_slots=self._DOCUMENT_SLOTS)
@@ -589,6 +670,34 @@ class MembershipCustomerPortal(CustomerPortal):
         except (AccessError, MissingError):
             return None
 
+    def _membership_file_not_found(self):
+        """Le refus d'accès à un dossier — **un seul message, neutre**.
+
+        Règle 25 : un refus affiche son motif sur une page rendue. Le rebond
+        muet d'avant (`redirect('/my')`) laissait le candidat devant son
+        profil sans savoir si le dossier avait disparu, s'il s'était trompé
+        de lien, ou si le portail était cassé. C'est le cas qu'un vrai
+        candidat rencontre : un signet gardé, un lien d'un vieil email.
+
+        ⚠ **Un seul message pour les deux cas**, et cela ne se négocie pas.
+        « Ce dossier n'existe pas » et « ce dossier ne vous appartient pas »
+        sont deux réponses différentes : les distinguer dirait à un visiteur
+        que l'objet existe, et lui permettrait d'énumérer les dossiers du
+        portail en changeant l'identifiant. C'est la règle 3 — une donnée
+        réservée ne sort pas, pas même sous forme d'une nuance de message.
+
+        Le motif oriente quand même : il dit où retourner.
+        """
+        return request.render(
+            'opex_membership.membership_access_refused',
+            {'refus': _(
+                "Ce dossier n'existe pas ou ne vous est pas accessible. "
+                "Vérifiez le lien que vous avez suivi — il peut provenir d'un "
+                "message ancien — puis retrouvez vos dossiers depuis « Mes "
+                "dossiers d'adhésion »."),
+             'peut_lire': request.env['opex.membership.file'].has_access(
+                 'read')})
+
     def _own_membership_file(self, file_id):
         """Dossier appartenant au candidat connecté, en `sudo()`, ou `None`.
 
@@ -646,7 +755,7 @@ class MembershipCustomerPortal(CustomerPortal):
     def portal_membership_file_page(self, file_id, **kw):
         membership_file_sudo = self._readable_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         return self._render_membership_file_page(membership_file_sudo)
 
     def _apply_candidate_action(self, membership_file, action):
@@ -679,7 +788,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._own_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         if membership_file_sudo.state != 'draft':
             return request.redirect('/my/membership/%s' % file_id)
         return self._apply_candidate_action(
@@ -704,7 +813,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._own_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         if membership_file_sudo.state not in ('draft', 'correction_requested'):
             return request.redirect('/my/membership/%s' % file_id)
 
@@ -783,7 +892,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._own_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         if membership_file_sudo.state != 'payment_pending':
             return request.redirect('/my/membership/%s' % file_id)
 
@@ -854,7 +963,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._readable_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         return request.render('opex_membership.portal_charte_adhesion', {
             'membership_file': membership_file_sudo,
             'page_name': 'membership',
@@ -872,7 +981,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._own_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         if membership_file_sudo.state != 'signature_pending':
             return request.redirect('/my/membership/%s' % file_id)
         if not post.get('certifie'):
@@ -897,7 +1006,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._own_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         if membership_file_sudo.state != 'signature_pending':
             return request.redirect('/my/membership/%s' % file_id)
 
@@ -926,7 +1035,7 @@ class MembershipCustomerPortal(CustomerPortal):
         """
         membership_file_sudo = self._own_membership_file(file_id)
         if not membership_file_sudo:
-            return request.redirect('/my')
+            return self._membership_file_not_found()
         if membership_file_sudo.state != 'correction_requested':
             return request.redirect('/my/membership/%s' % file_id)
         return self._apply_candidate_action(

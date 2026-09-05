@@ -144,9 +144,9 @@
                 <!-- Les actions rapides du §41. -->
                 <div class="mb-4 d-flex flex-wrap gap-2">
                     <a class="btn btn-primary" href="/missions">Voir les appels</a>
-                    <a class="btn btn-outline-secondary" href="/my/candidatures">Mes candidatures</a>
+                    <a class="btn btn-outline-secondary" href="/my/missions/candidatures">Mes candidatures</a>
                     <a class="btn btn-outline-secondary" href="/my/missions">Mes missions</a>
-                    <a class="btn btn-outline-secondary" href="/my/expertise">Mon expertise</a>
+                    <a class="btn btn-outline-secondary" href="/my/missions/expertise">Mon expertise</a>
                 </div>
 
                 <div t-if="space['opportunites']" class="mb-4">

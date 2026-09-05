@@ -130,7 +130,20 @@ class InnovationProjectPortal(CustomerPortal):
     # ------------------------------------------------------------
 
     @http.route(['/my/innovation'], type='http', auth='user', website=True)
-    def portal_my_projects(self, **kw):
+    def portal_innovation_my_projects(self, **kw):
+        """Le nom est préfixé, et ce n'est pas de la coquetterie.
+
+        Odoo fusionne toutes les sous-classes de `CustomerPortal` en une
+        seule : deux méthodes homonymes n'en laissent qu'une, celle du module
+        chargé en dernier. Nommée `portal_my_projects`, celle-ci écrasait
+        `project/ProjectCustomerPortal.portal_my_projects` — dont
+        `opex_innovation` dépend, donc qui charge avant — et **`/my/projects`
+        disparaissait du routing map**. Mesuré : 404 sur la route native,
+        alors que `/my/innovation` répondait 200.
+
+        Rien ne le signalait. La route perdue n'est pas la nôtre, et son
+        module ne sait pas qu'on existe.
+        """
         projects = self._own_projects()
         return request.render('opex_innovation.portal_my_projects', {
             'projects': projects,

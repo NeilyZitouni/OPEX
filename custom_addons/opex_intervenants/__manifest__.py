@@ -29,7 +29,7 @@ mission en sélection porte simultanément des candidatures short-listées,
     # Monotone. Cette version referme la dette D1 : le critere eliminatoire
     # de certification compare des references canoniques au lieu de texte
     # libre, et les certifications extraites d'un CV se promeuvent.
-    'version': '19.0.20.0.0',
+    'version': '19.0.21.0.0',
 
     # `opex_innovation` : le profil expert et le référentiel de compétences
     # viennent de là et ne sont pas recréés. « Un expert référencé ne ressaisit
@@ -190,6 +190,11 @@ mission en sélection porte simultanément des candidatures short-listées,
         # avant qu'un ecran les propose.
         'data/certification_catalog.xml',
         'views/certification_catalog_views.xml',
+        # Extension IA-3 - le controle qualite assiste. La definition est
+        # chargee apres `mission_roles.xml` (elle y ajoute un role) et apres
+        # les modeles de capital, qu'elle controle.
+        'data/expert_qualification_workflow.xml',
+        'views/expert_qualification_views.xml',
         'views/competence_taxonomy_views.xml',
     ],
 

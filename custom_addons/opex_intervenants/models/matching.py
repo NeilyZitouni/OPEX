@@ -377,15 +377,56 @@ class MissionRequestMatching(models.Model):
                                           if hasattr(attendue, 'display_name')
                                           else str(attendue))
                 if manquantes:
-                    bloquants.append(_(
-                        "%s — il manque : %s"
-                    ) % (criterion.name, ", ".join(sorted(manquantes))))
+                    # DEUX CAS QUI NE SE CONFONDENT PAS, ET C'EST LA NOTE
+                    # DE L'AUTEUR SUR LE §11 :
+                    #
+                    #   « Une certification non rapprochée n'est pas une
+                    #     non-conformité, c'est une file d'arbitrage — elle
+                    #     n'admet pas le candidat, elle nomme ce qu'on ne sait
+                    #     pas encore. »
+                    #
+                    # Un candidat qui **n'a pas** la certification est une
+                    # réponse. Un candidat qui en **déclare une que personne
+                    # n'a rapprochée** est une question - et une question qui
+                    # reste sans trace se repose à chaque appel.
+                    #
+                    # Les deux restent écartés, et le second n'est pas
+                    # négociable : admettre une déclaration non rapprochée
+                    # ferait franchir le critère éliminatoire à un intitulé
+                    # libre qui n'a jamais été comparé à quoi que ce soit.
+                    # C'est la dette D1 rouverte par la porte de derrière.
+                    en_attente = self._matching_unresolved_declarations(
+                        criterion, partner)
+                    if en_attente:
+                        bloquants.append(_(
+                            "%(critere)s — déclaration(s) non rapprochée(s), "
+                            "à arbitrer : %(labels)s"
+                        ) % {'critere': criterion.name,
+                             'labels': ", ".join(sorted(en_attente))})
+                    else:
+                        bloquants.append(_(
+                            "%s — il manque : %s"
+                        ) % (criterion.name, ", ".join(sorted(manquantes))))
                 continue
 
             ok, detail = criterion._compare(source, target)
             if not ok:
                 bloquants.append("%s — %s" % (criterion.name, detail))
         return not bloquants, avertissements + bloquants
+
+    def _matching_unresolved_declarations(self, criterion, partner):
+        """Ce que ce candidat déclare et que personne n'a rapproché.
+
+        Rend une liste de libellés, vide par défaut. C'est le point où une
+        famille de critères dit « je ne sais pas encore », par opposition à
+        « non ».
+
+        Neutre ici, et c'est voulu : `_matching_check_eliminatoires()` ne
+        connaît aucune famille de critère en particulier. La connaissance des
+        certifications vit dans `mission_certification.py`, qui surcharge
+        cette méthode — le fichier du matching reste générique.
+        """
+        return []
 
     @staticmethod
     def _matching_expected_items(source):

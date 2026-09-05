@@ -5,7 +5,7 @@
         Visibilité conditionnelle de l'entrée « Devenir membre » du menu
         principal.
 
-        Le lien pointe sur `/web/signup?redirect=/my/membership/new`, c'est-à-dire
+        Le lien pointe sur `/my/membership/new`, c'est-à-dire
         sur le début du parcours de dépôt. Laissé visible en permanence, il
         s'adressait aussi à un candidat dont le dossier est déjà en contrôle, au
         comité, en paiement ou même actif — et un clic de sa part créait alors un
@@ -44,7 +44,7 @@
               inherit_id="website.submenu" priority="21">
         <xpath expr="//t[@t-set='show_dropdown']" position="before">
             <t t-set="opex_is_become_member_menu"
-               t-value="submenu.url == '/web/signup?redirect=/my/membership/new'"/>
+               t-value="submenu.url == '/my/membership/new'"/>
             <!-- Le coût ne pèse que sur notre entrée : partout ailleurs
                  `opex_is_become_member_menu` est faux et Python court-circuite
                  avant la moindre lecture en base. -->

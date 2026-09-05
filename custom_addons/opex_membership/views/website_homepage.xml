@@ -24,7 +24,7 @@
                         <h1 class="display-4 mb-2">GIC OPEX Group</h1>
                         <p class="lead mb-4">Cluster d'excellence opérationnelle</p>
                         <div class="d-flex flex-wrap gap-2 justify-content-center">
-                            <a href="/web/signup?redirect=/my/membership/new" class="btn btn-light btn-lg">
+                            <a href="/my/membership/new" class="btn btn-light btn-lg">
                                 Devenir membre
                             </a>
                             <a href="/opex/directory" class="btn btn-outline-light btn-lg">

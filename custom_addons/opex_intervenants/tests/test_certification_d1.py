@@ -255,6 +255,150 @@ class TestCertificationD1(MissionCase):
         self.assertTrue(admis)
 
     #
+    # LA NOTE DU §11 — « CE QU'ON NE SAIT PAS ENCORE »
+    #
+
+    def _declaring(self, nom, intitule):
+        """Un expert qui déclare une certification que personne n'a
+        rapprochée."""
+        partner = self.env['res.partner'].sudo().create({'name': nom})
+        profile = self._profile(partner)
+        self.ExpertCert.sudo().create({
+            'profile_id': profile.id,
+            'name': intitule,
+            'source': 'expert',
+            'confiance': 'expert',
+            'date_expiration': date.today() + timedelta(days=365),
+        })
+        partner.invalidate_recordset()
+        return partner
+
+    def test_an_unmatched_declaration_is_not_a_missing_certification(self):
+        """Le premier des deux tests qui portent la note du §11.
+
+            « Une certification non rapprochée n'est pas une non-conformité,
+              c'est une file d'arbitrage : elle n'admet pas le candidat, elle
+              nomme ce qu'on ne sait pas encore. »
+
+        Trois candidats, trois situations qui ne se confondent pas :
+
+        - A détient la certification, rapprochée → **admis** ;
+        - B ne la détient pas → écarté, et c'est une **réponse** ;
+        - C en déclare une que personne n'a rapprochée → écarté aussi, mais
+          c'est une **question**.
+
+        Avant la correction, B et C recevaient le même motif — « il manque :
+        … ». Un responsable lisant la liste des écartés ne pouvait pas savoir
+        s'il regardait un candidat non qualifié ou un candidat dont on ne
+        savait pas encore s'il l'était.
+
+        ⚠ C reste **écarté**, et ce n'est pas négociable : admettre une
+        déclaration non rapprochée ferait franchir le critère éliminatoire à
+        un intitulé libre qui n'a jamais été comparé à quoi que ce soit —
+        c'est la dette D1 rouverte par la porte de derrière.
+        """
+        mission = self._requiring_mission(self.la27001)
+
+        # A — l'assertion positive, sans laquelle un critère qui écarterait
+        # tout le monde ferait passer ce test.
+        detenteur = self.env['res.partner'].sudo().create({'name': "A détient"})
+        self._hold(self._profile(detenteur), self.la27001)
+        detenteur.invalidate_recordset()
+        admis, _motifs = self._admitted(mission, detenteur)
+        self.assertTrue(admis)
+
+        # B — ne détient pas : une réponse.
+        absent = self.env['res.partner'].sudo().create({'name': "B ne détient pas"})
+        self._hold(self._profile(absent), self.cisa)
+        absent.invalidate_recordset()
+        admis_b, motifs_b = self._admitted(mission, absent)
+
+        # C — déclare sans rapprochement : une question.
+        declarant = self._declaring("C déclare", "ISO 27001 Lead Auditor")
+        admis_c, motifs_c = self._admitted(mission, declarant)
+
+        self.assertFalse(admis_b)
+        self.assertFalse(
+            admis_c,
+            "Une déclaration non rapprochée admet le candidat : un intitulé "
+            "libre franchit le critère éliminatoire sans avoir été comparé à "
+            "quoi que ce soit. C'est la dette D1 rouverte.")
+
+        texte_b = " ".join(motifs_b)
+        texte_c = " ".join(motifs_c)
+        self.assertNotEqual(
+            texte_b, texte_c,
+            "« ne détient pas » et « déclare sans rapprochement » reçoivent le "
+            "même motif : une réponse et une question sont confondues.")
+        self.assertIn("il manque", texte_b)
+        self.assertIn("arbitrer", texte_c)
+        self.assertIn(
+            "ISO 27001 Lead Auditor", texte_c,
+            "Le motif ne nomme pas la déclaration à arbitrer.")
+
+    def test_an_unmatched_declaration_goes_to_the_arbitration_queue(self):
+        """Le second : la question laisse une trace.
+
+        Sans elle, la même question se reposerait à chaque appel, sur chaque
+        candidat, sans que personne ne la voie jamais — c'est-à-dire qu'elle
+        serait passée sous silence, ce que la note interdit.
+        """
+        mission = self._requiring_mission(self.la27001)
+        intitule = "Auditeur certifie ISO 27001 par le PECB"
+
+        avant = self.Arbitrage.sudo().search_count(
+            [('name', '=', intitule)])
+        declarant = self._declaring("Déclarant", intitule)
+        self._admitted(mission, declarant)
+
+        lignes = self.Arbitrage.sudo().search([('name', '=', intitule)])
+        self.assertEqual(
+            len(lignes), avant + 1,
+            "La déclaration non rapprochée n'est pas partie en file : elle "
+            "est passée sous silence, et la question se reposera à chaque "
+            "appel.")
+        self.assertEqual(lignes[0].decision, 'pending')
+        self.assertEqual(lignes[0].profile_id, declarant.expert_profile_id)
+        self.assertIn(
+            "Matching", lignes[0].source_document or '',
+            "La ligne ne dit pas d'où vient la question.")
+
+        # Idempotence : un second passage du matching ne repose pas la même
+        # question. Le chemin est réel — on relance un matching plusieurs fois
+        # sur le même appel.
+        self._admitted(mission, declarant)
+        self.assertEqual(
+            self.Arbitrage.sudo().search_count([('name', '=', intitule)]),
+            avant + 1)
+
+    def test_an_expired_unmatched_declaration_poses_no_question(self):
+        """Une certification périmée a sa réponse.
+
+        Elle ne pose aucune question : même rapprochée, elle ne compterait
+        pas. L'envoyer en arbitrage encombrerait la file de lignes que
+        personne n'a de raison de traiter.
+        """
+        mission = self._requiring_mission(self.la27001)
+        partner = self.env['res.partner'].sudo().create({'name': "Périmé libre"})
+        profile = self._profile(partner)
+        self.ExpertCert.sudo().create({
+            'profile_id': profile.id,
+            'name': "Certification perimee non rapprochee",
+            'source': 'expert', 'confiance': 'expert',
+            'date_expiration': date.today() - timedelta(days=10),
+        })
+        partner.invalidate_recordset()
+
+        admis, motifs = self._admitted(mission, partner)
+        self.assertFalse(admis)
+        self.assertIn(
+            "il manque", " ".join(motifs),
+            "Une certification périmée est traitée comme une question alors "
+            "qu'elle a sa réponse.")
+        self.assertFalse(self.Arbitrage.sudo().search_count(
+            [('name', '=', "Certification perimee non rapprochee")]))
+
+    #
     # LE CAS QUI A CAUSÉ LA DETTE : LA CONFIGURATION MUETTE
     #
 

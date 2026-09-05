@@ -599,4 +599,35 @@
         </t>
     </template>
 
+    <!--
+        Tout refus d'acces du parcours d'adhesion, RENDU et non redirige.
+
+        Un gabarit pour les deux refus - le depot et la consultation -, parce
+        que c'est une seule regle : dans ce projet, un refus d'acces affiche
+        son motif. Deux gabarits auraient diverge au premier ajustement.
+
+        Rediriger vers `/my/membership` avec un parametre `error` paraissait
+        naturel : la page porte deja une banniere. Mesure, cela ne marche pas
+        - cette page rebondit elle-meme vers `/my` pour qui n'a pas le droit
+        de LIRE les dossiers, et le compte refuse est precisement celui-la. Le
+        message se perdait, et l'utilisateur revenait sur son profil : le
+        rebond muet une seconde fois.
+
+        Une page rendue ne peut pas se perdre.
+    -->
+    <template id="membership_access_refused" name="Accès refusé — adhésion">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="alert alert-warning" role="alert">
+                    <h5 class="alert-heading">Cet écran n'est pas accessible depuis ce compte</h5>
+                    <p class="mb-0"><t t-out="refus"/></p>
+                </div>
+                <a t-if="peut_lire" href="/my/membership" class="btn btn-primary">
+                    Mes dossiers d'adhésion
+                </a>
+                <a href="/my" class="btn btn-secondary">Retour au portail</a>
+            </div>
+        </t>
+    </template>
+
 </odoo>

@@ -191,7 +191,11 @@ class MissionDashboard(models.AbstractModel):
                     'reference': application.display_name,
                     'mission': application.mission_id.title or '',
                     'etape': application.workflow_stage_label or '',
-                    'url': '/my/candidatures/%s' % application.id,
+                    # `/my/missions/candidature/<id>` : l'espace de noms du
+                    # module est `/my/missions/*` (règle 1). Écrite
+                    # `/my/candidatures/<id>`, cette URL ne correspondait à
+                    # aucune règle du routing map — 404 mesuré.
+                    'url': '/my/missions/candidature/%s' % application.id,
                 }
                 for application in applications
             ],

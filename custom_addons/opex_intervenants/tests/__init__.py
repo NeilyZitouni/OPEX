@@ -30,3 +30,5 @@ from . import test_skill_catalog
 from . import test_cv_promotion
 # Dette D1 - le referentiel de certifications et le critere qui ecarte.
 from . import test_certification_d1
+# Extension IA-3 - le controle qualite assiste du §11 et l'avis du §12.
+from . import test_qualification_review

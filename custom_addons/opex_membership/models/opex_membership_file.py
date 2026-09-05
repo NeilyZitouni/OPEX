@@ -294,6 +294,54 @@ class OpexMembershipFile(models.Model):
         ], order='id asc', limit=1)
 
     @api.model
+    def deposit_refusal(self, partner, draft=None):
+        """**LA** fonction d'accès au dépôt. Rend False, ou le motif du refus.
+
+        Règle 2 du projet : un contrôle d'accès est **une seule fonction**,
+        appelée par la route **et** par le `t-if` du bouton. Elle a été
+        contournée ici, et cela a coûté un diagnostic :
+
+        - le bouton du portail testait `opex_can_apply_membership()`,
+          c'est-à-dire la seule règle du dossier engagé ;
+        - la route testait **deux** choses — `has_access('create')` d'abord,
+          puis le dossier engagé.
+
+        Un compte interne simple passait donc le premier filtre et échouait au
+        second : le bouton s'affichait, le clic renvoyait sur `/my`, sans un
+        mot. Deux questions différentes sous un seul libellé.
+
+        Rend :
+
+        - `False` — le dépôt est possible ;
+        - une **chaîne** — le motif, destiné à être lu par un humain. C'est ce
+          qui distingue un refus d'un bug : un rebond silencieux est
+          indistinguable d'une panne.
+
+        L'ordre des deux contrôles n'est pas indifférent. Les droits d'abord :
+        un compte qui ne peut pas créer n'a pas à s'entendre parler de son
+        dossier en cours, il n'en aura jamais.
+        """
+        if not self.has_access('create'):
+            return _(
+                "Le dépôt d'un dossier d'adhésion se fait depuis un compte "
+                "portail. Votre compte est un compte interne du cluster : il "
+                "lit les dossiers, il n'en dépose pas. Demandez au "
+                "Secrétariat d'ouvrir le dossier, ou connectez-vous avec le "
+                "compte portail de votre organisation."
+            )
+
+        # Un brouillon se reprend : rien ne sera créé, la règle du dossier
+        # engagé ne s'applique pas.
+        if draft:
+            return False
+
+        try:
+            self._check_no_engaged_file(partner)
+        except UserError as refus:
+            return refus.args[0]
+        return False
+
+    @api.model
     def _check_no_engaged_file(self, partner):
         """Refuse un second dossier à un contact qui en a déjà un engagé.
 

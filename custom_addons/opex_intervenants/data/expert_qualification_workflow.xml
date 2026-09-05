@@ -1,0 +1,330 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        LA MACHINE A ETATS DU §11 — douzieme definition du projet.
+
+            REGISTERED -> PROFILE_DRAFT -> SUBMITTED -> QUALITY_CHECK
+            -> QUALIFIED -> ACTIVE
+            branches : TO_COMPLETE · SUSPENDED · REJECTED · ARCHIVED
+
+        POURQUOI ELLE N'EST PAS POSEE SUR LE PROFIL EXPERT
+
+        Deux raisons mesurees, et aucune n'est une preference :
+
+        1. `opex.workflow.mixin.workflow_instance_id` est un **Many2one**, et
+           `start_workflow()` refuse plutot qu'il ne remplace. Le profil est
+           deja pilote par `profile_request` (Module 2) ;
+        2. etendre la definition du Module 2 ferait rougir un module gele :
+           `opex_innovation/tests/test_profiles.py` y verrouille
+           `len(stage_ids) == 6` et `len(transition_ids) == 6`.
+
+        Le dossier de qualification porte donc ce cycle. Ce n'est pas un
+        contournement : ACTIVE, SUSPENDED et ARCHIVED decrivent la vie de
+        l'intervenant APRES la demande, ce dont `profile_request` n'a aucune
+        notion. Les deux se recouvrent sur l'instruction, et voici la
+        correspondance, pour qu'on n'ait pas a la deviner :
+
+        | §11            | profile_request (Module 2) | ici                |
+        | REGISTERED     | (aucune)                   | registered         |
+        | PROFILE_DRAFT  | draft                      | profile_draft      |
+        | SUBMITTED      | submitted                  | submitted          |
+        | QUALITY_CHECK  | review                     | quality_check      |
+        | QUALIFIED      | validated                  | qualified          |
+        | ACTIVE         | (aucune)                        | active             |
+        | TO_COMPLETE    | complement_requested       | to_complete        |
+        | REJECTED       | refused                    | rejected           |
+        | SUSPENDED      | (aucune)                        | suspended          |
+        | ARCHIVED       | (aucune)                        | archived           |
+
+        LE ROLE NE SUPPOSE PAS UN HUMAIN
+
+        `qualification_control` tient toutes les transitions de controle. Rien
+        dans le module ne teste `env.user`, ne lit un groupe, ni ne suppose une
+        personne : remplacer le controleur par un agent autonome demande de
+        changer le PORTEUR du role sur l'instance, pas une ligne de ce
+        fichier. C'est ce que le document Smart Crowdfunding exige, et c'est
+        verifie par un test.
+
+        ⚠ AUCUNE CONDITION NE LIT UN AVIS D'IA.
+
+        Le §12 est categorique : « la decision d'activation reste gouvernee par
+        les regles OPEX ». Aucune transition ci-dessous ne porte de condition
+        sur `anomaly_count`, `blocking_count` ni sur quoi que ce soit que le
+        controle produit. L'agent prepare, un humain tranche.
+
+        Un test lit les conditions de cette definition et rougit si l'une
+        d'elles nomme un champ produit par le controle.
+    -->
+    <data noupdate="1">
+
+        <!-- ============================================================
+             LE ROLE
+             ============================================================ -->
+
+        <record id="role_qualification_control" model="opex.workflow.role">
+            <field name="name">Contrôle qualité</field>
+            <field name="code">qualification_control</field>
+            <field name="description">Instruit le dossier de qualification d'un intervenant et rend la décision. Le porteur peut être un membre du cluster ou un agent automatisé : le workflow ne fait aucune différence, et c'est délibéré — le remplacement de l'un par l'autre ne doit modifier aucune définition.</field>
+        </record>
+
+        <!-- ============================================================
+             LA DEFINITION
+             ============================================================ -->
+
+        <record id="wf_expert_qualification" model="opex.workflow.definition">
+            <field name="name">Qualification d'un intervenant</field>
+            <field name="code">expert_qualification</field>
+            <field name="model_id" ref="model_opex_expert_qualification_review"/>
+            <field name="description">Cycle de vie de la qualification d'un intervenant — §11. Le contrôle qualité est une étape ; l'agent d'assistance y produit un avis structuré, jamais une décision (§12).</field>
+        </record>
+
+        <!-- ============================================================
+             LES ETAPES
+             ============================================================ -->
+
+        <record id="eqst_registered" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">registered</field>
+            <field name="name">Inscrit</field>
+            <field name="user_label">Inscription enregistrée</field>
+            <field name="is_start" eval="True"/>
+            <field name="sequence">10</field>
+        </record>
+
+        <record id="eqst_profile_draft" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">profile_draft</field>
+            <field name="name">Profil en cours de saisie</field>
+            <field name="user_label">Action requise : compléter votre profil</field>
+            <field name="sequence">20</field>
+        </record>
+
+        <record id="eqst_submitted" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">submitted</field>
+            <field name="name">Profil soumis</field>
+            <field name="user_label">Profil soumis, en attente de prise en charge</field>
+            <field name="sequence">30</field>
+        </record>
+
+        <record id="eqst_quality_check" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">quality_check</field>
+            <field name="name">Contrôle qualité</field>
+            <field name="user_label">Dossier en cours de contrôle</field>
+            <field name="sequence">40</field>
+        </record>
+
+        <record id="eqst_to_complete" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">to_complete</field>
+            <field name="name">À compléter</field>
+            <field name="user_label">Action requise : compléter votre dossier</field>
+            <field name="sequence">50</field>
+        </record>
+
+        <record id="eqst_qualified" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualified</field>
+            <field name="name">Qualifié</field>
+            <field name="user_label">Profil qualifié</field>
+            <field name="sequence">60</field>
+        </record>
+
+        <record id="eqst_active" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">active</field>
+            <field name="name">Actif</field>
+            <field name="user_label">Intervenant actif au vivier</field>
+            <field name="sequence">70</field>
+        </record>
+
+        <record id="eqst_suspended" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">suspended</field>
+            <field name="name">Suspendu</field>
+            <field name="user_label">Profil suspendu</field>
+            <field name="sequence">80</field>
+        </record>
+
+        <!--
+            REJECTED et ARCHIVED sont les deux seules etapes finales.
+
+            `active` ne l'est pas, et c'est le point : un intervenant actif
+            reste dans le processus. `do_transition()` pose `state = 'done'`
+            en atteignant une etape `is_end` (regle 14), et
+            `_check_transition_allowed()` refuse alors tout — une
+            qualification close en `active` ne pourrait plus etre suspendue
+            ni archivee, ce qui est precisement ce que la vie d'un vivier
+            demande.
+        -->
+        <record id="eqst_rejected" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">rejected</field>
+            <field name="name">Refusé</field>
+            <field name="user_label">Candidature au vivier non retenue</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">90</field>
+        </record>
+
+        <record id="eqst_archived" model="opex.workflow.stage">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">archived</field>
+            <field name="name">Archivé</field>
+            <field name="user_label">Dossier archivé</field>
+            <field name="is_end" eval="True"/>
+            <field name="sequence">100</field>
+        </record>
+
+        <!-- ============================================================
+             LES TRANSITIONS
+             ============================================================
+
+             AUCUNE ne porte de condition sur un champ produit par le
+             controle qualite. C'est le §12, et c'est verifie par un test.
+        -->
+
+        <record id="eqtr_start_profile" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_start_profile</field>
+            <field name="name">Commencer le profil</field>
+            <field name="source_stage_id" ref="eqst_registered"/>
+            <field name="target_stage_id" ref="eqst_profile_draft"/>
+            <field name="sequence">10</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_submit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_submit</field>
+            <field name="name">Soumettre le profil</field>
+            <field name="source_stage_id" ref="eqst_profile_draft"/>
+            <field name="target_stage_id" ref="eqst_submitted"/>
+            <field name="sequence">20</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_take_over" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_take_over</field>
+            <field name="name">Prendre en charge le contrôle</field>
+            <field name="source_stage_id" ref="eqst_submitted"/>
+            <field name="target_stage_id" ref="eqst_quality_check"/>
+            <field name="sequence">30</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_request_complement" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_request_complement</field>
+            <field name="name">Demander un complément</field>
+            <field name="source_stage_id" ref="eqst_quality_check"/>
+            <field name="target_stage_id" ref="eqst_to_complete"/>
+            <field name="sequence">40</field>
+            <field name="requires_comment" eval="True"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_resubmit" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_resubmit</field>
+            <field name="name">Renvoyer le dossier complété</field>
+            <field name="source_stage_id" ref="eqst_to_complete"/>
+            <field name="target_stage_id" ref="eqst_quality_check"/>
+            <field name="sequence">50</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_intervenant'), ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_qualify" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_qualify</field>
+            <field name="name">Qualifier le profil</field>
+            <field name="source_stage_id" ref="eqst_quality_check"/>
+            <field name="target_stage_id" ref="eqst_qualified"/>
+            <field name="sequence">60</field>
+            <field name="requires_comment" eval="True"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_reject" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_reject</field>
+            <field name="name">Ne pas retenir</field>
+            <field name="source_stage_id" ref="eqst_quality_check"/>
+            <field name="target_stage_id" ref="eqst_rejected"/>
+            <field name="sequence">70</field>
+            <field name="requires_comment" eval="True"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_activate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_activate</field>
+            <field name="name">Activer au vivier</field>
+            <field name="source_stage_id" ref="eqst_qualified"/>
+            <field name="target_stage_id" ref="eqst_active"/>
+            <field name="sequence">80</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_suspend" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_suspend</field>
+            <field name="name">Suspendre</field>
+            <field name="source_stage_id" ref="eqst_active"/>
+            <field name="target_stage_id" ref="eqst_suspended"/>
+            <field name="sequence">90</field>
+            <field name="requires_comment" eval="True"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_reinstate" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_reinstate</field>
+            <field name="name">Réactiver</field>
+            <field name="source_stage_id" ref="eqst_suspended"/>
+            <field name="target_stage_id" ref="eqst_active"/>
+            <field name="sequence">100</field>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <record id="eqtr_archive_suspended" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_archive_suspended</field>
+            <field name="name">Archiver le dossier</field>
+            <field name="source_stage_id" ref="eqst_suspended"/>
+            <field name="target_stage_id" ref="eqst_archived"/>
+            <field name="sequence">110</field>
+            <field name="requires_comment" eval="True"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+        <!--
+            Sans cette transition, `to_complete` serait un cul-de-sac pour un
+            dossier abandonne : `_check_graph()` l'accepterait (il exige
+            l'absence de cul-de-sac, or `qualification_resubmit` en sort),
+            mais un dossier laisse sans reponse pendant des mois resterait
+            dans la file du §20 pour toujours.
+        -->
+        <record id="eqtr_archive_to_complete" model="opex.workflow.transition">
+            <field name="definition_id" ref="wf_expert_qualification"/>
+            <field name="code">qualification_archive_abandoned</field>
+            <field name="name">Archiver un dossier sans suite</field>
+            <field name="source_stage_id" ref="eqst_to_complete"/>
+            <field name="target_stage_id" ref="eqst_archived"/>
+            <field name="sequence">120</field>
+            <field name="requires_comment" eval="True"/>
+            <field name="allowed_role_ids" eval="[Command.set([ref('role_qualification_control')])]"/>
+        </record>
+
+    </data>
+
+    <!--
+        La publication hors bloc `noupdate` : elle doit se rejouer a chaque
+        `-u`, sinon une definition modifiee resterait en brouillon.
+    -->
+    <function model="opex.workflow.definition" name="action_publish">
+        <value eval="[ref('wf_expert_qualification')]"/>
+    </function>
+
+</odoo>

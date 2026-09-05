@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Le prompt du controle qualite assiste - IA-3.
+
+        Il n'est appele QU'APRES les controles deterministes, et seulement
+        pour ce qu'ils ne savent pas faire. D'ou les trois seuls controles
+        qu'il instruit : coherence de fond, competences non justifiees,
+        references a clarifier. L'identite, la completude, les
+        certifications et la conformite se verifient - elles ne se jugent
+        pas, et un modele de langage y serait moins fiable qu'un `if`.
+
+        LA CONSIGNE QUI COMPTE
+
+        Le modele rend un AVIS, jamais une decision. Le prompt le lui dit, et
+        le code le lui impose : `_validate_ai_payload()` degrade toute
+        gravite `blocking` rendue par l'IA en `warning`. Un jugement de
+        modele qui bloquerait un dossier serait une decision d'activation
+        prise par l'IA, ce que le §12 interdit.
+
+        Pas de `noupdate` : un prompt ne porte aucun etat d'execution, le
+        fichier est la reference, et un `-u` doit le redeployer.
+    -->
+    <data>
+
+        <record id="prompt_qualification_review" model="opex.ai.prompt">
+            <field name="code">qualification_review</field>
+            <field name="name">Contrôle qualité d'un profil expert</field>
+            <field name="version">1</field>
+            <field name="expected_keys">anomalies</field>
+            <field name="description">Seconde moitié du contrôle qualité du §11, appelée après les contrôles déterministes. Le modèle n'instruit que ce qui relève du jugement : contradictions de fond, compétences non justifiées par le parcours, points à clarifier.
+
+Il ne vérifie ni l'identité, ni la complétude, ni les certifications, ni la conformité — quatre contrôles entièrement déterministes, qu'un `if` fait mieux et gratuitement.</field>
+            <field name="body">Tu assistes le contrôle qualité d'un profil d'expert pour un cluster de conseil.
+
+Des contrôles automatiques ont DÉJÀ vérifié : les champs manquants, les dates incohérentes, les certifications expirées, les doublons. Ne les refais pas.
+
+Ton rôle est le jugement de fond, et lui seul.
+
+PROFIL DÉCLARÉ :
+{profil_declare}
+
+COMPÉTENCES DÉCLARÉES :
+{competences}
+
+EXPÉRIENCES :
+{experiences}
+
+CERTIFICATIONS :
+{certifications}
+
+TU CHERCHES TROIS CHOSES, ET RIEN D'AUTRE :
+
+1. coherence — une contradiction de fond entre ce qui est déclaré et ce que le parcours montre. Exemple : « 20 ans d'expérience » avec trois expériences couvrant six ans.
+
+2. competences — une compétence annoncée que rien dans le parcours ne justifie. Sois prudent : une compétence peut avoir été exercée sans figurer dans un intitulé de poste. Ne signale que ce qui est franchement inexpliqué.
+
+3. references — un point à clarifier avec l'intervenant : un trou de parcours long et non expliqué, un intitulé trop vague pour être vérifié.
+
+RÈGLES :
+
+- tu rends un AVIS, jamais une décision. Tu n'écris ni « à refuser », ni « à activer », ni « profil non conforme » ;
+- la gravité est « info » ou « warning ». Tu n'utilises jamais « blocking » : bloquer un dossier est une décision humaine ;
+- dans le doute, tu ne signales rien. Une fausse alerte coûte plus cher qu'une alerte manquée : elle fait douter d'un dossier sain, et un contrôleur qui reçoit trois fausses alertes cesse de lire les vraies ;
+- tu justifies chaque anomalie en une phrase, en citant ce qui te la fait dire.
+
+Réponds UNIQUEMENT par un objet JSON, sans texte autour :
+
+{"anomalies": [{"controle": "coherence", "gravite": "warning", "libelle": "Anciennete declaree superieure au parcours", "justification": "20 ans declares, 6 ans couverts par les experiences listees"}]}
+
+Si rien ne te paraît devoir être signalé :
+
+{"anomalies": []}</field>
+        </record>
+
+    </data>
+</odoo>
