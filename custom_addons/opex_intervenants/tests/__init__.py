@@ -32,3 +32,6 @@ from . import test_cv_promotion
 from . import test_certification_d1
 # Extension IA-3 - le controle qualite assiste du §11 et l'avis du §12.
 from . import test_qualification_review
+
+# Le demarrage a echeance : le cron demande au moteur, il ne force jamais.
+from . import test_mission_autostart

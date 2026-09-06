@@ -173,6 +173,10 @@ mission en sélection porte simultanément des candidatures short-listées,
         #
         # `expert_cv_views.xml` hérite de `view_expert_profile_form_capital`
         # (Extension 3) : chargé après elle.
+        # Le démarrage des missions à leur date de début contractuelle.
+        # Après les workflows : il référence `mission_start`, qui est déclarée
+        # par `mission_request_workflow.xml`.
+        'data/ir_cron_mission_autostart.xml',
         'data/ir_cron_cv_parsing.xml',
         'views/expert_cv_views.xml',
         # Extension IA-2 - la taxonomie du §8 et le rapprochement en deux temps.

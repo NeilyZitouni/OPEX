@@ -30,6 +30,11 @@ from . import mission_operational
 from . import mission_deliverable
 from . import mission_execution
 from . import mission_execution_request
+# Le démarrage à échéance. Fichier séparé de `mission_operational` **par
+# nécessité** : la garde de source de l'Extension 7 y refuse `do_transition`,
+# et ce cron en fait un. La ligne de partage — l'horloge n'est pas un
+# déclencheur métier — est écrite dans son en-tête.
+from . import mission_autostart
 # Extension 9 — service fait et facturation. `service_acceptance` d'abord : son
 # `related` vers `deliverable_unvalidated_count` est ce qui permet à la règle 6
 # de garder aussi la validation du cluster. `mission_invoicing` ensuite, et en

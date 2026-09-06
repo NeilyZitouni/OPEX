@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!--
+        Démarrage automatique des missions à leur date de début contractuelle.
+
+        `noupdate="1"` : l'administrateur change la fréquence, l'identité
+        d'exécution ou désactive l'action depuis l'écran, et une mise à jour
+        du module ne doit pas rétablir ses valeurs. C'est le parti des trois
+        crons déjà en place.
+
+        Cadence quotidienne, et ce n'est pas un réglage par défaut :
+        `date_debut` est une **date**, sans heure. La vérifier toutes les
+        heures produirait vingt-quatre fois la même réponse, et démarrerait la
+        mission à une heure arbitraire de la nuit plutôt que dans la journée
+        où elle est censée commencer.
+
+        ⚠ L'IDENTITÉ D'EXÉCUTION EST UN RÉGLAGE, PAS UN DÉTAIL.
+
+        `do_transition()` juge les rôles de `env.user`, et `sudo()` ne change
+        pas `env.user`. L'utilisateur porté par ce cron doit donc tenir un
+        rôle autorisé sur « Démarrer la mission » — `mission_manager` ou
+        `intervenant` — ou appartenir à `opex_workflow.group_workflow_manager`,
+        qui autorise le forçage.
+
+        `user_id` n'est volontairement **pas** renseigné ici : le laisser vide
+        fait s'exécuter le cron sous le super-utilisateur, ce qui convient à
+        une installation où l'administrateur tient les groupes du module, et
+        laisse l'administrateur désigner un compte de service là où ce n'est
+        pas le cas. Le renseigner en data désignerait un utilisateur qui
+        n'existe pas forcément sur l'instance de déploiement.
+
+        Le cron le dit dans le journal quand il ne peut pas franchir : il ne
+        se tait jamais sur un refus.
+    -->
+    <data noupdate="1">
+
+        <record id="cron_mission_autostart" model="ir.cron">
+            <field name="name">OPEX Intervenants : démarrage des missions à échéance</field>
+            <field name="model_id" ref="model_opex_mission_request"/>
+            <field name="state">code</field>
+            <field name="code">model._cron_start_due_missions()</field>
+            <field name="interval_number">1</field>
+            <field name="interval_type">days</field>
+            <field name="active" eval="True"/>
+        </record>
+
+    </data>
+</odoo>
