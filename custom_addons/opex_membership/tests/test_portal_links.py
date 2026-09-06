@@ -53,8 +53,9 @@ MODULES = ('opex_membership', 'opex_innovation', 'opex_intervenants',
 #: natives d'Odoo ne sont pas de notre ressort.
 PREFIXES = ('/my', '/staff')
 
-#: Une chaîne qui ressemble à un chemin de portail, dans du XML ou du Python.
-CANDIDATE = re.compile(r'["\'](/(?:my|staff)(?:/[^"\'\s]*)?)["\']')
+#: Un attribut XML et sa valeur, délimiteur compris. Le groupe retenu dépend
+#: du guillemet ouvrant : c'est lui, et lui seul, qui ferme la valeur.
+ATTRIBUT = re.compile(r'([\w:.-]+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\')')
 
 #: Ce qu'une lecture statique sait réduire à un segment : `%s`, `%d`, les
 #: convertisseurs de route `<int:x>`, et l'interpolation QWeb `#{…}` / `{{…}}`.
@@ -130,11 +131,32 @@ def _urls_du_python(chemin):
 
 
 def _urls_du_xml(chemin):
-    """Les URL citées dans un gabarit : `href`, `action`, `t-attf-*`."""
+    """Les URL citées dans un gabarit : `href`, `action`, `t-attf-*`, `t-value`.
+
+    ⚠ La lecture porte sur des **attributs**, pas sur des chaînes entre
+    guillemets, et la nuance a été payée. Une capture qui s'arrête au premier
+    guillemet — simple ou double — coupe au milieu d'une expression QWeb :
+
+        t-attf-action="/staff/missions/#{mission.id}/action/#{action['transition'].code}"
+
+    L'apostrophe de `['transition']` terminait la capture, le `#{action[`
+    restant était ensuite coupé comme une **ancre**, et il sortait
+    `/staff/missions/1/action` — une URL que personne n'a écrite, signalée
+    comme lien mort alors que la page fonctionne.
+
+    Le délimiteur de l'attribut est connu : tout ce qu'il contient lui
+    appartient, apostrophes comprises.
+    """
     with open(chemin, encoding='utf-8') as fichier:
         for numero, ligne in enumerate(fichier, start=1):
-            for url in CANDIDATE.findall(ligne):
-                yield url, numero
+            for _nom, double, simple in ATTRIBUT.findall(ligne):
+                valeur = (double or simple).strip()
+                # `t-value="'/staff/membership'"` : la valeur est une
+                # expression Python dont la chaîne est le tout.
+                if len(valeur) > 1 and valeur[0] == valeur[-1] == "'":
+                    valeur = valeur[1:-1]
+                if valeur.startswith(PREFIXES):
+                    yield valeur, numero
 
 
 def relever(modules=MODULES):

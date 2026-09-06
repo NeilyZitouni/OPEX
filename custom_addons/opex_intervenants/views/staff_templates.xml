@@ -35,7 +35,11 @@
                                 <td class="text-end" t-out="m.matching_candidate_count"/>
                                 <td class="text-end" t-out="m.received_application_count"/>
                                 <td class="text-end">
-                                    <a class="btn btn-sm btn-outline-secondary"
+                                    <a class="btn btn-sm btn-primary"
+                                       t-attf-href="/staff/missions/#{m.id}">
+                                        Ouvrir
+                                    </a>
+                                    <a class="btn btn-sm btn-outline-secondary ms-1"
                                        t-attf-href="/staff/missions/#{m.id}/pool">
                                         Pool
                                     </a>
@@ -311,7 +315,19 @@
                         </div>
                     </div>
                     <div>
-                        <a class="btn btn-outline-primary"
+                        <!--
+                            Le lien vers les décisions de l'APPEL, et il n'est
+                            pas décoratif : c'est ici que le décideur constate
+                            qu'un candidat est en « Retenus », et l'attribution
+                            se prend là-bas. Sans ce lien, l'écran qui la porte
+                            n'était atteignable qu'en connaissant son URL —
+                            une page sans lien est une page absente.
+                        -->
+                        <a class="btn btn-outline-secondary"
+                           t-attf-href="/staff/missions/#{mission.id}">
+                            Décisions sur l'appel
+                        </a>
+                        <a class="btn btn-outline-primary ms-1"
                            t-attf-href="/staff/missions/#{mission.id}/matching">
                             Smart Matching
                         </a>
@@ -616,6 +632,353 @@
                 </div>
             </div>
         </t>
+    </template>
+
+    <!--
+        §8 ET §17 — LE DÉTAIL DE L'APPEL ET SES DÉCISIONS
+
+        L'écran qui manquait. Le matching et le pool vivaient au portail, mais
+        « Publier l'appel » n'existait qu'au back-office : le premier geste du
+        cycle était le seul à ne pas y être.
+
+        Il porte désormais tout le chemin de l'appel, de la qualification au
+        lancement de la contractualisation. Le trou était le même que celui du
+        §8, un cran plus loin : `/pool` fait avancer une **candidature**, et
+        renvoyer vers lui pour l'attribution renvoyait vers un écran qui ne
+        pouvait pas la porter. Trois rôles s'y succèdent sans que personne ne
+        retourne au back-office — Responsable, Décideur, Secrétariat.
+
+        ⚠ AUCUN `t-if` NE DÉCIDE ICI QUI VOIT QUOI.
+
+        Les boutons viennent de `transition_options()`, c'est-à-dire du
+        croisement que le moteur fait déjà entre l'étape courante et les rôles
+        de l'utilisateur. « Demander un complément » n'apparaît donc qu'au
+        Secrétariat, et seulement en `qualified`, parce que la configuration le
+        dit — pas parce qu'un gabarit l'a réécrit.
+
+        Ce n'est pas une élégance : le POST se garde avec **la même** liste.
+        Un `t-if` écrit ici serait une seconde vérité, et c'est toujours la
+        seconde qui dérive.
+    -->
+    <template id="staff_mission_detail" name="Staff : détail de l'appel">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small" t-out="mission.name"/>
+                        <h3 class="mb-0" t-out="mission.title"/>
+                        <div class="text-muted">
+                            <t t-out="mission.mission_type_id.name"/> —
+                            <span class="badge text-bg-light"
+                                  t-out="mission.workflow_stage_label"/>
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <a class="btn btn-light" href="/staff/missions">Retour</a>
+                        <a class="btn btn-outline-secondary ms-1"
+                           t-attf-href="/staff/missions/#{mission.id}/pool">Pool</a>
+                        <a class="btn btn-outline-primary ms-1"
+                           t-attf-href="/staff/missions/#{mission.id}/matching">Smart Matching</a>
+                    </div>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                <!-- Le motif du dernier retour au client, lu dans le journal. -->
+                <div t-if="complement_reason" class="alert alert-info">
+                    <strong>Dernier complément demandé :</strong>
+                    <span t-out="complement_reason"/>
+                </div>
+
+                <!--
+                    LES DÉCISIONS
+
+                    Chaque action est un formulaire POST distinct. Le champ de
+                    motif n'apparaît que si la transition l'exige, et son
+                    caractère obligatoire est tenu par le moteur : `required`
+                    ci-dessous n'est qu'un confort de saisie.
+                -->
+                <!--
+                    LA CONTRACTUALISATION — §19
+
+                    Un bloc séparé, parce que c'est une **autre instance** :
+                    le sous-workflow `mission_contract` tourne sur le même
+                    enregistrement, et le bloc « Décisions » ci-dessous lit
+                    `mission.workflow_instance_id`, qui ne le voit pas.
+
+                    Les deux confirmations sont affichées avant les boutons :
+                    « Signatures recueillies » n'est franchissable que
+                    lorsqu'elles sont là, et le responsable doit pouvoir
+                    constater pourquoi elle est fermée sans avoir à ouvrir le
+                    back-office.
+                -->
+                <div class="card mb-4" t-if="contract_stage">
+                    <div class="card-header fw-bold d-flex justify-content-between">
+                        <span>Contractualisation</span>
+                        <span class="badge text-bg-light" t-out="contract_stage"/>
+                    </div>
+
+                    <ul class="list-group list-group-flush" t-if="contract_pieces">
+                        <li t-foreach="contract_pieces" t-as="piece"
+                            class="list-group-item">
+                            <div class="d-flex justify-content-between flex-wrap gap-2">
+                                <span>
+                                    <strong t-out="piece['type']"/>
+                                    <span class="text-muted small ms-1"
+                                          t-out="piece['name']"/>
+                                    <span class="text-muted small">
+                                        — version <t t-out="piece['version']"/>
+                                    </span>
+                                </span>
+                                <span>
+                                    <span t-if="piece['client_signe']"
+                                          class="badge text-bg-success">
+                                        Client : <t t-out="piece['client_nom']"/>
+                                    </span>
+                                    <span t-else="" class="badge text-bg-secondary">
+                                        Client : en attente
+                                    </span>
+                                    <span t-if="piece['intervenant_signe']"
+                                          class="badge text-bg-success ms-1">
+                                        Intervenant : <t t-out="piece['intervenant_nom']"/>
+                                    </span>
+                                    <span t-else="" class="badge text-bg-secondary ms-1">
+                                        Intervenant : en attente
+                                    </span>
+                                </span>
+                            </div>
+                        </li>
+                    </ul>
+
+                    <div class="card-body">
+                        <div t-if="not contract_actions" class="text-muted mb-0">
+                            Aucune décision de contractualisation ne vous est
+                            ouverte à cette étape du contrat.
+                        </div>
+                        <div t-foreach="contract_actions" t-as="action"
+                             class="border rounded p-3 mb-2">
+                            <form method="post"
+                                  t-attf-action="/staff/missions/#{mission.id}/contrat/#{action['transition'].code}">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div>
+                                        <div class="fw-bold"
+                                             t-out="action['transition'].name"/>
+                                        <div t-if="not action['available']"
+                                             class="small text-danger"
+                                             t-out="action['reason']"/>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary"
+                                            t-att-disabled="not action['available'] or None"
+                                            t-out="action['transition'].name"/>
+                                </div>
+                                <div t-if="action['transition'].requires_comment"
+                                     class="mt-2">
+                                    <label class="form-label small mb-1">
+                                        Motif — obligatoire, il est consigné
+                                        dans l'historique du contrat
+                                    </label>
+                                    <textarea name="comment" rows="2"
+                                              required="required"
+                                              class="form-control"
+                                              placeholder="La raison de cette décision."/>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-header fw-bold">Décisions</div>
+                    <div class="card-body">
+                        <!--
+                            Le vide se dit en nommant les DEUX raisons
+                            possibles, parce qu'elles ne se distinguent pas à
+                            l'écran : l'étape n'offre rien, ou elle n'offre
+                            rien *à ce rôle-là*. Le libellé mentionnait
+                            « qualification » du temps où la liste fermée
+                            s'arrêtait à la publication ; il envoyait alors
+                            chercher un défaut d'écran là où il n'y avait
+                            qu'une étape non atteinte.
+                        -->
+                        <div t-if="not actions" class="text-muted mb-0">
+                            Aucune décision ne vous est ouverte sur cet appel :
+                            son étape actuelle
+                            (<span t-out="mission.workflow_stage_label"/>)
+                            n'en propose aucune, ou celles qu'elle propose
+                            relèvent d'un autre rôle.
+                        </div>
+                        <div t-foreach="actions" t-as="action"
+                             class="border rounded p-3 mb-2">
+                            <form method="post"
+                                  t-attf-action="/staff/missions/#{mission.id}/action/#{action['transition'].code}">
+                                <input type="hidden" name="csrf_token"
+                                       t-att-value="request.csrf_token()"/>
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                    <div>
+                                        <div class="fw-bold"
+                                             t-out="action['transition'].name"/>
+                                        <div t-if="action['transition'].description"
+                                             class="small text-muted"
+                                             t-out="action['transition'].description"/>
+                                        <div t-if="not action['available']"
+                                             class="small text-danger"
+                                             t-out="action['reason']"/>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary"
+                                            t-att-disabled="not action['available'] or None"
+                                            t-out="action['transition'].name"/>
+                                </div>
+                                <!--
+                                    Le motif n'est plus toujours « pour le
+                                    client » : celui d'« Attribuer la mission »
+                                    ou d'un désistement est une décision
+                                    interne, journalisée. Le libellé dit donc
+                                    ce qui est vrai des deux — il est
+                                    obligatoire et il reste au dossier.
+                                -->
+                                <div t-if="action['transition'].requires_comment"
+                                     class="mt-2">
+                                    <label class="form-label small mb-1">
+                                        Motif — obligatoire, il est consigné dans
+                                        l'historique de l'appel
+                                    </label>
+                                    <textarea name="comment" rows="2" required="required"
+                                              class="form-control"
+                                              placeholder="La raison de cette décision."/>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LA DEMANDE, dans l'ordre des blocs du §4 -->
+                <div class="row g-3">
+                    <div class="col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-header fw-bold">Général</div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Client :</strong>
+                                    <t t-out="mission.client_id.display_name"/></p>
+                                <p class="mb-1"><strong>Type :</strong>
+                                    <t t-out="mission.mission_type_id.name"/></p>
+                                <p class="mb-1"><strong>Domaine :</strong>
+                                    <t t-out="mission.domaine_id.name or '—'"/></p>
+                                <p class="mb-1"><strong>Description :</strong></p>
+                                <p class="text-muted" t-out="mission.description or '—'"/>
+                                <p class="mb-1"><strong>Objectifs :</strong></p>
+                                <p class="text-muted" t-out="mission.objectifs or '—'"/>
+                                <p class="mb-1"><strong>Résultats attendus :</strong></p>
+                                <p class="text-muted mb-0"
+                                   t-out="mission.resultats_attendus or '—'"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6">
+                        <div class="card mb-3">
+                            <div class="card-header fw-bold">Profil recherché</div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Compétences :</strong>
+                                    <t t-out="', '.join(mission.skill_ids.mapped('name')) or '—'"/></p>
+                                <p class="mb-1"><strong>Niveau :</strong>
+                                    <t t-out="mission.niveau_experience or '—'"/></p>
+                                <p class="mb-1"><strong>Localisation :</strong>
+                                    <t t-out="mission.localisation or '—'"/></p>
+                                <p class="mb-0"><strong>Mode :</strong>
+                                    <t t-out="mission.mode_intervention or '—'"/></p>
+                            </div>
+                        </div>
+
+                        <div class="card mb-3">
+                            <div class="card-header fw-bold">Calendrier et budget</div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Début souhaité :</strong>
+                                    <t t-out="mission.date_debut_souhaitee or '—'"/></p>
+                                <p class="mb-1"><strong>Fin souhaitée :</strong>
+                                    <t t-out="mission.date_fin_souhaitee or '—'"/></p>
+                                <p class="mb-1"><strong>Durée estimée :</strong>
+                                    <t t-out="mission.duree_estimee_jours or '—'"/> jour(s)</p>
+                                <p class="mb-1"><strong>Date limite de candidature :</strong>
+                                    <t t-out="mission.date_limite_candidature or '—'"/></p>
+                                <p class="mb-0"><strong>Budget estimatif :</strong>
+                                    <t t-out="mission.budget_estimatif"/></p>
+                            </div>
+                        </div>
+
+                        <div class="card">
+                            <div class="card-header fw-bold">Sourcing et confidentialité</div>
+                            <div class="card-body">
+                                <p class="mb-1"><strong>Mode de sourcing :</strong>
+                                    <t t-out="mission.sourcing_mode or '—'"/></p>
+                                <p class="mb-1"><strong>Publié au catalogue :</strong>
+                                    <t t-out="'oui' if mission.is_published else 'non'"/></p>
+                                <p class="mb-0"><strong>NDA exigé :</strong>
+                                    <t t-out="'oui' if mission.nda_required else 'non'"/></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L'historique, tel que le modèle le prépare -->
+                <div class="card mt-4">
+                    <div class="card-header fw-bold">Historique</div>
+                    <ul class="list-group list-group-flush">
+                        <li t-if="not history" class="list-group-item text-muted">
+                            Aucun mouvement enregistré.
+                        </li>
+                        <li t-foreach="history" t-as="entry" class="list-group-item">
+                            <span class="text-muted small me-2" t-out="entry['date']"/>
+                            <span t-out="entry['body']"/>
+                            <div t-if="entry['comment']" class="small text-muted"
+                                 t-out="entry['comment']"/>
+                        </li>
+                    </ul>
+                </div>
+
+            </div>
+        </t>
+    </template>
+
+    <!--
+        LE POINT D'ENTRÉE DEPUIS `/my`
+
+        Le trou de navigation : l'espace responsable ne se référençait que
+        lui-même. `/staff/queue` était lié depuis `/staff/missions`, et
+        `/staff/missions` depuis les autres pages `/staff/*` — donc il fallait
+        déjà y être pour y entrer. Une page inatteignable est une page absente.
+
+        Motif repris tel quel d'`opex_membership.portal_my_home_staff`, y
+        compris `config_card` : sans lui, `portal.portal_docs_entry` rend la
+        carte en `d-none` et ne la réaffiche que si un compteur asynchrone
+        revient strictement positif. Une file vide est une information — « rien
+        ne vous attend » — et la tuile ne doit pas disparaître pour autant.
+
+        Pas de `placeholder_count` : cette tuile n'en demande aucun, donc le
+        controller n'en renvoie aucun. Les deux, ou aucun (règle 6).
+
+        Le `t-if` pose **exactement** la question que la route pose :
+        `_is_missions_staff()`, la même fonction (règle 2).
+    -->
+    <template id="portal_my_home_missions_staff"
+              name="Portail : espace responsable Missions"
+              customize_show="True" inherit_id="portal.portal_my_home"
+              priority="62">
+        <xpath expr="//div[hasclass('o_portal_docs')]" position="before">
+            <t t-set="portal_client_category_enable" t-value="True"/>
+        </xpath>
+        <div id="portal_client_category" position="inside">
+            <t t-if="request.env.user._is_missions_staff()">
+                <t t-call="portal.portal_docs_entry">
+                    <t t-set="title">Espace responsable Missions</t>
+                    <t t-set="text">Qualifier les demandes, publier les appels, comparer les candidatures</t>
+                    <t t-set="url" t-value="'/staff/missions'"/>
+                    <t t-set="config_card" t-value="True"/>
+                </t>
+            </t>
+        </div>
     </template>
 
 </odoo>

@@ -790,6 +790,54 @@ correspondre à une règle. 82 URL relevées sur les quatre modules.
 ⚠ Ce que ce test **ne** dit pas : qu'une route existe ne veut pas dire que ce
 lecteur-là y a droit. C'est la règle 22, et elle reste gardée séparément.
 
+### 27 bis. Un écran de traitement doit exister au portail, pas seulement au back-office
+
+Payé sur la qualification des appels à mission.
+
+Le responsable de mission travaillait au portail pour tout — matching, pool,
+sélection — sauf pour le **premier geste du cycle** : publier l'appel n'existait
+qu'au back-office. Le §8 est pourtant le point d'entrée de tout le reste.
+
+Deux enseignements, et le second est le plus général.
+
+**① Les boutons se déduisent du moteur, jamais d'un `t-if`.**
+`transition_options()` part d'`available_transitions(user)`, qui croise déjà
+l'étape courante (`source_stage_id`) et les rôles de l'utilisateur
+(`allowed_role_ids`). Écrire dans le gabarit « visible si Secrétariat et si
+`qualified` » serait une **seconde vérité** — et c'est toujours la seconde qui
+dérive quand le graphe change.
+
+Corollaire : **la liste fermée de codes sert des deux côtés.** Elle filtre les
+boutons *et* garde le POST. Deux listes distinctes feraient apparaître un
+bouton que le POST refuse, ou l'inverse.
+
+**② Le masquage du bouton n'est jamais le rempart.** Quatre contrôles se
+succèdent au POST, aucun ne supposant le précédent : habilitation, appartenance
+au périmètre (l'objet résolu **dans** la file, pas par `browse()` sur
+l'identifiant reçu), code dans la liste fermée, puis **recherche de la
+transition dans celles que le moteur offre à cet utilisateur à cet instant**.
+`workflow_do_transition()` rejuge ensuite pour son propre compte.
+
+Mesuré en forgeant les requêtes : le Secrétariat qui poste « Publier l'appel »
+— bouton jamais affiché pour lui — reçoit un refus et l'étape ne bouge pas.
+
+⚠ Et le motif obligatoire n'est pas exigé par le controller : c'est
+`do_transition()` qui refuse un commentaire vide quand la transition porte
+`requires_comment` (`workflow_instance.py:722`). La configuration décide, le
+controller transmet.
+
+**③ Une page sans lien est une page absente.** L'espace responsable ne se
+référençait que lui-même : `/staff/queue` lié depuis `/staff/missions`, et
+`/staff/missions` depuis les autres pages `/staff/*`. Il fallait déjà y être
+pour y entrer. La tuile sur `/my` porte le `t-if` de **la même fonction** que
+la route — `_is_missions_staff()` — et `config_card`, sans quoi
+`portal_docs_entry` rend la carte en `d-none` jusqu'à ce qu'un compteur
+asynchrone revienne positif.
+
+⚠ Ce trou échappe aux deux gardes existantes : `test_portal_links` vérifie
+qu'un lien mène à une route, **jamais qu'une route est atteignable par un
+lien**.
+
 ### 28. Une correction appliquée au xmlid n'atteint pas les copies par site
 
 Payé sur « Devenir membre », **après** que la règle 24 eut été écrite et le

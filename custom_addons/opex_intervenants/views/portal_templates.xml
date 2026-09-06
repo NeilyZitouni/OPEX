@@ -85,9 +85,31 @@
 
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h3 class="mb-0">OPEX Intervenants — mes demandes</h3>
-                    <a class="btn btn-primary" href="/my/missions/new">
-                        + Créer une demande de mission
-                    </a>
+                    <div>
+                        <!--
+                            Les deux écrans que le client atteint depuis ici,
+                            et qui n'étaient reliés à rien : le constat de
+                            service fait (§27) et sa grille d'évaluation
+                            (§30). Une route sans lien est une route absente —
+                            `test_portal_links` vérifie qu'un lien mène à une
+                            route, jamais qu'une route est atteignable.
+                        -->
+                        <a class="btn btn-outline-secondary"
+                           href="/my/missions/contrats">
+                            Mes contrats
+                        </a>
+                        <a class="btn btn-outline-secondary ms-1"
+                           href="/my/missions/services">
+                            Services à valider
+                        </a>
+                        <a class="btn btn-outline-secondary ms-1"
+                           href="/my/missions/evaluations">
+                            Mes évaluations
+                        </a>
+                        <a class="btn btn-primary ms-1" href="/my/missions/new">
+                            + Créer une demande de mission
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Les quatre indicateurs du §6, dans son ordre. -->
@@ -845,6 +867,576 @@
                         </table>
                     </div>
                 </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        LE REFUS D'ACCÈS À UN APPEL — RÈGLE 25
+
+        Calqué sur `opex_membership.membership_access_refused`, et pour la
+        même raison : un refus qui redirige est indistinguable d'une panne.
+        Celui-ci a été trouvé au navigateur — l'intervenant qui cliquait sur
+        sa notification « le contrat est disponible pour signature » recevait
+        un 303 muet vers `/my/missions`.
+
+        ⚠ Le gabarit ne décide de rien et ne connaît aucun cas : il affiche
+        `refus`, que le controller a composé. Un `t-if` qui distinguerait
+        « inexistant » de « pas à vous » serait la fuite que la règle 3
+        interdit, écrite dans la vue au lieu du modèle.
+
+        Les deux liens sont les deux espaces réels de l'utilisateur ; on ne
+        sait pas lequel il cherchait, donc on propose les deux.
+    -->
+    <!--
+        §30 — MES ÉVALUATIONS, ET LA GRILLE
+
+        ⚠ LES SIX CRITÈRES NE SONT PAS ÉCRITS ICI.
+
+        `evaluation_grid()` les rend depuis `_criteria_fields()`, qui choisit
+        selon `evaluateur`. Le modèle porte dix notes pour deux grilles ; en
+        nommer six dans ce gabarit ferait une seconde liste, et c'est celle-là
+        qui aurait divergé — l'Extension 10 a déjà mesuré ce que coûte une
+        moyenne prise sur les mauvais critères (`3.0 != 5.0`).
+
+        Les boutons viennent de `transition_options()`, comme partout
+        ailleurs : aucun `t-if` de rôle ni d'étape n'est écrit dans cette
+        page.
+    -->
+    <template id="portal_my_evaluations" name="Portail : mes évaluations">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h4 class="mb-3">Les intervenants que vous avez à évaluer</h4>
+
+                <div t-if="not evaluations" class="alert alert-info">
+                    Aucune évaluation ne vous est demandée pour l'instant.
+                    Une grille vous est ouverte à la clôture de chaque mission.
+                </div>
+
+                <div class="table-responsive" t-if="evaluations">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Mission</th>
+                                <th>Intervenant</th>
+                                <th>État</th>
+                                <th class="text-end">Note</th>
+                                <th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="evaluations" t-as="ev">
+                                <td class="text-nowrap" t-out="ev.name"/>
+                                <td t-out="ev.mission_id.title"/>
+                                <td t-out="ev.partner_id.display_name"/>
+                                <td>
+                                    <span class="badge text-bg-light"
+                                          t-out="ev.workflow_stage_label"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-if="ev.grille_complete"
+                                          t-out="ev.note_globale"/>
+                                    <span t-else="" class="text-muted">—</span>
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-primary"
+                                       t-attf-href="/my/missions/evaluation/#{ev.id}">
+                                        Ouvrir
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <a href="/my/missions" class="btn btn-light">Retour à mes missions</a>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_evaluation_form" name="Portail : grille d'évaluation">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small" t-out="evaluation.name"/>
+                        <h4 class="mb-0" t-out="evaluation.mission_id.title"/>
+                        <div class="text-muted">
+                            Intervenant :
+                            <t t-out="evaluation.partner_id.display_name"/> —
+                            <span class="badge text-bg-light"
+                                  t-out="evaluation.workflow_stage_label"/>
+                        </div>
+                    </div>
+                    <a href="/my/missions/evaluations" class="btn btn-light">Retour</a>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                <div t-if="not modifiable" class="alert alert-info">
+                    Cette grille a été rendue : elle n'est plus modifiable.
+                    Le cluster peut vous la renvoyer si un point demande à être
+                    précisé.
+                </div>
+
+                <form method="post">
+                    <input type="hidden" name="csrf_token"
+                           t-att-value="request.csrf_token()"/>
+
+                    <div class="card mb-3">
+                        <div class="card-header fw-bold">
+                            Les six critères du §30 — de 1 à 5
+                        </div>
+                        <div class="card-body">
+                            <div t-foreach="grille" t-as="critere"
+                                 class="row align-items-center mb-2">
+                                <label class="col-sm-6 col-form-label"
+                                       t-out="critere['libelle']"/>
+                                <div class="col-sm-6">
+                                    <select class="form-select"
+                                            t-att-name="critere['champ']"
+                                            t-att-disabled="not modifiable or None">
+                                        <option value="0"
+                                                t-att-selected="critere['note'] == 0 or None">
+                                            — pas encore noté —
+                                        </option>
+                                        <t t-foreach="[1, 2, 3, 4, 5]" t-as="n">
+                                            <option t-att-value="n"
+                                                    t-att-selected="critere['note'] == n or None"
+                                                    t-out="n"/>
+                                        </t>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="form-label">Commentaire</label>
+                                <textarea name="commentaire" rows="3"
+                                          class="form-control"
+                                          t-att-disabled="not modifiable or None"
+                                          t-out="evaluation.commentaire"/>
+                                <div class="form-text">
+                                    Ce commentaire reste interne au cluster : il
+                                    n'est jamais publié sur la fiche publique de
+                                    l'intervenant (§33).
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        <button t-if="modifiable" type="submit" name="action"
+                                value="save" class="btn btn-outline-primary">
+                            Enregistrer sans rendre
+                        </button>
+                        <!--
+                            Les actions du moteur. « Rendre » porte ses deux
+                            conditions — mission validée (règle 7) et grille
+                            complète — et le moteur explique lui-même pourquoi
+                            elle est fermée.
+                        -->
+                        <t t-foreach="actions" t-as="action">
+                            <button type="submit" name="action"
+                                    t-att-value="action['transition'].code"
+                                    class="btn btn-primary"
+                                    t-att-disabled="not action['available'] or None"
+                                    t-out="action['transition'].name"/>
+                        </t>
+                    </div>
+                    <div t-foreach="actions" t-as="action">
+                        <div t-if="not action['available']"
+                             class="small text-danger mt-1"
+                             t-out="action['reason']"/>
+                    </div>
+                </form>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §27 ET §28 — LE CONSTAT DE SERVICE FAIT, CÔTÉ CLIENT
+
+        Le client lit ce que le cluster a coché, et prononce. Les quatre
+        points sont affichés en lecture : ils sont l'objet de sa décision, ce
+        n'est pas lui qui les coche (`test_the_client_cannot_tick_the_cluster_checklist`).
+
+        « Contester » porte un motif obligatoire — exigé par la configuration
+        de la transition, pas par ce gabarit : `required` ci-dessous n'est
+        qu'un confort de saisie.
+    -->
+    <template id="portal_my_services" name="Portail : services à valider">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h4 class="mb-3">Les prestations à réceptionner</h4>
+
+                <div t-if="not services" class="alert alert-info">
+                    Aucun constat de service fait ne vous attend. Un constat
+                    vous est soumis lorsque l'intervenant a rendu ses livrables
+                    et que le cluster les a vérifiés.
+                </div>
+
+                <div class="table-responsive" t-if="services">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Référence</th>
+                                <th>Mission</th>
+                                <th>État</th>
+                                <th class="text-end">Montant</th>
+                                <th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="services" t-as="sv">
+                                <td class="text-nowrap" t-out="sv.name"/>
+                                <td t-out="sv.mission_id.title"/>
+                                <td>
+                                    <span class="badge text-bg-light"
+                                          t-out="sv.workflow_stage_label"/>
+                                </td>
+                                <td class="text-end">
+                                    <span t-out="sv.montant_a_facturer"
+                                          t-options="{'widget': 'monetary', 'display_currency': sv.currency_id}"/>
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-primary"
+                                       t-attf-href="/my/missions/service/#{sv.id}">
+                                        Ouvrir
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <a href="/my/missions" class="btn btn-light">Retour à mes missions</a>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_service_form" name="Portail : constat de service fait">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small" t-out="service.name"/>
+                        <h4 class="mb-0" t-out="service.mission_id.title"/>
+                        <div class="text-muted">
+                            <span class="badge text-bg-light"
+                                  t-out="service.workflow_stage_label"/>
+                        </div>
+                    </div>
+                    <a href="/my/missions/services" class="btn btn-light">Retour</a>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">
+                        Ce que le cluster a vérifié
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Les objectifs ont été atteints</span>
+                            <span t-if="service.objectifs_atteints"
+                                  class="badge text-bg-success">oui</span>
+                            <span t-else="" class="badge text-bg-secondary">non</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Les livrables sont complets</span>
+                            <span t-if="service.livrables_complets"
+                                  class="badge text-bg-success">oui</span>
+                            <span t-else="" class="badge text-bg-secondary">non</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Les corrections ont été effectuées</span>
+                            <span t-if="service.corrections_effectuees"
+                                  class="badge text-bg-success">oui</span>
+                            <span t-else="" class="badge text-bg-secondary">non</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>La prestation correspond au contrat</span>
+                            <span t-if="service.conforme_contrat"
+                                  class="badge text-bg-success">oui</span>
+                            <span t-else="" class="badge text-bg-secondary">non</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span class="fw-bold">Montant à facturer</span>
+                            <span class="fw-bold"
+                                  t-out="service.montant_a_facturer"
+                                  t-options="{'widget': 'monetary', 'display_currency': service.currency_id}"/>
+                        </li>
+                    </ul>
+                    <div class="card-body" t-if="service.observations">
+                        <div class="small text-muted">Observations du cluster</div>
+                        <div t-out="service.observations"/>
+                    </div>
+                </div>
+
+                <!-- L'historique du §28 : les tours qui ont échoué comptent. -->
+                <div class="card mb-3" t-if="validations">
+                    <div class="card-header fw-bold">Historique des prononcés</div>
+                    <ul class="list-group list-group-flush">
+                        <li t-foreach="validations" t-as="v"
+                            class="list-group-item">
+                            <span class="text-muted small"
+                                  t-out="v['date']"
+                                  t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                            — <t t-out="v['etape']"/>
+                            <span t-if="v['auteur']" class="text-muted">
+                                (<t t-out="v['auteur']"/>)
+                            </span>
+                            <div t-if="v['commentaire']"
+                                 class="small text-muted" t-out="v['commentaire']"/>
+                        </li>
+                    </ul>
+                </div>
+
+                <div t-if="not actions" class="alert alert-info">
+                    Aucune décision ne vous est ouverte sur ce constat à son
+                    étape actuelle.
+                </div>
+
+                <div t-foreach="actions" t-as="action" class="border rounded p-3 mb-2">
+                    <form method="post"
+                          t-attf-action="/my/missions/service/#{service.id}">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="action"
+                               t-att-value="action['transition'].code"/>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="fw-bold" t-out="action['transition'].name"/>
+                            <button type="submit" class="btn btn-primary"
+                                    t-att-disabled="not action['available'] or None"
+                                    t-out="action['transition'].name"/>
+                        </div>
+                        <div t-if="not action['available']"
+                             class="small text-danger" t-out="action['reason']"/>
+                        <div t-if="action['transition'].requires_comment" class="mt-2">
+                            <label class="form-label small mb-1">
+                                Motif — obligatoire, il est transmis au cluster
+                            </label>
+                            <textarea name="comment" rows="2" required="required"
+                                      class="form-control"
+                                      placeholder="Ce qui ne correspond pas à ce qui était attendu."/>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <!--
+        §19 — LES PIÈCES CONTRACTUELLES, CÔTÉ CLIENT ET INTERVENANT
+
+        Une confirmation horodatée, pas une signature cryptographique — c'est
+        l'arbitrage de l'Extension 7, et le hors-périmètre du module le dit.
+
+        ⚠ Le gabarit reçoit un DICTIONNAIRE à clés fermées, jamais le
+        recordset : `montant`, `conditions` et `modalites_validation` n'ont
+        pas à traverser vers une page que le §14 ne leur ouvre pas. La leçon
+        de l'Extension 5, règle 12 — la garde est au modèle, l'écran est la
+        seconde barrière.
+
+        `cote` dit de quel côté est la session. Ce n'est pas ce qui autorise :
+        `_check_signer()` repose la question dans le modèle, et c'est lui qui
+        refuse. Ici, `cote` ne décide que de ce qui s'affiche.
+    -->
+    <template id="portal_my_contracts" name="Portail : mes contrats">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <h4 class="mb-3">Mes pièces contractuelles</h4>
+
+                <div t-if="not contrats" class="alert alert-info">
+                    Aucune pièce contractuelle ne vous attend. Le contrat et
+                    l'ordre de mission vous sont soumis lorsque le cluster les
+                    envoie à la signature.
+                </div>
+
+                <div class="table-responsive" t-if="contrats">
+                    <table class="table table-hover align-middle">
+                        <thead>
+                            <tr>
+                                <th>Pièce</th>
+                                <th>Mission</th>
+                                <th>Votre confirmation</th>
+                                <th>L'autre partie</th>
+                                <th/>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr t-foreach="contrats" t-as="k">
+                                <td>
+                                    <t t-out="k['type']"/>
+                                    <div class="text-muted small">
+                                        <t t-out="k['name']"/> — v<t t-out="k['version']"/>
+                                    </div>
+                                </td>
+                                <td t-out="k['mission']"/>
+                                <td>
+                                    <t t-set="mien"
+                                       t-value="k['client_signe'] if k['cote'] == 'client' else k['intervenant_signe']"/>
+                                    <span t-if="mien" class="badge text-bg-success">
+                                        confirmée
+                                    </span>
+                                    <span t-else="" class="badge text-bg-warning">
+                                        à confirmer
+                                    </span>
+                                </td>
+                                <td>
+                                    <t t-set="autre"
+                                       t-value="k['intervenant_signe'] if k['cote'] == 'client' else k['client_signe']"/>
+                                    <span t-if="autre" class="badge text-bg-success">
+                                        confirmée
+                                    </span>
+                                    <span t-else="" class="badge text-bg-secondary">
+                                        en attente
+                                    </span>
+                                </td>
+                                <td class="text-end">
+                                    <a class="btn btn-sm btn-primary"
+                                       t-attf-href="/my/missions/contrat/#{k['id']}">
+                                        Ouvrir
+                                    </a>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <a href="/my" class="btn btn-light">Retour au portail</a>
+            </div>
+        </t>
+    </template>
+
+    <template id="portal_contract_form" name="Portail : confirmer un contrat">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <div>
+                        <div class="text-muted small">
+                            <t t-out="contrat['name']"/> — version
+                            <t t-out="contrat['version']"/>
+                        </div>
+                        <h4 class="mb-0" t-out="contrat['type']"/>
+                        <div class="text-muted">
+                            <t t-out="mission_titre"/>
+                            <span t-if="etape_contrat" class="badge text-bg-light ms-1"
+                                  t-out="etape_contrat"/>
+                        </div>
+                    </div>
+                    <a href="/my/missions/contrats" class="btn btn-light">Retour</a>
+                </div>
+
+                <div t-if="error" class="alert alert-warning" t-out="error"/>
+
+                <div class="card mb-3">
+                    <div class="card-header fw-bold">Les deux confirmations</div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Client</span>
+                            <span t-if="contrat['client_signe']">
+                                <span class="badge text-bg-success">confirmée</span>
+                                <span class="text-muted small ms-1">
+                                    <t t-out="contrat['client_nom']"/>,
+                                    <span t-out="contrat['client_date']"
+                                          t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                                </span>
+                            </span>
+                            <span t-else="" class="badge text-bg-secondary">en attente</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Intervenant</span>
+                            <span t-if="contrat['intervenant_signe']">
+                                <span class="badge text-bg-success">confirmée</span>
+                                <span class="text-muted small ms-1">
+                                    <t t-out="contrat['intervenant_nom']"/>,
+                                    <span t-out="contrat['intervenant_date']"
+                                          t-options="{'widget': 'datetime', 'format': 'dd/MM/yyyy HH:mm'}"/>
+                                </span>
+                            </span>
+                            <span t-else="" class="badge text-bg-secondary">en attente</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <t t-set="deja"
+                   t-value="contrat['client_signe'] if cote == 'client' else contrat['intervenant_signe']"/>
+
+                <div t-if="deja" class="alert alert-success">
+                    Votre confirmation est enregistrée. Le cluster prononcera
+                    « Signatures recueillies » lorsque les deux parties se
+                    seront prononcées.
+                </div>
+
+                <div t-if="not deja" class="card mb-3">
+                    <div class="card-body">
+                        <p class="mb-2">
+                            En confirmant, vous déclarez avoir pris connaissance
+                            de cette pièce et en accepter les termes. Votre nom
+                            et la date sont enregistrés ; cette confirmation
+                            vaut engagement au sens de l'ordre de mission.
+                        </p>
+                        <form method="post">
+                            <input type="hidden" name="csrf_token"
+                                   t-att-value="request.csrf_token()"/>
+                            <input type="hidden" name="action" value="confirmer"/>
+                            <button type="submit" class="btn btn-primary">
+                                Je confirme cette pièce
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!--
+                    « Signature refusée » — la seule transition du
+                    sous-workflow que le moteur ouvre à ces deux rôles, et
+                    elle n'avait aucun écran.
+                -->
+                <div t-foreach="actions" t-as="action" class="border rounded p-3 mb-2">
+                    <form method="post">
+                        <input type="hidden" name="csrf_token"
+                               t-att-value="request.csrf_token()"/>
+                        <input type="hidden" name="action"
+                               t-att-value="action['transition'].code"/>
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="fw-bold" t-out="action['transition'].name"/>
+                            <button type="submit" class="btn btn-outline-danger"
+                                    t-att-disabled="not action['available'] or None"
+                                    t-out="action['transition'].name"/>
+                        </div>
+                        <div t-if="not action['available']"
+                             class="small text-danger" t-out="action['reason']"/>
+                        <div t-if="action['transition'].requires_comment" class="mt-2">
+                            <label class="form-label small mb-1">
+                                Motif — obligatoire, il est transmis au cluster
+                            </label>
+                            <textarea name="comment" rows="2" required="required"
+                                      class="form-control"
+                                      placeholder="Ce qui vous empêche de confirmer cette pièce."/>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </t>
+    </template>
+
+    <template id="mission_access_refused" name="Accès refusé — appel à mission">
+        <t t-call="portal.portal_layout">
+            <div class="container my-4">
+                <div class="alert alert-warning" role="alert">
+                    <h5 class="alert-heading">Cet appel n'est pas consultable depuis ce compte</h5>
+                    <p class="mb-0"><t t-out="refus"/></p>
+                </div>
+                <a href="/my/missions" class="btn btn-primary">Mes demandes</a>
+                <a href="/my/missions/candidatures" class="btn btn-outline-primary ms-1">
+                    Mes candidatures
+                </a>
+                <a href="/my" class="btn btn-secondary ms-1">Retour au portail</a>
             </div>
         </t>
     </template>

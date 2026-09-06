@@ -1,4 +1,5 @@
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 #: Référence de pièce contractuelle, séquence semée en data.
 CONTRACT_SEQUENCE = 'opex.mission.contract'
@@ -164,6 +165,43 @@ class MissionContract(models.Model):
     # champs. Enchaîner automatiquement ferait décider le modèle à la place du
     # responsable, et rendrait la transition inutile.
 
+    def _check_signer(self, cote):
+        """Cette session est-elle bien **ce** signataire-là ?
+
+        LE CONTRÔLE QUI N'AVAIT JAMAIS ÉTÉ NÉCESSAIRE
+
+        Ces deux méthodes n'ont longtemps été appelées que par des boutons de
+        back-office, sous des comptes qui avaient déjà le droit d'écrire sur
+        la pièce. Le portail, lui, est en **lecture seule** (`rwcu=1000`) :
+        confirmer depuis un écran portail demande un `sudo()`, et à partir de
+        là plus rien ne distingue le client de l'intervenant — ni de
+        quiconque atteindrait la méthode.
+
+        Sans cette garde, `action_sign_client()` appelée en `sudo()` depuis
+        une requête forgée signerait **au nom du client** en inscrivant le nom
+        de l'appelant. Le champ dirait alors la vérité sur qui a cliqué, et un
+        mensonge sur ce que cela vaut.
+
+        Le contrôle vit ici et non dans le controller — précédent
+        `_check_manager()` de `competence_arbitrage.py:307` : une méthode de
+        modèle s'appelle aussi par script, par import et par requête forgée.
+
+        ⚠ Le personnel des missions n'est **pas** exempté. Le §19 fait
+        signer le client et l'intervenant ; un responsable qui enregistrerait
+        les deux confirmations depuis le portail viderait la condition
+        `contract_signed` de son sens. Il garde ses boutons de back-office,
+        qui sont un autre chemin et le disent.
+        """
+        self.ensure_one()
+        attendu = (self.sudo().client_id if cote == 'client'
+                   else self.sudo().partner_id)
+        if attendu != self.env.user.partner_id:
+            raise UserError(_(
+                "Cette confirmation appartient à l'autre partie du contrat. "
+                "Le client et l'intervenant confirment chacun de leur côté, "
+                "et chacun depuis son propre compte."))
+        return True
+
     def action_sign_client(self):
         self.ensure_one()
         self.write({
@@ -186,6 +224,66 @@ class MissionContract(models.Model):
             "Signature de l'intervenant enregistrée : %s."
         ) % self.env.user.display_name)
         return True
+
+    # ------------------------------------------------------------
+    # §19 — la confirmation depuis le portail
+    # ------------------------------------------------------------
+
+    def action_portal_confirm(self, cote):
+        """Enregistre la confirmation horodatée de l'une des deux parties.
+
+        **Aucune transition n'est franchie ici**, et c'est le principe
+        d'origine des deux boutons, conservé tel quel : signer est un fait à
+        consigner ; ce qu'on en tire est l'affaire du workflow. La transition
+        « Signatures recueillies » porte la condition `contract_signed`, qui
+        lit `contract_fully_signed`, qui lit ces deux champs — elle devient
+        franchissable d'elle-même quand les deux parties se sont prononcées,
+        et c'est le cluster qui la franchit.
+
+        Le `sudo()` est **encadré** : `_check_signer()` a eu lieu juste avant,
+        et il compare le contact de la session au contact attendu de ce
+        contrat-ci — pas un rôle, pas un groupe. Le nom et la date restent
+        pris de la session, ils ne sont jamais reçus du navigateur.
+        """
+        self.ensure_one()
+        if cote not in ('client', 'intervenant'):
+            raise UserError(_("Partie inconnue pour une confirmation."))
+        self._check_signer(cote)
+        # `sudo()` élève les droits sans changer `env.user` : le nom inscrit
+        # reste celui de la session, ce qui est exactement ce qu'on veut.
+        # Idempotent — une double soumission n'écrase pas l'horodatage
+        # d'origine par celui du second clic.
+        if cote == 'client':
+            if self.signature_client:
+                return False
+            self.sudo().action_sign_client()
+        else:
+            if self.signature_intervenant:
+                return False
+            self.sudo().action_sign_intervenant()
+        return True
+
+    def portal_signature_state(self):
+        """Ce que l'écran portail lit — dictionnaire à clés fermées.
+
+        Jamais le recordset : un gabarit qui le recevrait pourrait afficher
+        `montant` ou `conditions` à une partie que le §14 n'y autorise pas.
+        """
+        self.ensure_one()
+        return {
+            'id': self.id,
+            'name': self.name,
+            'type': dict(self._fields['contract_type'].selection).get(
+                self.contract_type, self.contract_type),
+            'version': self.version,
+            'client_signe': self.signature_client,
+            'client_nom': self.signature_client_nom or '',
+            'client_date': self.signature_client_date,
+            'intervenant_signe': self.signature_intervenant,
+            'intervenant_nom': self.signature_intervenant_nom or '',
+            'intervenant_date': self.signature_intervenant_date,
+            'complet': self.is_signed,
+        }
 
     # ------------------------------------------------------------
     # Aperçu

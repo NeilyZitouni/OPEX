@@ -30,9 +30,23 @@
             <div class="container my-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h3 class="mb-0">Mes candidatures</h3>
-                    <a class="btn btn-outline-primary" href="/missions">
-                        Voir les appels ouverts
-                    </a>
+                    <div>
+                        <!--
+                            L'intervenant retenu doit confirmer son contrat et
+                            son ordre de mission, et c'est ici qu'il vient :
+                            `/my/missions` est l'espace du CLIENT, et il y est
+                            renvoyé avec un motif. Sans ce lien, la page de
+                            confirmation n'aurait été atteignable que depuis
+                            l'URL de la notification.
+                        -->
+                        <a class="btn btn-outline-secondary"
+                           href="/my/missions/contrats">
+                            Mes contrats
+                        </a>
+                        <a class="btn btn-outline-primary ms-1" href="/missions">
+                            Voir les appels ouverts
+                        </a>
+                    </div>
                 </div>
 
                 <div t-if="not applications" class="alert alert-light border">

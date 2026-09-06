@@ -113,6 +113,67 @@ class MissionRequestPortal(CustomerPortal):
         return self._intervenants_own_missions().filtered(
             lambda m: m.id == mission_id)[:1]
 
+    def _intervenants_application_on(self, mission_id):
+        """La candidature du contact connecté sur cet appel, s'il en a une.
+
+        Sert **uniquement** à orienter : un intervenant qui suit le lien d'une
+        notification de mission n'est pas égaré, il est simplement au mauvais
+        endroit. Sa page existe, elle porte son nom, et elle est à un clic.
+
+        Aucun droit n'en découle — la candidature est cherchée sur son propre
+        `partner_id`, comme le fait `_intervenants_own_applications()` dans
+        l'autre controller. Deux domaines identiques et séparés seraient une
+        duplication ; celui-ci est volontairement borné à ce seul usage et ne
+        rend rien d'autre qu'un identifiant.
+        """
+        return request.env['opex.mission.application'].sudo().search([
+            ('mission_id', '=', mission_id),
+            ('partner_id', '=', request.env.user.partner_id.id),
+        ], limit=1)
+
+    def _intervenants_mission_refused(self, mission_id):
+        """Le refus d'accès à un appel — une page rendue, jamais un rebond.
+
+        RÈGLE 25, ET ELLE A ÉTÉ PAYÉE ICI AUSSI
+
+        `portal_intervenants_mission_detail` renvoyait un 303 vers
+        `/my/missions`, sans un mot. Mesuré au navigateur : c'est ce que
+        recevait **l'intervenant** qui cliquait sur « le contrat et l'ordre de
+        mission sont disponibles pour signature » — la cloche résout le lien
+        vers `/my/missions/<id>` parce que le message est posté sur la
+        mission, et ce controller borne son périmètre à `client_id`.
+
+        Le diagnostic avait d'abord conclu l'inverse, en éprouvant l'accès
+        **ORM** : l'`ir.rule` laisse bien l'intervenant lire la mission. Mais
+        le controller a son propre domaine, plus étroit que l'`ir.rule`, et
+        c'est lui qui décide de la page. Vérifier les droits du modèle ne dit
+        donc rien de ce que l'écran fera.
+
+        Deux issues, et l'orientation prime sur le constat :
+
+        - **l'intervenant de cet appel** est envoyé sur *sa* page, celle de sa
+          candidature. Ce n'est pas un refus, c'est une redirection vers ce
+          qu'il cherchait ;
+        - **tout autre compte** reçoit une page qui porte son motif.
+
+        ⚠ Le message est **le même** que l'appel n'existe pas ou qu'il ne le
+        concerne pas — règle 3. Les distinguer laisserait énumérer les appels
+        du portail en changeant l'identifiant.
+        """
+        application = self._intervenants_application_on(mission_id)
+        if application:
+            return request.redirect(
+                '/my/missions/candidature/%s' % application.id)
+        return request.render(
+            'opex_intervenants.mission_access_refused', {
+                'refus': _(
+                    "Cet appel à mission n'existe pas, ou il n'est pas suivi "
+                    "depuis ce compte. L'espace « Mes demandes » réunit les "
+                    "appels que vous avez déposés ; « Mes candidatures » "
+                    "réunit ceux auxquels vous avez répondu."),
+                'page_name': 'intervenants_mission',
+            })
+
     def _intervenants_current_draft(self):
         """La saisie en cours, s'il y en a une.
 
@@ -523,7 +584,7 @@ class MissionRequestPortal(CustomerPortal):
         """
         mission = self._intervenants_own_mission(mission_id)
         if not mission:
-            return request.redirect('/my/missions')
+            return self._intervenants_mission_refused(mission_id)
         instance = mission.workflow_instance_id.sudo()
         return request.render('opex_intervenants.portal_mission_detail', {
             'mission': mission,

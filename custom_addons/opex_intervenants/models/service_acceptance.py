@@ -25,6 +25,7 @@ sont **calculés depuis l'historique**, jamais écrits.
 """
 
 from odoo import _, api, fields, models
+from odoo.exceptions import UserError
 
 from .optional_backends import SALE_ORDER
 
@@ -427,3 +428,93 @@ class ServiceAcceptance(models.Model):
             'view_mode': 'list,form',
             'domain': [('id', 'in', order.invoice_ids.ids)],
         }
+
+    # ------------------------------------------------------------
+    # §27 et §28 — le client prononce, depuis le portail
+    # ------------------------------------------------------------
+    #
+    # POURQUOI CES DEUX MÉTHODES EXISTENT
+    #
+    # Le moteur ouvrait déjà `service_validate_client` et `service_dispute`
+    # au rôle `client`, mais le portail est en **lecture seule** sur ce
+    # modèle (`rwcu=1000`) : franchir la transition demande d'écrire
+    # l'instance, donc un `sudo()`. Or un `sudo()` posé dans un controller
+    # remplace l'`ir.rule` par la confiance qu'on accorde à ce fichier.
+    #
+    # Le contrôle vit donc **ici**, sur le modèle, exactement comme
+    # `_check_manager()` de `competence_arbitrage.py:307` : ces méthodes
+    # s'appellent aussi par script, par import et par requête forgée, et un
+    # écran n'est pas une garde.
+    #
+    # ⚠ Elles ne rejugent pas le rôle ni l'étape — c'est le travail du
+    # moteur, et le refaire ici en ferait une seconde vérité. Elles
+    # répondent à la seule question que le moteur ne pose pas : **cette
+    # session est-elle le client de ce constat ?**
+
+    def _check_client(self):
+        """Le prononcé du §28 appartient au client, et à lui seul.
+
+        L'intervenant est acteur du constat en `limited` — il voit où en est
+        ce qui conditionne son paiement. Le laisser valider lui ferait
+        prononcer la réception de sa propre prestation.
+
+        Le personnel des missions n'a pas besoin de passer par ici : il a
+        `service_validate_client` par son rôle et son propre écran. Cette
+        garde protège le chemin **portail**, qui est le seul à devoir
+        `sudo()`.
+        """
+        self.ensure_one()
+        if self.sudo().mission_id.client_id != self.env.user.partner_id:
+            raise UserError(_(
+                "Le constat de service fait est prononcé par le client de la "
+                "mission. Votre compte n'est pas celui du client de ce "
+                "dossier."))
+        return True
+
+    def _portal_do(self, code, comment=None):
+        """Franchit une transition du constat pour le compte du client.
+
+        Le `sudo()` est **encadré** : le contrôle d'appelant a eu lieu juste
+        avant, et la transition est cherchée dans celles que le moteur ouvre
+        à **cet utilisateur** — pas à `sudo()`. Résoudre la transition en
+        `sudo()` ferait franchir au client des transitions réservées au
+        responsable, ce que ni le rôle ni l'écran ne montreraient.
+        """
+        self.ensure_one()
+        self._check_client()
+        transition = self.workflow_instance_id.sudo()\
+            .available_transitions(user=self.env.user)\
+            .filtered(lambda t: t.code == code)[:1]
+        if not transition:
+            raise UserError(_(
+                "Cette action n'est pas disponible : soit le constat a changé "
+                "d'étape, soit votre rôle ne l'autorise pas."))
+        # ⚠ L'ORDRE DES DEUX APPELS COMPTE, et il a été mesuré.
+        #
+        # `with_user()` **après** `sudo()` remet `env.su` à False :
+        # `record.sudo().with_user(u).env.su` vaut `False`, alors que
+        # `record.with_user(u).sudo().env.su` vaut `True`. Écrit dans le
+        # mauvais ordre, le `sudo()` ne fait rien — et le code continue de
+        # fonctionner, parce que la transition écrit l'**instance** et non le
+        # constat. Il tomberait le jour où une action configurée sur cette
+        # transition écrirait le constat lui-même, c'est-à-dire longtemps
+        # après qu'on ait oublié pourquoi.
+        #
+        # `sudo()` ne change pas `env.user` : le journal du moteur porte bien
+        # le client comme auteur, ce qui est vérifié — la ligne d'historique
+        # de « Service fait contesté » nomme le compte du client.
+        return self.sudo().workflow_do_transition(
+            transition, comment=comment or '')
+
+    def action_portal_validate(self):
+        """« Je valide le service fait » — §28, second passage."""
+        return self._portal_do('service_validate_client')
+
+    def action_portal_dispute(self, comment=None):
+        """« Je conteste » — le motif est exigé par la configuration.
+
+        `requires_comment` est porté par la transition, et c'est
+        `do_transition()` qui refuse un commentaire vide
+        (`workflow_instance.py:722`). On transmet, on ne redouble pas.
+        """
+        return self._portal_do('service_dispute', comment=comment)

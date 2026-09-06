@@ -307,6 +307,280 @@ class MissionStaffPortal(http.Controller):
         return request.redirect(url)
 
     #
+    # §8 — La qualification et la publication, depuis le portail
+    #
+
+    #: Les transitions de l'appel ouvertes au portail, de la qualification
+    #: jusqu'au lancement de la contractualisation.
+    #:
+    #: Une liste fermée, et **la même** des deux côtés : elle filtre les
+    #: boutons affichés et elle garde le POST. C'est la règle 2 du projet
+    #: appliquée à la lettre — un bouton qui apparaîtrait sans que le POST
+    #: l'accepte, ou l'inverse, seraient deux réponses à une seule question.
+    #:
+    #: ⚠ Cette liste ne donne aucun droit. Elle **retranche** de ce que le
+    #: moteur offre déjà à cet utilisateur à cette étape ; les rôles notés en
+    #: commentaire décrivent la configuration, ils ne la posent pas. Un code
+    #: ajouté ici sans le rôle correspondant sur la transition ne produit
+    #: aucun bouton.
+    #:
+    #: Le périmètre couvrait autrefois la seule qualification, et renvoyait
+    #: vers `/pool` pour la suite. C'était un renvoi vers un écran qui ne l'a
+    #: jamais portée : `/pool` fait avancer **une candidature**, jamais
+    #: l'appel, et sa route de POST prend un identifiant de candidature. Le
+    #: segment `open → contracting` n'existait donc qu'au back-office.
+    #:
+    #: `mission_cancel_draft` reste dehors : il appartient au client depuis
+    #: son espace, et `mission_submit` avec lui.
+    _INTERVENANTS_MISSION_TRANSITIONS = (
+        # Depuis QUALIFIED
+        'mission_request_complement',   # Secrétariat, motif obligatoire
+        'mission_start_sourcing',       # Responsable de mission
+        'mission_reject_request',       # Responsable, motif obligatoire
+        'mission_cancel_qualified',     # Responsable
+        # Depuis SOURCING — sans elle l'appel ne devient jamais public
+        'mission_open_applications',    # Responsable de mission
+        'mission_sourcing_unsuccessful',   # Responsable, motif obligatoire
+        'mission_cancel_sourcing',      # Responsable
+        # Depuis OPEN — la porte de la sélection
+        'mission_close_applications',   # Responsable, condition : au moins une
+        'mission_open_unsuccessful',    # Responsable, motif obligatoire
+        'mission_cancel_open',          # Responsable
+        # Depuis SELECTION — l'attribution du §17
+        'mission_award',                # Décideur, motif + 2 conditions
+        'mission_reopen',               # Responsable, motif obligatoire
+        'mission_selection_unsuccessful',  # Responsable ou Décideur, motif
+        'mission_cancel_selection',     # Responsable
+        # Depuis AWARDED — le relais vers la contractualisation
+        'mission_start_contracting',    # Secrétariat
+        'mission_back_to_selection',    # Responsable, motif obligatoire
+        'mission_cancel_awarded',       # Responsable
+    )
+
+    def _intervenants_mission_actions(self, mission):
+        """Ce que **cet** utilisateur peut faire sur **cet** appel, maintenant.
+
+        Rien n'est décidé ici. `transition_options()` part
+        d'`available_transitions()`, qui croise déjà les deux critères :
+        l'étape courante (`source_stage_id`) et les rôles que l'utilisateur
+        tient sur cette instance (`allowed_role_ids`).
+
+        C'est ce qui fait que « Demander un complément » n'apparaît qu'au
+        Secrétariat et à l'étape `qualified`, sans qu'aucun `if` ne l'écrive :
+        la configuration le dit déjà, et la dédoubler ici en ferait deux
+        vérités qui divergeraient au premier ajustement du graphe.
+        """
+        options = mission.workflow_instance_id.sudo().transition_options(
+            user=request.env.user)
+        return [
+            option for option in options
+            if option['transition'].code in self._INTERVENANTS_MISSION_TRANSITIONS
+        ]
+
+    #: Les transitions du SOUS-WORKFLOW du contrat qui reviennent au cluster.
+    #:
+    #: ⚠ Une seconde liste fermée, et il en fallait une seconde : ces
+    #: transitions vivent sur une **autre instance** que celles de l'appel.
+    #: Le sous-workflow `mission_contract` tourne sur `opex.mission.request`
+    #: — même modèle, même enregistrement — mais c'est une instance distincte,
+    #: résolue par `_contract_instance()`. Le bloc « Décisions » lit
+    #: `mission.workflow_instance_id` et ne les aurait jamais vues.
+    #:
+    #: Sans cet écran, le cycle du §19 restait entièrement au back-office, et
+    #: la confirmation des deux parties au portail n'aurait mené nulle part :
+    #: le contrat serait resté **signé mais jamais validé**, donc
+    #: `subworkflow_done('mission_contract')` faux, donc la règle 5 du §39
+    #: infranchissable — la mission signée des deux côtés n'aurait pas pu
+    #: démarrer. C'est le même trou que `mission_award`, une couche plus bas.
+    #:
+    #: `contract_sign_refused` n'y est **pas** : elle appartient au client et
+    #: à l'intervenant, et c'est l'écran portail du contrat qui la porte.
+    _INTERVENANTS_CONTRACT_TRANSITIONS = (
+        'contract_submit_review',       # Secrétariat ou Responsable
+        'contract_send_to_sign',        # Responsable
+        'contract_request_revision',    # Responsable
+        'contract_sign',                # Responsable ou Secrétariat
+        'contract_validate',            # Décideur ou Responsable
+        'contract_reject_signed',       # Décideur
+        'contract_revise',              # Secrétariat ou Responsable
+    )
+
+    def _intervenants_contract_actions(self, mission):
+        """Ce que le cluster peut faire sur le contrat de cet appel.
+
+        Rien n'est décidé ici non plus : `transition_options()` croise déjà
+        l'étape du sous-workflow et les rôles. « Signatures recueillies »
+        n'apparaît franchissable que lorsque les deux parties ont confirmé,
+        parce que la transition porte `contract_signed` — et le moteur dit
+        lui-même pourquoi elle est fermée quand elle l'est.
+        """
+        instance = mission.sudo()._contract_instance()
+        if not instance:
+            return []
+        return [
+            option
+            for option in instance.transition_options(user=request.env.user)
+            if option['transition'].code
+            in self._INTERVENANTS_CONTRACT_TRANSITIONS
+        ]
+
+    def _intervenants_mission_values(self, mission, error=None):
+        instance = mission.sudo()._contract_instance()
+        stage = instance.current_stage_id if instance else None
+        return {
+            'mission': mission,
+            'actions': self._intervenants_mission_actions(mission),
+            'contract_actions': self._intervenants_contract_actions(mission),
+            'contract_stage': (stage.user_label or stage.name) if stage else '',
+            'contract_pieces': [
+                k.portal_signature_state()
+                for k in mission.sudo().assignment_ids.contract_ids
+                if k.current_version and k.active
+            ],
+            'complement_reason': mission.complement_reason(),
+            'history': mission.history_entries(),
+            'error': error,
+            'page_name': 'staff_missions',
+        }
+
+    @http.route(['/staff/missions/<int:mission_id>'], type='http',
+                auth='user', website=True, sitemap=False)
+    def staff_intervenants_mission_page(self, mission_id, **kw):
+        """Le détail de l'appel, et toutes ses décisions — du §8 au §17.
+
+        Écran manquant jusqu'ici : la qualification et la publication
+        n'existaient qu'au back-office, alors que le reste du travail du
+        responsable — matching, pool, sélection — se fait au portail. Le §8
+        est pourtant le premier geste du cycle.
+
+        Le même trou existait un cran plus loin, et il était moins visible :
+        `mission_close_applications`, `mission_award` et
+        `mission_start_contracting` n'étaient exposés nulle part au portail.
+        Le commentaire de la liste fermée renvoyait vers `/pool`, qui fait
+        avancer une **candidature** et dont la route de POST prend un
+        identifiant de candidature : il ne pouvait pas les porter. Passer un
+        candidat en « Retenus » laissait donc l'appel à `open`, sans qu'aucun
+        écran ne dise par où continuer.
+
+        Trois rôles s'y succèdent, et c'est le moteur qui les distingue :
+        Responsable pour clore les candidatures, Décideur pour attribuer,
+        Secrétariat pour lancer la contractualisation.
+        """
+        if not self._intervenants_staff_user():
+            return request.redirect('/my')
+        mission = self._intervenants_staff_mission(mission_id)
+        if not mission:
+            return request.redirect('/staff/missions')
+        return request.render(
+            'opex_intervenants.staff_mission_detail',
+            self._intervenants_mission_values(mission, error=kw.get('error')))
+
+    @http.route(['/staff/missions/<int:mission_id>/action/<string:code>'],
+                type='http', auth='user', website=True, methods=['POST'])
+    def staff_intervenants_mission_transition(self, mission_id, code, **post):
+        """Franchit une transition de l'appel — en POST, et tout est rejugé.
+
+        **Le masquage du bouton n'est jamais le rempart.** Il a fallu le
+        corriger trois fois côté Module 1 — paiement, signature, comité — et
+        le motif est toujours le même : le formulaire est une vue, pas une
+        garde. Quatre contrôles se succèdent donc ici, et aucun ne suppose que
+        le précédent a eu lieu :
+
+        1. l'habilitation, par `_is_missions_staff()` ;
+        2. l'appartenance au périmètre, l'appel étant résolu **dans** la file
+           et non par un `browse()` sur l'identifiant reçu ;
+        3. le code reçu, confronté à la liste fermée — celle-là même qui a
+           produit les boutons ;
+        4. **le rôle et l'étape**, en cherchant la transition dans celles que
+           le moteur propose *à cet utilisateur* *à cet instant*. Un code
+           valide mais hors étape, ou hors rôle, ne se trouve pas — donc ne
+           s'exécute pas.
+
+        Et `workflow_do_transition()` repasse ensuite par
+        `_check_transition_allowed()` : le moteur rejuge une cinquième fois,
+        pour son propre compte.
+
+        Le motif obligatoire n'est pas exigé ici non plus. C'est
+        `do_transition()` qui refuse un commentaire vide quand la transition
+        porte `requires_comment` (`workflow_instance.py:722`) — la
+        configuration décide, le controller transmet.
+        """
+        if not self._intervenants_staff_user():
+            return request.redirect('/my')
+        mission = self._intervenants_staff_mission(mission_id)
+        if not mission:
+            return request.redirect('/staff/missions')
+        if code not in self._INTERVENANTS_MISSION_TRANSITIONS:
+            return self._intervenants_mission_back(
+                mission, _("Action inconnue sur un appel à mission."))
+
+        transition = next(
+            (option['transition']
+             for option in self._intervenants_mission_actions(mission)
+             if option['transition'].code == code),
+            request.env['opex.workflow.transition'].browse())
+        if not transition:
+            return self._intervenants_mission_back(mission, _(
+                "Cette action n'est pas disponible : soit l'appel a changé "
+                "d'étape, soit votre rôle ne l'autorise pas."))
+
+        try:
+            mission.workflow_do_transition(
+                transition, comment=(post.get('comment') or '').strip())
+        except UserError as refus:
+            return self._intervenants_mission_back(mission, refus)
+        return self._intervenants_mission_back(mission)
+
+    @http.route(['/staff/missions/<int:mission_id>/contrat/<string:code>'],
+                type='http', auth='user', website=True, methods=['POST'])
+    def staff_intervenants_contract_transition(self, mission_id, code, **post):
+        """Franchit une transition du sous-workflow du contrat.
+
+        Route distincte de celle de l'appel, et c'est structurel : les deux
+        familles de transitions vivent sur **deux instances** différentes du
+        même enregistrement. Un seul point d'entrée aurait dû deviner
+        laquelle, et se serait trompé le jour où deux codes se ressembleraient.
+
+        Les quatre contrôles du §27 bis, à l'identique : habilitation,
+        appartenance au périmètre, code dans la liste fermée, puis recherche
+        de la transition parmi celles que le moteur offre à cet utilisateur.
+        `do_transition()` rejuge ensuite — et c'est lui qui refuse
+        « Signatures recueillies » tant que `contract_signed` est faux.
+        """
+        if not self._intervenants_staff_user():
+            return request.redirect('/my')
+        mission = self._intervenants_staff_mission(mission_id)
+        if not mission:
+            return request.redirect('/staff/missions')
+        if code not in self._INTERVENANTS_CONTRACT_TRANSITIONS:
+            return self._intervenants_mission_back(
+                mission, _("Action inconnue sur un contrat."))
+
+        transition = next(
+            (option['transition']
+             for option in self._intervenants_contract_actions(mission)
+             if option['transition'].code == code),
+            request.env['opex.workflow.transition'].browse())
+        if not transition:
+            return self._intervenants_mission_back(mission, _(
+                "Cette action n'est pas disponible : soit le contrat a changé "
+                "d'étape, soit votre rôle ne l'autorise pas."))
+
+        try:
+            mission.sudo()._contract_instance().with_user(request.env.user)\
+                .sudo().do_transition(
+                    transition, comment=(post.get('comment') or '').strip())
+        except UserError as refus:
+            return self._intervenants_mission_back(mission, refus)
+        return self._intervenants_mission_back(mission)
+
+    def _intervenants_mission_back(self, mission, message=None):
+        url = '/staff/missions/%s' % mission.id
+        if message:
+            url += '?error=%s' % quote(str(message))
+        return request.redirect(url)
+
+    #
     # « Consulter le profil » — la cinquième action du §6
     #
 
