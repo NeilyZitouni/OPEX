@@ -3,3 +3,7 @@ odoo.conf
 odoo/
 __pycache__/
 *.pyc
+claude.md
+custom_addons/opex_membership/claude.md
+custom_addons/opex_workflow/claude.md
+custom_addons/opex_crowdfunding/claude.md
