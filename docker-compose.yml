@@ -1,0 +1,32 @@
+ervices:
+
+  db:
+    image: postgres:17
+    container_name: opex_db
+    environment:
+      POSTGRES_DB: opex_db
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: opex_docker_2026
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  web:
+    image: odoo:19.0
+    container_name: opex_web
+    depends_on:
+      - db
+    ports:
+      - "${ODOO_PORT:-8069}:8069"
+    environment:
+      HOST: db
+      USER: odoo
+      PASSWORD: opex_docker_2026
+    volumes:
+      - ./custom_addons:/mnt/extra-addons
+      - odoo-web-data:/var/lib/odoo
+    restart: unless-stopped
+
+volumes:
+  odoo-db-data:
+  odoo-web-data:
