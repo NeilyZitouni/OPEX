@@ -81,6 +81,20 @@ class MissionApplicationPortal(CustomerPortal):
         return bool(application) \
             and application.workflow_stage_id.sudo().code == 'interested'
 
+    #: Ce que l'étape atteinte veut dire pour le candidat. Les étapes absentes
+    #: de cette table sont celles où le dossier suit son cours.
+    _INTERVENANTS_APPLICATION_OUTCOME = {
+        'selected': 'retenue',
+        'rejected': 'ecartee',
+        'withdrawn': 'retiree',
+        'declined': 'declinee',
+    }
+
+    def _intervenants_application_outcome(self, application):
+        """« en_cours », ou l'issue atteinte. Jamais un code d'étape brut."""
+        code = application.workflow_stage_id.sudo().code
+        return self._INTERVENANTS_APPLICATION_OUTCOME.get(code, 'en_cours')
+
     def _intervenants_application_values(self, application, **extra):
         """Ce que l'écran doit savoir — **et ce qu'il montre sans le demander**.
 
@@ -100,6 +114,20 @@ class MissionApplicationPortal(CustomerPortal):
             'profil': profile,
             'capital': profile.capital_summary() if profile else {},
             'types_pieces': self._INTERVENANTS_APPLICATION_DOCUMENTS,
+            # Le dénouement, pour que le titre de la page dise ce qui s'est
+            # réellement passé.
+            #
+            # Le gabarit affichait « Votre candidature est déposée » sur
+            # **toutes** les étapes non modifiables — donc aussi à un candidat
+            # écarté, qui lisait « votre candidature est déposée … vous ne
+            # pouvez plus la modifier : la version examinée par le cluster
+            # doit être celle qu'il a lue » alors que le cluster avait déjà
+            # tranché. Mesuré en session sur une candidature rejetée.
+            #
+            # Le code d'étape est lu ici, sous `sudo()` : c'est de la
+            # configuration moteur, à laquelle un compte portail n'a pas accès
+            # et n'a pas à en avoir. Ce qui le concerne, c'est le résultat.
+            'denouement': self._intervenants_application_outcome(application),
             # `modifiable`, et surtout **pas** `editable`.
             #
             # `editable` est une variable **réservée du rendu website** :

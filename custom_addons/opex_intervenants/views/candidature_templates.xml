@@ -372,12 +372,47 @@
 
                 <div t-if="not modifiable" class="card">
                     <div class="card-body">
-                        <h6>Votre candidature est déposée</h6>
+                        <!--
+                            Le titre suit le **dénouement**, pas le seul fait
+                            que la page ne soit plus modifiable. Un candidat
+                            écarté lisait « Votre candidature est déposée » et
+                            l'explication qui va avec — « la version examinée
+                            par le cluster doit être celle qu'il a lue » —
+                            alors que le cluster avait déjà tranché.
+                        -->
+                        <h6 t-if="denouement == 'retenue'">
+                            Votre candidature a été retenue
+                        </h6>
+                        <h6 t-elif="denouement == 'ecartee'">
+                            Votre candidature n'a pas été retenue
+                        </h6>
+                        <h6 t-elif="denouement == 'retiree'">
+                            Vous avez retiré votre candidature
+                        </h6>
+                        <h6 t-elif="denouement == 'declinee'">
+                            Vous avez décliné cette invitation
+                        </h6>
+                        <h6 t-else="">Votre candidature est déposée</h6>
+
                         <p class="text-muted mb-3">
                             Elle est à l'étape
                             « <t t-out="application.workflow_stage_label"/> ».
-                            Vous ne pouvez plus la modifier : la version examinée
-                            par le cluster doit être celle qu'il a lue.
+                            <t t-if="denouement == 'en_cours'">
+                                Vous ne pouvez plus la modifier : la version
+                                examinée par le cluster doit être celle qu'il a
+                                lue.
+                            </t>
+                            <t t-elif="denouement == 'retenue'">
+                                Le cluster va vous transmettre vos pièces
+                                contractuelles : elles apparaîtront dans
+                                <a href="/my/missions/contrats">Mes contrats</a>.
+                            </t>
+                            <t t-else="">
+                                Ce dossier est clos. Les autres appels ouverts
+                                restent accessibles depuis
+                                <a href="/missions">les opportunités du
+                                cluster</a>.
+                            </t>
                         </p>
                         <dl class="row mb-0">
                             <dt class="col-sm-4">Disponibilité</dt>

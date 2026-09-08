@@ -255,8 +255,17 @@ class MissionRequestPortal(CustomerPortal):
         elif step == 'organisation':
             values['mode_intervention'] = (
                 post.get('mode_intervention') or False)
-            for name in ('date_debut_souhaitee', 'date_fin_souhaitee'):
+            # `date_limite_candidature` est de cet écran, et elle n'était sur
+            # aucun : la transition « Publier l'appel » l'exige
+            # (`rule_mission_has_deadline`, puis `rule_mission_deadline_open`),
+            # de sorte qu'un appel déposé au portail ne pouvait jamais être
+            # publié sans passer par le back-office.
+            for name in ('date_debut_souhaitee', 'date_fin_souhaitee',
+                         'date_limite_candidature'):
                 values[name] = (post.get(name) or '').strip() or False
+            duree = (post.get('duree_estimee_jours') or '').strip()
+            if duree.isdigit():
+                values['duree_estimee_jours'] = int(duree)
 
         elif step == 'budget':
             values['type_remuneration'] = post.get('type_remuneration') or False

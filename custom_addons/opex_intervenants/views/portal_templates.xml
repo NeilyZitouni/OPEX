@@ -434,6 +434,52 @@
                         </div>
                     </div>
 
+                    <!--
+                        La date limite de candidature est **exigée pour publier
+                        l'appel** (`rule_mission_has_deadline`), et elle doit
+                        encore être à venir (`rule_mission_deadline_open`).
+
+                        Elle ne figurait sur aucun écran du portail : ni ici,
+                        ni sur l'écran responsable, qui ne fait que l'afficher.
+                        Le seul endroit où la poser était le back-office —
+                        autrement dit, un appel déposé au portail ne pouvait
+                        **jamais** atteindre le catalogue, et aucun intervenant
+                        ne pouvait candidater. Trouvé en déroulant le parcours
+                        complet en session HTTP réelle.
+
+                        Sa place est ici : le §4 la range dans le bloc temporel,
+                        avec les deux dates qui l'entourent déjà.
+                    -->
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="date_limite_candidature">
+                                Date limite de candidature
+                            </label>
+                            <input type="date" class="form-control"
+                                   name="date_limite_candidature"
+                                   id="date_limite_candidature"
+                                   t-att-value="mission.date_limite_candidature or ''"/>
+                            <div class="form-text">
+                                Jusqu'à quand les intervenants peuvent répondre.
+                                Elle doit être à venir, et au plus tard le jour
+                                du début souhaité.
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="duree_estimee_jours">
+                                Durée estimée (jours)
+                            </label>
+                            <input type="number" min="0" class="form-control"
+                                   name="duree_estimee_jours"
+                                   id="duree_estimee_jours"
+                                   t-att-value="mission.duree_estimee_jours or ''"/>
+                            <div class="form-text">
+                                Sert à ramener le budget à un tarif journalier
+                                lors de la mise en correspondance.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label" for="localisation">Localisation</label>
@@ -671,6 +717,21 @@
                                 <t t-out="mission.date_debut_souhaitee or '—'"/>
                                 →
                                 <t t-out="mission.date_fin_souhaitee or '—'"/>
+                            </dd>
+                            <!--
+                                La date limite décide de la publication de
+                                l'appel : elle est récapitulée ici pour que son
+                                absence se voie **avant** la soumission, et non
+                                au moment où le cluster ne peut pas publier.
+                            -->
+                            <dt class="col-sm-4">Date limite de candidature</dt>
+                            <dd class="col-sm-8">
+                                <t t-if="mission.date_limite_candidature"
+                                   t-out="mission.date_limite_candidature"/>
+                                <span t-else="" class="text-danger">
+                                    Non renseignée — le cluster ne pourra pas
+                                    publier l'appel tant qu'elle manque.
+                                </span>
                             </dd>
                             <dt class="col-sm-4">Mode d'intervention</dt>
                             <dd class="col-sm-8">

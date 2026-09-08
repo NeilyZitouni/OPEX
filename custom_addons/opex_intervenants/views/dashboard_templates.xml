@@ -141,11 +141,36 @@
                     </div>
                 </div>
 
-                <!-- Les actions rapides du §41. -->
+                <!--
+                    Les actions rapides du §41.
+
+                    « Mes missions » pointait sur `/my/missions`, qui est
+                    l'espace du **client** — « mes demandes », « Créer une
+                    demande de mission », quatre compteurs à zéro. Un
+                    intervenant qui l'ouvrait n'y voyait rien de ce qui le
+                    concerne, et l'intitulé lui laissait croire que le portail
+                    avait perdu sa mission.
+
+                    L'écran qui le concerne réellement une fois retenu — ses
+                    pièces contractuelles — n'était atteignable que par un
+                    détour : `/my/missions/candidatures` puis « Mes contrats ».
+                    Un intervenant qui vient signer ne passe pas par la liste
+                    de ses candidatures.
+
+                    ⚠ « Services faits » et « Mes évaluations » ne sont
+                    **pas** repris ici, et c'est délibéré : les deux écrans
+                    sont bornés au client par construction
+                    (`_intervenants_service_own`, `_intervenants_evaluation_own`
+                    — « on n'évalue pas soi-même »). Les proposer à
+                    l'intervenant lui montrerait deux pages vides rédigées pour
+                    quelqu'un d'autre — « Les prestations à réceptionner »,
+                    « Les intervenants que vous avez à évaluer ». Mesuré en
+                    session : les deux répondent 200 et ne contiennent rien.
+                -->
                 <div class="mb-4 d-flex flex-wrap gap-2">
                     <a class="btn btn-primary" href="/missions">Voir les appels</a>
                     <a class="btn btn-outline-secondary" href="/my/missions/candidatures">Mes candidatures</a>
-                    <a class="btn btn-outline-secondary" href="/my/missions">Mes missions</a>
+                    <a class="btn btn-outline-secondary" href="/my/missions/contrats">Mes contrats</a>
                     <a class="btn btn-outline-secondary" href="/my/missions/expertise">Mon expertise</a>
                 </div>
 

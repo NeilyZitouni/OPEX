@@ -244,9 +244,28 @@ class MissionStaffPortal(http.Controller):
             # Ce que le responsable peut faire sur chaque candidature vient du
             # **moteur**, pas d'une liste écrite ici : le jour où le processus
             # change, cet écran suit.
+            #
+            # ⚠ Mais filtré par la **même liste fermée qui garde le POST**.
+            #
+            # Sans ce filtre, l'écran affichait « Retirer la candidature » —
+            # que le moteur ouvre au responsable parce qu'il porte
+            # `group_workflow_manager` — et le POST le refusait par
+            # « Action inconnue sur une candidature ». Un bouton mort, et le
+            # défaut exact contre lequel la docstring de
+            # `staff_intervenants_pool_transition` met en garde : la liste
+            # fermée sert **des deux côtés**, ou elle ne sert à rien.
+            #
+            # Le retrait reste hors de cette liste volontairement : se retirer
+            # après dépôt est l'acte du candidat, pas une décision du
+            # responsable.
             'actions': {
-                a.id: a.workflow_instance_id.sudo().transition_options(
-                    user=request.env.user)
+                a.id: [
+                    option
+                    for option in a.workflow_instance_id.sudo()
+                    .transition_options(user=request.env.user)
+                    if option['transition'].code
+                    in self._INTERVENANTS_POOL_TRANSITIONS
+                ]
                 for a in applications
             },
             'error': kw.get('error'),
@@ -355,6 +374,20 @@ class MissionStaffPortal(http.Controller):
         'mission_start_contracting',    # Secrétariat
         'mission_back_to_selection',    # Responsable, motif obligatoire
         'mission_cancel_awarded',       # Responsable
+        # Depuis CONTRACTING — le démarrage effectif.
+        #
+        # Sans elle, le parcours s'arrêtait ici pour qui travaille au portail :
+        # le contrat validé, la mission ne démarrait jamais, donc ni exécution,
+        # ni livrables, ni service fait, ni évaluation. Les deux seules autres
+        # portes étaient le back-office et le cron d'échéance — lequel ne fait
+        # rien tant que la date de début contractuelle n'est pas arrivée.
+        #
+        # Elle n'ouvre aucun droit : `available_transitions(user)` filtre déjà
+        # par rôle, et la règle 5 du §39 — contrat validé — reste une condition
+        # de la transition, rejugée par `workflow_do_transition()`.
+        'mission_start',                # Responsable, condition : contrat validé
+        'mission_contracting_failed',   # Responsable, motif obligatoire
+        'mission_cancel_contracting',   # Responsable
     )
 
     def _intervenants_mission_actions(self, mission):
